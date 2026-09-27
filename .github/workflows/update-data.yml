@@ -1,0 +1,66 @@
+# Every 10 minutes: fetch market data on GitHub's servers and publish index.html + data.json to GitHub Pages.
+# Visitors only download data.json, so they never hit CoinGecko or the exchanges themselves.
+name: Update heatmap data
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'   # GitHub may start scheduled runs a few minutes late
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # only for the keep-alive commit below
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Fetch market data
+        env:
+          PREV_URL: ${{ steps.pages.outputs.base_url }}/data.json
+        run: |
+          mkdir -p _site
+          cp index.html _site/
+          node scripts/build-data.mjs _site/data.json
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+      # GitHub turns off scheduled workflows in repos with no commits for 60 days.
+      # This deploys without committing, so add a tiny commit every ~50 days to keep the schedule running.
+      - name: Keep the schedule alive
+        if: github.event_name == 'schedule'
+        run: |
+          last=$(git log -1 --format=%ct)
+          if [ $(( $(date +%s) - last )) -gt $(( 50 * 86400 )) ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            date -u +%FT%TZ > .github/keepalive
+            git add .github/keepalive
+            git commit -m "chore: keep scheduled data refresh alive"
+            git push
+          fi
