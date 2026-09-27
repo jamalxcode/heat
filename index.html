@@ -109,6 +109,21 @@ h1 .tld { color: var(--ink-2); font-weight: 600; }
 .fresh b { color: var(--ink); }
 .fresh .f-ic { font-size: 16px; }
 .fresh.late { border-left-color: var(--amber); }
+/* work-in-progress notice: floating card, never blocks the page */
+.wip {
+  position: fixed; z-index: 30; top: 14px; left: 50%; width: min(560px, calc(100vw - 32px));
+  display: flex; gap: 12px; align-items: flex-start;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-left: 4px solid var(--amber);
+  border-radius: 14px; padding: 12px 14px; box-shadow: var(--shadow);
+  transform: translate(-50%, 0); animation: wip-in .35s ease-out;
+}
+.wip[hidden] { display: none; }
+.wip .wip-ic { font-size: 22px; line-height: 1.2; }
+.wip b { display: block; font-size: 14px; margin-bottom: 2px; }
+.wip p { margin: 0; font-size: 13px; color: var(--ink-2); }
+.wip .wip-ok { flex: none; align-self: center; font-weight: 600; }
+@keyframes wip-in { from { transform: translate(-50%, -24px); opacity: 0; } }
+@media (max-width: 640px) { .wip { flex-wrap: wrap; } .wip .wip-ok { width: 100%; } }
 .sub { color: var(--ink-2); margin: 0; font-size: 13px; }
 .status { color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; margin-right: 6px; vertical-align: 1px; }
@@ -265,6 +280,7 @@ footer details summary { cursor: pointer; }
       <span id="clock"></span>
       <button class="btn" id="refresh" title="Fetch fresh data">↻ Refresh</button>
       <button class="btn" id="theme" title="Switch theme">◐ Auto</button>
+      <button class="btn" id="wipBtn" title="Work in progress: read the warning">⚠ WIP</button>
     </div>
   </header>
 
@@ -316,6 +332,14 @@ footer details summary { cursor: pointer; }
   </footer>
 </div>
 
+<div class="wip" id="wip" role="alertdialog" aria-labelledby="wip-t" aria-describedby="wip-d" hidden>
+  <span class="wip-ic" aria-hidden="true">⚠️</span>
+  <div>
+    <b id="wip-t">Work in progress: use at your own risk</b>
+    <p id="wip-d">This site is experimental. Data can be late, wrong or missing, and nothing here is financial advice. Don't trust anyone, ever. That includes this page, so check everything yourself.</p>
+  </div>
+  <button class="btn wip-ok" id="wipOk">I understand</button>
+</div>
 <div id="scrim"></div>
 <div id="detail" role="dialog" aria-label="Coin details"><button class="x" aria-label="Close">×</button><div class="body"></div></div>
 
@@ -1069,6 +1093,15 @@ applyTheme(prefs.theme || '');
 $('#theme').addEventListener('click', () => { const cur = document.documentElement.dataset.theme || ''; applyTheme(THEMES[(THEMES.indexOf(cur) + 1) % 3]); savePrefs(); });
 
 $('#refresh').addEventListener('click', () => { if (Date.now() >= manualAt()) run(true); });
+
+// Work-in-progress notice: shown on first visit, then again 30 days after it was dismissed
+const WIP_AGAIN = 30 * DAY;
+const showWip = () => { $('#wip').hidden = false; $('#wipOk').focus({ preventScroll: true }); };
+const hideWip = () => { $('#wip').hidden = true; store.set('hm.wip', Date.now()); };
+$('#wipOk').addEventListener('click', hideWip);
+$('#wipBtn').addEventListener('click', () => ($('#wip').hidden ? showWip() : hideWip()));
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#wip').hidden) hideWip(); });
+if (!(Date.now() - (store.get('hm.wip') || 0) < WIP_AGAIN)) setTimeout(showWip, 600);
 
 /* ================= snapshot (data.json built by GitHub Actions) ================= */
 async function loadSnapshot() {
