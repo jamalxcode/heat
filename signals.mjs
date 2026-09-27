@@ -322,7 +322,7 @@ export function buildScorecard(coins, current, { prev = null, tuneNow = false, n
     signalDay: isoDay(lastDay), outcomeDay: isoDay(lastDay + 1),
     yesterday: {
       market: y[0]?.mkt ?? null,
-      coins: y.map(r => ({ id: r.id, sym: r.sym, score: r.score, good: r.good, bad: r.bad, ret: r.ret, exc: r.exc })),
+      coins: y.map(r => ({ id: r.id, sym: r.sym, score: r.score, good: r.good, bad: r.bad, ret: r.raw, exc: r.exc })), // real move shown; averages use the capped one
       stats: stats(y),
     },
     windows: { d30: stats(since(30)), d90: stats(since(90)), all: stats(rows) },
