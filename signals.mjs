@@ -129,7 +129,9 @@ export function signalRows(coins, p) {
       const a = componentsAt(s, i, P);
       if (Object.values(a).some(v => v == null)) continue;
       const { good, bad, score } = scoreOf(a, P);
-      rows.push({ day: d0 + i, id: coin.id, sym: coin.symbol, a, good, bad, score, ret: coin.c[i + 1] / coin.c[i] - 1 });
+      // Cap at ±30%: a relisting or bad price print can show +500% in a day and swamp every average
+      const raw = coin.c[i + 1] / coin.c[i] - 1;
+      rows.push({ day: d0 + i, id: coin.id, sym: coin.symbol, a, good, bad, score, raw, ret: Math.max(-0.3, Math.min(0.3, raw)) });
     }
   }
   // excess return = coin's next-day return minus the average of every coin that day (removes the market's move)
