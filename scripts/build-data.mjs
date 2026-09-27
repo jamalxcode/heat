@@ -14,7 +14,7 @@ const ALIASES = { 'the-open-network': ['TON'], 'polygon-ecosystem-token': ['POL'
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const DAY = 864e5;
 
-async function getJSON(url, { tries = 3, timeout = 20000 } = {}) {
+export async function getJSON(url, { tries = 3, timeout = 20000 } = {}) {
   for (let i = 0; ; i++) {
     let status = 0;
     try {
@@ -83,52 +83,52 @@ const symbolsFor = c => [...new Set([...(ALIASES[c.id] || []), c.symbol.toUpperC
 const sane = (closes, price) => closes.length >= 20 && price > 0 && Math.abs(closes[closes.length - 1][1] / price - 1) < 0.15;
 
 const EXCHANGES = [
-  ['Binance', s => `https://data-api.binance.vision/api/v3/klines?symbol=${s}USDT&interval=1d&limit=${CANDLES}`, d => d.map(r => [r[0], +r[4]])],
-  ['Gate.io', s => `https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair=${s}_USDT&interval=1d&limit=${CANDLES}`, d => d.map(r => [+r[0] * 1000, +r[2]])],
-  ['OKX', s => `https://www.okx.com/api/v5/market/candles?instId=${s}-USDT&bar=1Dutc&limit=${CANDLES}`, d => (d.data || []).map(r => [+r[0], +r[4]])],
+  ['Binance', (s, n) => `https://data-api.binance.vision/api/v3/klines?symbol=${s}USDT&interval=1d&limit=${n}`, d => d.map(r => [r[0], +r[4]])],
+  ['Gate.io', (s, n) => `https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair=${s}_USDT&interval=1d&limit=${n}`, d => d.map(r => [+r[0] * 1000, +r[2]])],
+  ['OKX', (s, n) => `https://www.okx.com/api/v5/market/candles?instId=${s}-USDT&bar=1Dutc&limit=${Math.min(n, 300)}`, d => (d.data || []).map(r => [+r[0], +r[4]])],
   // No CORS on these two, so only the server-side job can use them
   ...(IS_NODE ? [
-    ['MEXC', s => `https://api.mexc.com/api/v3/klines?symbol=${s}USDT&interval=1d&limit=${CANDLES}`, d => d.map(r => [r[0], +r[4]])],
-    ['KuCoin', s => `https://api.kucoin.com/api/v1/market/candles?type=1day&symbol=${s}-USDT`, d => (d.data || []).map(r => [+r[0] * 1000, +r[2]])],
+    ['MEXC', (s, n) => `https://api.mexc.com/api/v3/klines?symbol=${s}USDT&interval=1d&limit=${n}`, d => d.map(r => [r[0], +r[4]])],
+    ['KuCoin', (s, n) => `https://api.kucoin.com/api/v1/market/candles?type=1day&symbol=${s}-USDT`, d => (d.data || []).map(r => [+r[0] * 1000, +r[2]])],
   ] : []),
 ];
 
-async function fromExchanges(c, preferred) {
+export async function fromExchanges(c, preferred, n = CANDLES) {
   const order = [...EXCHANGES].sort((a, b) => (b[0] === preferred) - (a[0] === preferred));
   for (const [name, url, parse] of order) {
     for (const s of symbolsFor(c)) {
       try {
-        const closes = parse(await getJSON(url(s), { tries: 1 })).sort((a, b) => a[0] - b[0]).slice(-CANDLES);
+        const closes = parse(await getJSON(url(s, n), { tries: 1 })).sort((a, b) => a[0] - b[0]).slice(-n);
         if (sane(closes, c.current_price)) return { src: name, pair: s + '/USDT', closes };
       } catch { /* not listed there */ }
     }
   }
   return null;
 }
-async function fromCoinGecko(c) {
+export async function fromCoinGecko(c, n = CANDLES) {
   if (c.id.startsWith('cl-')) return null;
-  const d = await getJSON(`${CG}/coins/${encodeURIComponent(c.id)}/market_chart?vs_currency=usd&days=${CANDLES - 1}&interval=daily`);
+  const d = await getJSON(`${CG}/coins/${encodeURIComponent(c.id)}/market_chart?vs_currency=usd&days=${n - 1}&interval=daily`);
   const closes = (d.prices || []).map(p => [p[0], p[1]]);
   return closes.length >= 20 ? { src: 'CoinGecko', pair: c.symbol.toUpperCase() + '/USD', closes } : null;
 }
 
 // Compact form: one close per UTC day starting at day t0 (gaps forward-filled), 7 significant digits
-function pack(h) {
+export function pack(h, n = CANDLES) {
   const byDay = new Map(h.closes.map(([t, v]) => [Math.floor(t / DAY), v]));
   const days = [...byDay.keys()].sort((a, b) => a - b);
   const c = [];
   let last = byDay.get(days[0]);
   for (let d = days[0]; d <= days[days.length - 1]; d++) { if (byDay.has(d)) last = byDay.get(d); c.push(+last.toPrecision(7)); }
-  return { src: h.src, pair: h.pair, t: h.t, t0: days[0] * DAY, c: c.slice(-CANDLES) };
+  return { src: h.src, pair: h.pair, t: h.t, t0: days[0] * DAY, c: c.slice(-n) };
 }
 
-async function pool(items, n, fn) {
+export async function pool(items, n, fn) {
   let i = 0;
   await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => { while (i < items.length) await fn(items[i++]); }));
 }
 
 /* ---------- main ---------- */
-export async function build({ prev = null, log = console.log } = {}) {
+export async function build({ prev = null, log = console.log, params = null } = {}) {
   const started = Date.now();
   const { src, markets, stale } = await loadMarkets(prev, log);
   const cats = await loadCategories(prev, log);
@@ -163,6 +163,7 @@ export async function build({ prev = null, log = console.log } = {}) {
     v: 1,
     generated: Date.now(),
     intervalMin: 10,
+    params,
     marketSrc: src,
     marketStale: !!stale,
     markets,
@@ -181,7 +182,10 @@ if (IS_NODE && process.argv[1] && import.meta.url.endsWith(process.argv[1].repla
     try { prev = await getJSON(process.env.PREV_URL + '?b=' + Date.now(), { tries: 2 }); console.log('Loaded previous data from ' + process.env.PREV_URL); }
     catch { console.log('No previous data.json (first run?)'); }
   }
-  const data = await build({ prev });
+  const { readFile } = await import('node:fs/promises');
+  let params = null; // signal settings chosen by the tuner (scripts/score.mjs); the page falls back to defaults
+  try { params = JSON.parse(await readFile(new URL('../params.json', import.meta.url), 'utf8')); } catch { /* none yet */ }
+  const data = await build({ prev, params });
   await mkdir(dirname(out), { recursive: true });
   await writeFile(out, JSON.stringify(data));
   console.log(`Wrote ${out} (${(JSON.stringify(data).length / 1024).toFixed(0)} KB)`);

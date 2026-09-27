@@ -27,6 +27,14 @@ GitHub Actions (every 10 min)                    Visitors
 - Each run reuses the previous `data.json`. Candles are refetched hourly (every 6 h for coins whose candles come from CoinGecko). In between, the page updates today's candle with the latest price.
 - If `data.json` is missing or more than 45 minutes old, the page falls back to fetching live in the browser. That path has its own rate limiter, which caps requests per API (shared across tabs), backs off after a block, and uses a countdown to decide when it may refresh.
 
+## Scorecard and self-tuning
+
+All three parts use the same signal engine (`signals.mjs`): the page, the daily scorer and the weekly tuner. So the 🚀 / 😢 on the site are exactly what gets scored.
+
+- **Daily, 00:20 UTC** (`.github/workflows/score-signals.yml` → `scripts/score.mjs`): takes today's top 50 and fetches about 1,000 days of daily candles. It then checks the signals at every close against the next day's move, both raw and against the average of all 50 coins, and writes `data/scorecard.json`. The **Scorecard** tab on the site shows yesterday's calls, the track record over 30 days, 90 days and all history, and how each signal did on its own.
+- **Weekly, Sundays**: the tuner tries RSI periods and levels, moving-average pairs, and Bollinger thresholds. For each signal it decides whether it should count as a 🚀, a 😢, or be switched off. It tunes on the older 70% of the history and checks on the newest 30%, which it never saw. New settings go into `params.json` **only if they score better on that unseen 30%**. Every change is logged on the Scorecard.
+- To run it by hand, go to **Actions → Score signals → Run workflow**, and tick "Run the tuner now" to tune immediately.
+
 ## Setup
 
 1. Push to a GitHub repo (public repos get free Actions minutes).

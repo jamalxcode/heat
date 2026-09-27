@@ -1,0 +1,49 @@
+# Daily at 00:20 UTC (just after the daily candle closes): score yesterday's 🚀 / 😢 against what the coins
+# actually did, and on Sundays re-tune the signal settings. Commits data/scorecard.json (and params.json when
+# the tuner finds better settings); the 10-minute deploy job publishes them with the next data refresh.
+name: Score signals
+
+on:
+  schedule:
+    - cron: '20 0 * * *'
+  workflow_dispatch:
+    inputs:
+      tune:
+        description: Run the tuner now (normally Sundays only)
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: score
+  cancel-in-progress: false
+
+jobs:
+  score:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Score signals
+        env:
+          SITE_URL: https://heat.sala.company
+        run: node scripts/score.mjs ${{ inputs.tune && '--tune' || '' }}
+
+      - name: Commit the scorecard
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/scorecard.json params.json 2>/dev/null || git add data/scorecard.json
+          if git diff --cached --quiet; then echo "Nothing changed"; exit 0; fi
+          msg="chore: signal scorecard $(date -u +%F)"
+          git diff --cached --name-only | grep -q params.json && msg="$msg (tuner adopted new settings)"
+          git commit -m "$msg"
+          git pull --rebase --quiet
+          git push

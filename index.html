@@ -123,6 +123,33 @@ h1 .tld { color: var(--ink-2); font-weight: 600; }
 .wip p { margin: 0; font-size: 13px; color: var(--ink-2); }
 .wip .wip-ok { flex: none; align-self: center; font-weight: 600; }
 @keyframes wip-in { from { transform: translate(-50%, -24px); opacity: 0; } }
+/* scorecard view */
+#scorewrap { display: grid; gap: 12px; }
+.sc-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+.sc-card h2 { font-size: 16px; margin: 0 0 10px; }
+.sc-card h3 { font-size: 13px; margin: 16px 0 6px; color: var(--ink-2); }
+.sc-card p { margin: 8px 0 0; font-size: 13px; }
+.sc-muted { color: var(--muted); font-weight: 400; font-size: 12.5px; }
+.sc-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.sc-head h2 { margin: 0; }
+.sc-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; margin-top: 10px; }
+.sc-tile { border: 1px solid var(--grid); border-radius: 10px; padding: 10px 12px; }
+.sc-t { font-size: 12px; color: var(--muted); }
+.sc-big { font-size: 17px; font-weight: 700; margin: 2px 0; }
+.sc-l { font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.sc-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.sc-chip { font-size: 12px; padding: 3px 8px; border-radius: 999px; background: var(--tint); color: var(--tint-ink); box-shadow: inset 0 0 0 1px var(--border); white-space: nowrap; }
+.sc-verdict { font-size: 13.5px !important; margin-top: 12px !important; }
+.sc-table td, .sc-table th { text-align: right; }
+.sc-table td:first-child, .sc-table th:first-child { text-align: left; }
+.sc-emo { letter-spacing: -1px; }
+.sc-bar { display: inline-block; position: relative; width: 70px; height: 8px; vertical-align: 0; background: var(--grid); border-radius: 4px; margin-right: 6px; }
+.sc-bar i { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
+.sc-bar i.pos { background: #0077be; }
+.sc-bar i.neg { background: #b8413f; }
+.sc-warn { color: var(--down-text); }
+.sc-card details { margin-top: 8px; font-size: 13px; }
+.sc-card summary { cursor: pointer; color: var(--ink-2); }
 @media (max-width: 640px) { .wip { flex-wrap: wrap; } .wip .wip-ok { width: 100%; } }
 .sub { color: var(--ink-2); margin: 0; font-size: 13px; }
 .status { color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -202,9 +229,9 @@ h1 .tld { color: var(--ink-2); font-weight: 600; }
 .tag.sq { background: color-mix(in oklab, var(--amber) 32%, transparent); }
 .gauge { position: relative; flex: 1; min-width: 28px; height: 6px; border-radius: 3px;
   background: linear-gradient(90deg,
-    color-mix(in oklab, var(--blue) 45%, transparent) 0 30%,
-    var(--grid) 30% 70%,
-    color-mix(in oklab, var(--orange) 50%, transparent) 70% 100%); }
+    color-mix(in oklab, var(--blue) 45%, transparent) 0 var(--rsi-lo, 30%),
+    var(--grid) var(--rsi-lo, 30%) var(--rsi-hi, 70%),
+    color-mix(in oklab, var(--orange) 50%, transparent) var(--rsi-hi, 70%) 100%); }
 .gauge i { position: absolute; top: -3px; width: 3px; height: 12px; margin-left: -1.5px; border-radius: 2px; background: var(--ink); box-shadow: 0 0 0 1.5px var(--surface); }
 .ico { width: 14px; height: 14px; flex: none; }
 .up-t { color: var(--up-text); }
@@ -310,6 +337,7 @@ footer details summary { cursor: pointer; }
       <div class="seg" id="view">
         <button data-v="grid" aria-pressed="true">Grid</button>
         <button data-v="table" aria-pressed="false">Table</button>
+        <button data-v="score" aria-pressed="false">Scorecard</button>
       </div>
     </div>
     <label class="check"><input type="checkbox" id="pegged"> Include stablecoins &amp; pegged</label>
@@ -320,11 +348,12 @@ footer details summary { cursor: pointer; }
   <main>
     <div class="grid" id="grid" aria-live="polite"></div>
     <div class="tablewrap" id="tablewrap" hidden></div>
+    <section id="scorewrap" hidden aria-label="Signal scorecard"></section>
   </main>
 
   <footer>
-    <div><b>How to read a tile.</b> <b>RSI</b>: below 30 is <i>oversold</i> and above 70 is <i>overbought</i>. The marker shows where RSI(14) sits on 0–100.
-      <b>Trend</b>: 50-day MA above the 200-day MA is an uptrend, below is a downtrend. The note says whether price agrees ("strong") or not ("pullback" / "bounce"). ✦ marks a golden or death cross in the last 14 days.
+    <div><b>How to read a tile.</b> <b>RSI</b>: below the lower line is <i>oversold</i> and above the upper line is <i>overbought</i> (the exact levels are in the legend and can be retuned). The marker shows where RSI sits on 0–100.
+      <b>Trend</b>: the fast moving average above the slow one (50/200-day by default) is an uptrend, below is a downtrend. The note says whether price agrees ("strong") or not ("pullback" / "bounce"). ✦ marks a golden or death cross in the last 14 days.
       <b>BB width</b>: (upper − lower) / middle band, ranked against the last 180 days. Bottom 25% is a <i>squeeze</i> (volatility is compressed, and a big move often follows, in either direction). Top 20% is <i>expanded</i>.</div>
     <div id="srcinfo"></div>
     <details id="excluded"><summary>Excluded tokens</summary><div></div></details>
@@ -343,9 +372,9 @@ footer details summary { cursor: pointer; }
 <div id="scrim"></div>
 <div id="detail" role="dialog" aria-label="Coin details"><button class="x" aria-label="Close">×</button><div class="body"></div></div>
 
-<script>
+<script type="module">
+import * as SIG from './signals.mjs';
 (() => {
-'use strict';
 
 /* ================= config ================= */
 const TOP_N = 50;
@@ -487,6 +516,7 @@ const S = {
   colorBy: '24h', filter: 'all', view: 'grid', pegged: false,
   sort: { key: 'rank', dir: 1 }, pinned: null, busy: false,
   updated: null, marketSrc: '', stale: false, nextAuto: 0, waitingFor: '',
+  params: SIG.withDefaults(null), scorecard: null, scoreWin: 'd30',
 };
 const prefs = store.get('hm.prefs') || {};
 Object.assign(S, { colorBy: prefs.colorBy || '24h', view: prefs.view || 'grid', pegged: !!prefs.pegged });
@@ -681,75 +711,43 @@ function setHist(c, h) {
   updateCoin(c);
 }
 
-/* ================= indicators ================= */
-function smaSeries(a, n) {
-  const out = new Array(a.length).fill(null);
-  let s = 0;
-  for (let i = 0; i < a.length; i++) {
-    s += a[i];
-    if (i >= n) s -= a[i - n];
-    if (i >= n - 1) out[i] = s / n;
-  }
-  return out;
-}
-function rsiSeries(a, n = 14) {
-  const out = new Array(a.length).fill(null);
-  if (a.length <= n) return out;
-  let g = 0, l = 0;
-  for (let i = 1; i <= n; i++) { const d = a[i] - a[i - 1]; if (d > 0) g += d; else l -= d; }
-  g /= n; l /= n;
-  out[n] = l === 0 ? 100 : 100 - 100 / (1 + g / l);
-  for (let i = n + 1; i < a.length; i++) {
-    const d = a[i] - a[i - 1];
-    g = (g * (n - 1) + Math.max(d, 0)) / n;
-    l = (l * (n - 1) + Math.max(-d, 0)) / n;
-    out[i] = l === 0 ? 100 : 100 - 100 / (1 + g / l);
-  }
-  return out;
-}
-function bbSeries(a, n = 20, k = 2) {
-  const mid = smaSeries(a, n), up = [], lo = [], w = [];
-  for (let i = 0; i < a.length; i++) {
-    if (mid[i] == null) { up.push(null); lo.push(null); w.push(null); continue; }
-    let v = 0;
-    for (let j = i - n + 1; j <= i; j++) v += (a[j] - mid[i]) ** 2;
-    const sd = Math.sqrt(v / n);
-    up.push(mid[i] + k * sd); lo.push(mid[i] - k * sd); w.push((2 * k * sd) / mid[i] * 100);
-  }
-  return { mid, up, lo, w };
-}
-function compute(series) {
-  const t = series.map(x => x[0]), c = series.map(x => x[1]);
+/* ================= indicators (shared engine: signals.mjs) ================= */
+// Signal settings: tuned weekly by the scorer and shipped in data.json; defaults until the first tuning
+const P = () => S.params;
+function compute(ser) {
+  const p = P();
+  const t = ser.map(x => x[0]), c = ser.map(x => x[1]);
   const n = c.length, last = c[n - 1];
-  const rsi = rsiSeries(c), ma50 = smaSeries(c, 50), ma200 = smaSeries(c, 200), bb = bbSeries(c);
-  const r = { t, c, rsi, ma50, ma200, bb, n, last };
+  const s = SIG.series(c, p);
+  const r = { t, c, rsi: s.rsi, maF: s.maF, maS: s.maS, bb: s.bb, n, last };
   const back = k => n - 1 - k >= 0 ? (last / c[n - 1 - k] - 1) * 100 : null;
   r.chg = { '24h': back(1), '7d': back(7), '30d': back(30) };
 
-  r.rsiNow = rsi[n - 1];
-  r.rsiState = r.rsiNow == null ? null : r.rsiNow < 30 ? 'os' : r.rsiNow > 70 ? 'ob' : 'mid';
+  r.rsiNow = s.rsi[n - 1];
+  r.rsiState = r.rsiNow == null ? null : r.rsiNow < p.rsiLow ? 'os' : r.rsiNow > p.rsiHigh ? 'ob' : 'mid';
 
-  const m50 = ma50[n - 1], m200 = ma200[n - 1];
-  r.m50 = m50; r.m200 = m200;
-  if (m50 != null && m200 != null) {
-    r.trend = m50 > m200 ? 'up' : 'down';
-    r.strong = r.trend === 'up' ? last > m50 : last < m50;
-    for (let i = n - 1; i >= Math.max(n - 14, 200); i--) {
-      const a = ma50[i] - ma200[i], b = ma50[i - 1] - ma200[i - 1];
+  const mF = s.maF[n - 1], mS = s.maS[n - 1];
+  r.mF = mF; r.mS = mS;
+  if (mF != null && mS != null) {
+    r.trend = mF > mS ? 'up' : 'down';
+    r.strong = r.trend === 'up' ? last > mF : last < mF;
+    for (let i = n - 1; i >= Math.max(n - 14, p.maSlow); i--) {
+      const a = s.maF[i] - s.maS[i], b = s.maF[i - 1] - s.maS[i - 1];
       if (Math.sign(a) !== Math.sign(b)) { r.cross = { type: a > 0 ? 'golden' : 'death', ago: n - 1 - i }; break; }
     }
-  } else if (m50 != null) {
-    r.trend = null; r.partial = last > m50 ? 'above50' : 'below50';
+  } else if (mF != null) {
+    r.trend = null; r.partial = last > mF ? 'above' : 'below';
   }
 
-  const w = bb.w[n - 1];
-  if (w != null) {
-    const hist = bb.w.slice(-180).filter(x => x != null);
+  const w = s.bb.w[n - 1];
+  if (w != null && s.bbPct[n - 1] != null) {
     r.bbw = w;
-    r.bbPct = hist.filter(x => x <= w).length / hist.length * 100;
-    r.bbState = r.bbPct <= 10 ? 'tight' : r.bbPct <= 25 ? 'squeeze' : r.bbPct >= 80 ? 'expanded' : 'normal';
-    r.bbShort = hist.length < 90; // percentile on little history
+    r.bbPct = s.bbPct[n - 1];
+    r.bbState = r.bbPct <= p.bbTightPct ? 'tight' : r.bbPct <= Math.max(25, p.bbTightPct) ? 'squeeze' : r.bbPct >= p.bbWidePct ? 'expanded' : 'normal';
+    r.bbShort = s.bb.w.slice(-p.bbLookback).filter(x => x != null).length < 90;
   }
+  // 🚀 / 😢: exactly what the daily scorecard measures
+  r.sig = SIG.scoreOf(SIG.componentsAt(s, n - 1, p), p);
   return r;
 }
 
@@ -792,7 +790,7 @@ function indHTML(ind) {
     const note = ind.cross ? `✦ ${ind.cross.type} ${ind.cross.ago}d` : up ? (ind.strong ? 'strong' : 'pullback') : (ind.strong ? 'strong' : 'bounce');
     rows.push(`<div class="row"><span class="k">MA</span><span class="${up ? 'up-t' : 'dn-t'}" style="display:inline-flex;align-items:center;gap:3px">${up ? ICON.up : ICON.down}<span class="v">${up ? 'Up' : 'Down'}<span class="tw">trend</span></span></span><span class="s">${note}</span></div>`);
   } else {
-    rows.push(`<div class="row"><span class="k">MA</span><span class="s">${ind.partial ? (ind.partial === 'above50' ? 'Above 50MA · ' : 'Below 50MA · ') : ''}200MA n/a</span></div>`);
+    rows.push(`<div class="row"><span class="k">MA</span><span class="s">${ind.partial ? (ind.partial === 'above' ? `Above ${P().maFast}MA · ` : `Below ${P().maFast}MA · `) : ''}${P().maSlow}MA n/a</span></div>`);
   }
   // BB width
   if (ind.bbw != null) {
@@ -804,17 +802,29 @@ function indHTML(ind) {
   return rows.join('');
 }
 
-// 🚀 per bullish signal, 😢 per its opposite
+// 🚀 per signal the tuner rates bullish, 😢 per signal it rates bearish (see Scorecard)
 function signals(ind) {
-  const good = [], bad = [];
-  if (!ind || ind.error) return { good, bad };
-  if (ind.trend === 'up' && ind.strong) good.push('strong uptrend');
-  if (ind.rsiState === 'os') good.push('RSI oversold');
-  if (ind.bbState === 'tight') good.push('tight BB (bottom 10%)');
-  if (ind.trend === 'down' && ind.strong) bad.push('strong downtrend');
-  if (ind.rsiState === 'ob') bad.push('RSI overbought');
-  if (ind.bbState === 'expanded') bad.push('wide BB (expanded)');
-  return { good, bad };
+  if (!ind || ind.error || !ind.sig) return { good: [], bad: [] };
+  return { good: ind.sig.good.map(k => SIG.COMPONENTS[k]), bad: ind.sig.bad.map(k => SIG.COMPONENTS[k]) };
+}
+const roleOf = k => { const w = P().weights[k] || 0; return w > 0 ? '🚀' : w < 0 ? '😢' : 'off'; };
+function legendName(k) {
+  const p = P();
+  return {
+    trendUp: `strong uptrend (${p.maFast}/${p.maSlow} MA)`, trendDown: `strong downtrend (${p.maFast}/${p.maSlow} MA)`,
+    oversold: `RSI(${p.rsiPeriod}) under ${p.rsiLow}`, overbought: `RSI(${p.rsiPeriod}) over ${p.rsiHigh}`,
+    bbTight: `BB width in bottom ${p.bbTightPct}%`, bbWide: `BB width in top ${100 - p.bbWidePct}%`,
+  }[k];
+}
+// Apply signal settings everywhere they show (RSI gauge zones, labels) and recompute every tile
+function applyParams(p) {
+  const next = SIG.withDefaults(p);
+  const changed = JSON.stringify(next) !== JSON.stringify(S.params);
+  S.params = next;
+  document.documentElement.style.setProperty('--rsi-lo', next.rsiLow + '%');
+  document.documentElement.style.setProperty('--rsi-hi', next.rsiHigh + '%');
+  if (changed) for (const c of S.coins) if (S.hist[c.id]) S.ind[c.id] = compute(withLive(S.hist[c.id].closes, c.current_price));
+  return changed;
 }
 function emojiHTML(ind) {
   const { good, bad } = signals(ind);
@@ -848,11 +858,13 @@ function renderLegend() {
   $('#legend').innerHTML = `
     <span class="leg-item">${S.colorBy} change %</span>
     <span class="scale">${cells.map(([k, l]) => `<span class="${k}">${l}</span>`).join('')}</span>
-    <span class="leg-item"><span class="gauge" style="width:60px;flex:none"><i style="left:50%"></i></span> RSI 0–100 (≤30 oversold · ≥70 overbought)</span>
-    <span class="leg-item"><span class="up-t" style="display:inline-flex">${ICON.up}</span>/<span class="dn-t" style="display:inline-flex">${ICON.down}</span> 50MA vs 200MA</span>
+    <span class="leg-item"><span class="gauge" style="width:60px;flex:none"><i style="left:50%"></i></span> RSI 0–100 (under ${P().rsiLow} oversold · over ${P().rsiHigh} overbought)</span>
+    <span class="leg-item"><span class="up-t" style="display:inline-flex">${ICON.up}</span>/<span class="dn-t" style="display:inline-flex">${ICON.down}</span> ${P().maFast}MA vs ${P().maSlow}MA</span>
     <span class="leg-item">${ICON.squeeze} BBW squeeze = move likely</span>
-    <span class="leg-item">🚀 each: strong uptrend · RSI oversold · tight BB (bottom 10%)</span>
-    <span class="leg-item">😢 each: strong downtrend · RSI overbought · wide BB</span>`;
+    ${['🚀', '😢'].map(e => {
+      const ks = Object.keys(SIG.COMPONENTS).filter(k => roleOf(k) === e);
+      return ks.length ? `<span class="leg-item">${e} each: ${ks.map(legendName).join(' · ')}</span>` : '';
+    }).join('')}`;
 }
 
 function renderGrid() {
@@ -894,8 +906,8 @@ const COLS = [
   ['mcap', 'Mkt cap', c => c.market_cap],
   ['rsi', 'RSI', c => S.ind[c.id]?.rsiNow],
   ['trend', 'Trend', c => { const i = S.ind[c.id]; return i?.trend ? (i.trend === 'up' ? 2 : 0) + (i.strong ? (i.trend === 'up' ? 1 : -0.5) : 0) : null; }],
-  ['d50', 'vs 50MA', c => { const i = S.ind[c.id]; return i?.m50 ? (i.last / i.m50 - 1) * 100 : null; }],
-  ['d200', 'vs 200MA', c => { const i = S.ind[c.id]; return i?.m200 ? (i.last / i.m200 - 1) * 100 : null; }],
+  ['dF', 'vs fast MA', c => { const i = S.ind[c.id]; return i?.mF ? (i.last / i.mF - 1) * 100 : null; }],
+  ['dS', 'vs slow MA', c => { const i = S.ind[c.id]; return i?.mS ? (i.last / i.mS - 1) * 100 : null; }],
   ['bbw', 'BBW %', c => S.ind[c.id]?.bbw],
   ['bbp', 'BBW pctl', c => S.ind[c.id]?.bbPct],
 ];
@@ -916,7 +928,7 @@ function renderTable() {
     const bbp = i.bbPct != null ? `${i.bbPct.toFixed(0)}${i.bbState === 'tight' || i.bbState === 'squeeze' ? ' · Squeeze' : ''}` : '—';
     return `<tr class="${dim ? 'dim' : ''}" data-id="${esc(c.id)}"><td>${c.market_cap_rank}</td><td><b>${esc(c.symbol.toUpperCase())}</b> <span style="color:var(--ink-2)">${esc(c.name)}</span></td><td style="text-align:left">${emojiHTML(S.ind[c.id]) || ''}</td>
       <td>${fmtPrice(c.current_price)}</td><td>${heat('24h')}</td><td>${heat('7d')}</td><td>${heat('30d')}</td><td>${fmtBig(c.market_cap)}</td>
-      <td>${rsi}</td><td>${trend}</td><td>${fmtPct(i.m50 ? (i.last / i.m50 - 1) * 100 : null, 1)}</td><td>${fmtPct(i.m200 ? (i.last / i.m200 - 1) * 100 : null, 1)}</td>
+      <td>${rsi}</td><td>${trend}</td><td>${fmtPct(i.mF ? (i.last / i.mF - 1) * 100 : null, 1)}</td><td>${fmtPct(i.mS ? (i.last / i.mS - 1) * 100 : null, 1)}</td>
       <td>${i.bbw != null ? i.bbw.toFixed(1) + '%' : '—'}</td><td>${bbp}</td></tr>`;
   }).join('');
   $('#tablewrap').innerHTML = `<table><caption class="sr">Top ${TOP_N} coins with indicators</caption><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
@@ -937,9 +949,93 @@ function renderAll() {
   renderLegend();
   $('#grid').hidden = S.view !== 'grid';
   $('#tablewrap').hidden = S.view !== 'table';
-  if (S.view === 'grid') renderGrid(); else renderTable();
+  $('#scorewrap').hidden = S.view !== 'score';
+  if (S.view === 'grid') renderGrid(); else if (S.view === 'table') renderTable(); else renderScorecard();
   renderCounts();
   renderFooter();
+}
+
+/* ================= scorecard (daily check of the 🚀 / 😢, built by scripts/score.mjs) ================= */
+async function loadScorecard() {
+  try {
+    const r = await fetch(`scorecard.json?b=${Math.floor(Date.now() / 600e3)}`, { cache: 'no-store' });
+    S.scorecard = r.ok ? await r.json() : null;
+  } catch { S.scorecard = null; }
+}
+const pc = (v, d = 1) => v == null ? '—' : (v * 100).toFixed(d) + '%';
+const spc = (v, d = 2) => fmtPct(v == null ? null : v * 100, d);
+const emo = s => s > 0 ? '🚀'.repeat(s) : s < 0 ? '😢'.repeat(-s) : 'none';
+const edgeWord = (t, n) => t == null || !n ? '—' : n < 20 ? 'too few to tell' : Math.abs(t) >= 2 ? 'consistent' : Math.abs(t) >= 1 ? 'weak hint' : 'looks like noise';
+const icVerdict = ic => ic?.mean == null ? 'not enough data yet'
+  : ic.t >= 2 ? 'a real edge: more 🚀 did mean better next days'
+  : ic.t <= -2 ? 'backwards: more 🚀 meant worse next days'
+  : 'no reliable edge yet, about as good as a coin flip';
+
+function renderScorecard() {
+  const box = $('#scorewrap'), sc = S.scorecard;
+  if (!sc) {
+    box.innerHTML = `<div class="sc-card"><h2>Scorecard</h2><p class="sc-muted">The first scorecard appears after the daily scoring job runs (00:20 UTC). It checks every 🚀 and 😢 against what the coin actually did the next day.</p></div>`;
+    return;
+  }
+  const y = sc.yesterday, ys = y.stats, w = sc.windows[S.scoreWin] || sc.windows.d30;
+  const winName = { d30: 'last 30 days', d90: 'last 90 days', all: 'all history' }[S.scoreWin];
+  const moved = y.coins.filter(c => c.score !== 0);
+  const tile = (title, big, lines) => `<div class="sc-tile"><div class="sc-t">${title}</div><div class="sc-big">${big}</div>${lines.map(l => `<div class="sc-l">${l}</div>`).join('')}</div>`;
+
+  const scoreRows = [3, 2, 1, 0, -1, -2, -3].map(s => {
+    const b = w.byScore[s];
+    if (!b || !b.n) return '';
+    const exc = b.avgExc ?? 0, width = Math.min(50, Math.abs(exc) * 100 * 25);
+    return `<tr><td class="sc-emo">${emo(s)}</td><td>${b.n.toLocaleString()}</td><td>${pc(b.upRate)}</td><td>${spc(b.avgRet)}</td>
+      <td><span class="sc-bar"><i class="${exc >= 0 ? 'pos' : 'neg'}" style="${exc >= 0 ? 'left:50%' : `right:50%`};width:${width}%"></i></span> ${spc(b.avgExc)}</td></tr>`;
+  }).join('');
+
+  const compRows = Object.keys(SIG.COMPONENTS).map(k => {
+    const c = w.components[k] || {}, role = roleOf(k);
+    const wrong = c.n >= 20 && Math.abs(c.t) >= 1 && ((role === '🚀' && c.avgExc < 0) || (role === '😢' && c.avgExc > 0));
+    return `<tr><td>${esc(legendName(k))}</td><td class="sc-emo">${role}</td><td>${(c.n || 0).toLocaleString()}</td><td>${pc(c.upRate)}</td>
+      <td>${spc(c.avgExc)}</td><td>${edgeWord(c.t, c.n)}${wrong ? ' · <b class="sc-warn">⚠ pointing the wrong way</b>' : ''}</td></tr>`;
+  }).join('');
+
+  const t = sc.tuning || {}, last = t.last;
+  const tuneHTML = !t.lastRun ? '<p class="sc-muted">The tuner hasn\'t run yet. It runs every Sunday.</p>' : `
+    <p><b>Last run ${new Date(t.lastRun).toLocaleDateString()}</b>: ${last.adopted ? '✅ <b>adopted new settings</b>, because they predicted better on data they were not tuned on.' : 'kept the current settings. The alternative did not beat them on data it wasn\'t tuned on.'}
+      Tuned on ${last.trainFrom} to ${last.testFrom}, checked on ${last.testFrom} to ${last.testTo}.
+      Score on the check period (rank correlation): current <b>${last.testIC.before?.toFixed(3) ?? '—'}</b> vs candidate <b>${last.testIC.after?.toFixed(3) ?? '—'}</b>.</p>
+    <details><summary>What the tuner found for each signal</summary><ul>${(last.notes || []).map(n => `<li>${esc(n)}</li>`).join('')}</ul></details>
+    ${(t.history || []).length ? `<details><summary>Settings changes (${t.history.length})</summary><ul>${t.history.map(h => `<li>${h.date}: check-period score ${h.testIC.before?.toFixed(3)} → ${h.testIC.after?.toFixed(3)}</li>`).join('')}</ul></details>` : ''}`;
+
+  box.innerHTML = `
+    <div class="sc-card">
+      <h2>Yesterday's calls <span class="sc-muted">signals at the ${sc.signalDay} close, then how the coins did by the ${sc.outcomeDay} close (UTC)</span></h2>
+      <div class="sc-tiles">
+        ${tile('🚀 coins', ys.rockets.n ? `${Math.round(ys.rockets.upRate * ys.rockets.n)} of ${ys.rockets.n} went up` : 'none', ys.rockets.n ? [`average ${spc(ys.rockets.avgRet)}`, `vs market ${spc(ys.rockets.avgExc)}`] : [])}
+        ${tile('😢 coins', ys.sad.n ? `${Math.round(ys.sad.downRate * ys.sad.n)} of ${ys.sad.n} went down` : 'none', ys.sad.n ? [`average ${spc(ys.sad.avgRet)}`, `vs market ${spc(ys.sad.avgExc)}`] : [])}
+        ${tile('Whole market', spc(y.market), [`average of all ${sc.coins} coins`])}
+      </div>
+      ${moved.length ? `<div class="sc-chips">${moved.map(c => `<span class="sc-chip ${heatClass(c.ret * 100, '24h')}" title="${esc(c.sym)}: ${c.good.map(k => '🚀 ' + SIG.COMPONENTS[k]).concat(c.bad.map(k => '😢 ' + SIG.COMPONENTS[k])).join(', ')}">${esc(c.sym)} ${emo(c.score)} ${spc(c.ret, 1)}</span>`).join('')}</div>` : ''}
+    </div>
+
+    <div class="sc-card">
+      <div class="sc-head"><h2>Track record <span class="sc-muted">${winName}</span></h2>
+        <div class="seg" id="scoreWin">${['d30', 'd90', 'all'].map(k => `<button data-w="${k}" aria-pressed="${S.scoreWin === k}">${{ d30: '30 days', d90: '90 days', all: 'All' }[k]}</button>`).join('')}</div></div>
+      <div class="sc-tiles">
+        ${tile('When a coin had more 🚀 than 😢', `${pc(w.rockets.upRate)} went up next day`, [`${pc(w.rockets.beatRate)} beat the market · ${w.rockets.n.toLocaleString()} calls`])}
+        ${tile('When a coin had more 😢 than 🚀', `${pc(w.sad.downRate)} went down next day`, [`${pc(w.sad.lagRate)} lagged the market · ${w.sad.n.toLocaleString()} calls`])}
+        ${tile('Coin-flip baseline', `${pc(w.all.upRate)} of all coins went up`, [`${w.days} days · ${w.rows.toLocaleString()} coin-days`])}
+      </div>
+      <p class="sc-verdict">Verdict: <b>${icVerdict(w.ic)}</b>. <span class="sc-muted">(Daily rank correlation between score and next-day move: ${w.ic.mean?.toFixed(3) ?? '—'}, t = ${w.ic.t?.toFixed(1) ?? '—'}. Around 0 means no link, and t above 2 means it's unlikely to be luck.)</span></p>
+      <h3>More 🚀 → bigger move?</h3>
+      <div class="tablewrap"><table class="sc-table"><thead><tr><th>Signals</th><th>Coin-days</th><th>Up next day</th><th>Avg next day</th><th>vs market</th></tr></thead><tbody>${scoreRows}</tbody></table></div>
+      <h3>Each signal on its own</h3>
+      <div class="tablewrap"><table class="sc-table"><thead><tr><th>Signal</th><th>Counts as</th><th>Fired</th><th>Up next day</th><th>Avg vs market</th><th>Reliability</th></tr></thead><tbody>${compRows}</tbody></table></div>
+    </div>
+
+    <div class="sc-card">
+      <h2>Self-tuning <span class="sc-muted">weekly, on about 2 years of history</span></h2>
+      ${tuneHTML}
+      <p class="sc-muted">How it works: each Sunday the tuner tries other RSI levels, moving-average pairs and Bollinger thresholds. For each signal it decides whether it should count as a 🚀, a 😢, or be switched off. It tunes on the older 70% of the history and checks on the newest 30%, which it never tuned on. New settings are only adopted if they do better on that newest 30%, which protects against fitting to noise.</p>
+    </div>`;
 }
 
 /* ================= detail popover ================= */
@@ -956,7 +1052,7 @@ function detailChart(ind) {
   const N = Math.min(120, ind.n), s = ind.n - N;
   const W = 332, H = 130, PAD_L = 0, PAD_R = 44;
   const sl = a => a.slice(s);
-  const c = sl(ind.c), m50 = sl(ind.ma50), m200 = sl(ind.ma200), up = sl(ind.bb.up), lo = sl(ind.bb.lo), rsi = sl(ind.rsi);
+  const c = sl(ind.c), m50 = sl(ind.maF), m200 = sl(ind.maS), up = sl(ind.bb.up), lo = sl(ind.bb.lo), rsi = sl(ind.rsi);
   const all = [...c, ...m50, ...m200, ...up, ...lo].filter(v => v != null);
   let min = Math.min(...all), max = Math.max(...all);
   const pad = (max - min) * 0.06 || max * 0.01; min -= pad; max += pad;
@@ -977,13 +1073,13 @@ function detailChart(ind) {
   </svg>`;
   const RH = 46, ry = v => RH - v / 100 * RH;
   const rsiSvg = `<svg viewBox="0 0 ${W} ${RH}" role="img" aria-label="RSI 14, last ${N} days">
-    <rect x="0" y="${ry(100)}" width="${W - PAD_R}" height="${ry(70) - ry(100)}" fill="color-mix(in oklab, var(--orange) 12%, transparent)"/>
-    <rect x="0" y="${ry(30)}" width="${W - PAD_R}" height="${ry(0) - ry(30)}" fill="color-mix(in oklab, var(--blue) 12%, transparent)"/>
-    ${[70, 30].map(v => `<line x1="0" x2="${W - PAD_R}" y1="${ry(v)}" y2="${ry(v)}" stroke="var(--axis)" stroke-width="1"/><text x="${W - PAD_R + 6}" y="${ry(v) + 3.5}" font-size="10" fill="var(--muted)">${v}</text>`).join('')}
+    <rect x="0" y="${ry(100)}" width="${W - PAD_R}" height="${ry(P().rsiHigh) - ry(100)}" fill="color-mix(in oklab, var(--orange) 12%, transparent)"/>
+    <rect x="0" y="${ry(P().rsiLow)}" width="${W - PAD_R}" height="${ry(0) - ry(P().rsiLow)}" fill="color-mix(in oklab, var(--blue) 12%, transparent)"/>
+    ${[P().rsiHigh, P().rsiLow].map(v => `<line x1="0" x2="${W - PAD_R}" y1="${ry(v)}" y2="${ry(v)}" stroke="var(--axis)" stroke-width="1"/><text x="${W - PAD_R + 6}" y="${ry(v) + 3.5}" font-size="10" fill="var(--muted)">${v}</text>`).join('')}
     <path d="${linePath(rsi, x, ry)}" fill="none" stroke="var(--s-price)" stroke-width="1.5" stroke-linejoin="round"/>
     ${rsi[N - 1] != null ? `<circle cx="${x(N - 1)}" cy="${ry(rsi[N - 1])}" r="3" fill="var(--s-price)" stroke="var(--surface)" stroke-width="2"/>` : ''}
   </svg>`;
-  return `<div class="d-legend"><span><i style="background:var(--s-price)"></i>Price</span><span><i style="background:var(--s-ma50)"></i>50-day MA</span><span><i style="background:var(--s-ma200)"></i>200-day MA</span><span><i class="band"></i>Bollinger (20, 2)</span></div>
+  return `<div class="d-legend"><span><i style="background:var(--s-price)"></i>Price</span><span><i style="background:var(--s-ma50)"></i>${P().maFast}-day MA</span><span><i style="background:var(--s-ma200)"></i>${P().maSlow}-day MA</span><span><i class="band"></i>Bollinger (${P().bbPeriod}, ${P().bbK})</span></div>
     <div class="d-chart">${priceSvg}<p class="ttl">RSI (14)</p>${rsiSvg}</div>`;
 }
 
@@ -997,11 +1093,11 @@ function showDetail(id, anchor, keepPos) {
     <div class="d-chg"><span>24h ${fmtPct(chgOf(c, '24h'))}</span><span>7d ${fmtPct(chgOf(c, '7d'))}</span><span>30d ${fmtPct(chgOf(c, '30d'))}</span><span>Cap ${fmtBig(c.market_cap)}</span></div>`;
   if (ind && !ind.error) {
     body += detailChart(ind);
-    const trendTxt = ind.trend ? `${ind.trend === 'up' ? '▲ Uptrend' : '▼ Downtrend'} (${ind.strong ? 'price agrees' : ind.trend === 'up' ? 'price below 50MA' : 'price above 50MA'})` : '200-day history not available yet';
+    const trendTxt = ind.trend ? `${ind.trend === 'up' ? '▲ Uptrend' : '▼ Downtrend'} (${ind.strong ? 'price agrees' : ind.trend === 'up' ? `price below ${P().maFast}MA` : `price above ${P().maFast}MA`})` : `${P().maSlow}-day history not available yet`;
     body += `<dl class="kv">
       <dt>RSI (14)</dt><dd>${ind.rsiNow != null ? ind.rsiNow.toFixed(1) + (ind.rsiState === 'os' ? ' · Oversold' : ind.rsiState === 'ob' ? ' · Overbought' : ' · Neutral') : '—'}</dd>
-      <dt>50-day MA</dt><dd>${fmtPrice(ind.m50)} (${fmtPct(ind.m50 ? (ind.last / ind.m50 - 1) * 100 : null, 1)})</dd>
-      <dt>200-day MA</dt><dd>${fmtPrice(ind.m200)} (${fmtPct(ind.m200 ? (ind.last / ind.m200 - 1) * 100 : null, 1)})</dd>
+      <dt>${P().maFast}-day MA</dt><dd>${fmtPrice(ind.mF)} (${fmtPct(ind.mF ? (ind.last / ind.mF - 1) * 100 : null, 1)})</dd>
+      <dt>${P().maSlow}-day MA</dt><dd>${fmtPrice(ind.mS)} (${fmtPct(ind.mS ? (ind.last / ind.mS - 1) * 100 : null, 1)})</dd>
       <dt>Trend</dt><dd>${trendTxt}</dd>
       ${ind.cross ? `<dt>MA cross</dt><dd>✦ ${ind.cross.type === 'golden' ? 'Golden' : 'Death'} cross ${ind.cross.ago === 0 ? 'today' : ind.cross.ago + ' day' + (ind.cross.ago > 1 ? 's' : '') + ' ago'}</dd>` : ''}
       <dt>BB width</dt><dd>${ind.bbw != null ? `${ind.bbw.toFixed(2)}% · ${ordinal(Math.round(ind.bbPct))} pctl · ${BB_LABEL[ind.bbState]}` : '—'}</dd>
@@ -1078,6 +1174,10 @@ function seg(id, key, after) {
 }
 seg('colorBy', 'colorBy', renderAll);
 seg('view', 'view', () => { hideDetail(true); renderAll(); });
+$('#scorewrap').addEventListener('click', e => {
+  const b = e.target.closest('[data-w]');
+  if (b) { S.scoreWin = b.dataset.w; renderScorecard(); }
+});
 $('#filters').addEventListener('click', e => {
   const b = e.target.closest('.chip'); if (!b) return;
   S.filter = S.filter === b.dataset.f && b.dataset.f !== 'all' ? 'all' : b.dataset.f;
@@ -1167,7 +1267,9 @@ async function runSnapshot(snap) {
   S.markets = snap.markets; S.updated = snap.generated; S.marketSrc = snap.marketSrc; S.stale = !!snap.marketStale;
   S.stable = new Set(snap.cats?.stable || []); S.gold = new Set(snap.cats?.gold || []);
   for (const [id, h] of Object.entries(snap.hist || {})) S.hist[id] = unpack(h);
-  if (isNew || !S.coins.length) { pickCoins(); renderAll(); }
+  const paramsChanged = applyParams(snap.params);
+  if (isNew) await loadScorecard();
+  if (isNew || paramsChanged || !S.coins.length) { pickCoins(); renderAll(); }
   await loadHistories({ onlyMissing: true }); // only coins the job had no candles for
   done();
   // next build lands ~10 min after this one; if it hasn't appeared yet, look again every 2 min
@@ -1180,6 +1282,7 @@ async function runLive(force) {
   S.markets = m.data; S.updated = m.t; S.marketSrc = m.src || 'CoinGecko'; S.stale = !!m.stale;
   const cats = await loadCategories();
   S.stable = new Set(cats.stable); S.gold = new Set(cats.gold);
+  if (!S.scorecard) await loadScorecard();
   pickCoins();
   renderAll();
   await loadHistories();

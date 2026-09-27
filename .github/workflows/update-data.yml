@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # only for the keep-alive commit below
+  contents: read
   pages: write
   id-token: write
 
@@ -40,7 +40,8 @@ jobs:
           PREV_URL: ${{ steps.pages.outputs.base_url }}/data.json
         run: |
           mkdir -p _site
-          cp index.html _site/
+          cp index.html signals.mjs _site/
+          [ -f data/scorecard.json ] && cp data/scorecard.json _site/ || true
           node scripts/build-data.mjs _site/data.json
 
       - uses: actions/upload-pages-artifact@v4
@@ -49,18 +50,4 @@ jobs:
 
       - id: deploy
         uses: actions/deploy-pages@v4
-
-      # GitHub turns off scheduled workflows in repos with no commits for 60 days.
-      # This deploys without committing, so add a tiny commit every ~50 days to keep the schedule running.
-      - name: Keep the schedule alive
-        if: github.event_name == 'schedule'
-        run: |
-          last=$(git log -1 --format=%ct)
-          if [ $(( $(date +%s) - last )) -gt $(( 50 * 86400 )) ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            date -u +%FT%TZ > .github/keepalive
-            git add .github/keepalive
-            git commit -m "chore: keep scheduled data refresh alive"
-            git push
-          fi
+      # No keep-alive needed: score-signals.yml commits the scorecard daily, which keeps the schedules active.
