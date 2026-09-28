@@ -26,7 +26,13 @@ A crypto heatmap of the top 50 coins by market cap. Every tile combines the pric
 
 - **✓ / ? next to the ticker**: ✓ means the coin's price history comes from an exchange pair confirmed by its CoinGecko ID. ? means it was matched by ticker only (a best guess, checked against the price). Hover the mark to see the exchange and pair.
 
-Hover a tile (tap on a phone) to see a 120-day chart with price, both moving averages, the Bollinger band and RSI. The **Table** view sorts by any column. The **Scorecard** view shows how the signals have actually performed.
+**Coin details.** Hover a tile to open its details. On laptops they appear in a two-column popup, sized to fit a 13-inch screen:
+- **Left:** a 120-day chart of price, both moving averages, the Bollinger band and the recommended stop lines, plus RSI below it.
+- **Right:** the key numbers, the long and short stop cards, and where the price history comes from (✓ or ?).
+
+The popup stays on the coin you opened while the mouse is on it. Crossing other tiles only switches it if you stop on one for about 0.2 seconds. Click the popup (or the tile) to pin it open, and click outside it to close it. On phones, tapping a tile opens the same details as a bottom sheet.
+
+The **Table** view sorts by any column, including the recommended stops. The **Scorecard** view shows how the signals have actually performed.
 
 ## Scorecard: are the 🚀 / 😢 right?
 
