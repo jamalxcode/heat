@@ -1,3 +1,7 @@
 data.json
 _site/
 /scorecard.json
+node_modules/
+test-results/
+playwright-report/
+package-lock.json

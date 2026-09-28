@@ -81,6 +81,16 @@ test('scoreOf: weights decide 🚀 vs 😢 vs off, and the squeeze never counts'
   assert.equal(sc.squeeze, true);
 });
 
+test('momentum: +1%/day for 30 days is strong momentum, and it is off by default', () => {
+  const c = Array.from({ length: 260 }, (_, i) => 100 * 1.01 ** i);   // 30-day move ≈ +34.8%
+  const a = S.componentsAt(S.series(c, S.DEFAULT_PARAMS), 259, S.DEFAULT_PARAMS);
+  assert.equal(a.momUp, true);
+  assert.equal(a.momDown, false);
+  assert.equal(S.scoreOf(a, S.DEFAULT_PARAMS).good.includes('momUp'), false, 'weight 0: no 🚀 until the tuner proves it');
+  assert.equal(S.scoreOf(a, { weights: { momUp: 1 } }).good.includes('momUp'), true);
+  assert.equal(S.componentsAt(S.series(c, { momPct: 40 }), 259, { momPct: 40 }).momUp, false, 'threshold is a setting');
+});
+
 test('withDefaults: ignores unknown weights and fills missing ones', () => {
   const p = S.withDefaults({ rsiLow: 25, weights: { bbTight: 1, overbought: 1 } });
   assert.equal(p.rsiLow, 25);
@@ -139,6 +149,7 @@ test('stats: stop-loss hit and good-exit rates are sane', () => {
   for (const s of [s3, s7]) for (const k of ['long', 'short']) {
     assert.ok(s[k].hitRate > 0 && s[k].hitRate < 1, `${k} hit rate in (0,1)`);
     assert.ok(s[k].goodRate >= 0 && s[k].goodRate <= 1, `${k} good rate in [0,1]`);
+    assert.ok(Number.isFinite(s[k].avgSaved) && Math.abs(s[k].avgSaved) < 0.5, `${k} average saved is a sane fraction`);
   }
   assert.ok(s7.long.hitRate >= s3.long.hitRate, 'a longer window can only cross more often');
 });
@@ -154,7 +165,9 @@ test('tune: runs on random data and returns a well-formed decision', () => {
   assert.equal(typeof res.adopt, 'boolean');
   assert.equal(res.folds.length, 3);
   assert.ok(res.notes.length >= 1);
-  if (!res.adopt) assert.deepEqual(res.params, S.withDefaults(S.DEFAULT_PARAMS));
+  if (!res.adopt && !res.stop.adopt) assert.deepEqual(res.params, S.withDefaults(S.DEFAULT_PARAMS));
+  assert.equal(res.stop.table.length, S.STOP_MULTS.length, 'every stop distance was compared');
+  assert.ok(S.STOP_MULTS.includes(res.params.stopMult));
 });
 
 test('buildScorecard: has yesterday, all windows and horizons', () => {

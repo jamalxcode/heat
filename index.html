@@ -222,6 +222,11 @@ h1 .tld { color: var(--ink-2); font-weight: 600; }
 .tile .name { font-size: 12px; display: flex; align-items: center; gap: 4px; min-width: 0; white-space: nowrap; }
 .tile .name .nm { opacity: .85; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .tile .emo { flex: none; font-size: 13px; letter-spacing: -1px; line-height: 1; }
+/* no proven edge yet: signals shown as quiet hints, not loud calls */
+body.signals-unproven .tile .emo { opacity: .55; filter: grayscale(.35); }
+.leg-item.edge { flex-basis: 100%; }
+.leg-item.edge.weak { color: var(--ink-2); }
+.leg-item.edge a { color: inherit; }
 .tile .px { font-size: 12px; opacity: .85; text-align: right; white-space: nowrap; }
 .tile .ind { padding: 8px 12px 10px; display: grid; gap: 5px; font-size: 11.5px; border-top: 1px solid var(--border); min-height: 74px; }
 .row { display: flex; align-items: center; gap: 6px; min-width: 0; white-space: nowrap; }
@@ -235,7 +240,9 @@ h1 .tld { color: var(--ink-2); font-weight: 600; }
 .tag.stop-x { background: #b8413f; color: #fff; }
 .row .sl { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink-2); }
 .row .sl.near { color: var(--ink); background: color-mix(in oklab, var(--amber) 30%, transparent); border-radius: 4px; padding: 0 3px; }
-.tile.stop-crossed { box-shadow: inset 0 0 0 2px #b8413f; }
+.tile.stop-closed { box-shadow: inset 0 0 0 2px #b8413f; }
+.tile.stop-intraday { box-shadow: inset 0 0 0 2px var(--amber); }
+.tag.stop-i { background: color-mix(in oklab, var(--amber) 40%, transparent); }
 .empty { grid-column: 1 / -1; background: var(--surface); border: 1px dashed var(--axis); border-radius: 12px; padding: 22px 16px; text-align: center; color: var(--ink-2); font-size: 14px; }
 .empty .btn { margin-left: 8px; }
 .tile .sym .vf { font-size: 10px; font-weight: 700; line-height: 14px; width: 14px; height: 14px; border-radius: 50%; display: inline-grid; place-items: center; flex: none; }
@@ -244,7 +251,8 @@ h1 .tld { color: var(--ink-2); font-weight: 600; }
 .d-stops { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
 .d-stop { border: 1px solid var(--grid); border-radius: 10px; padding: 8px 10px; }
 .d-stop.near { border-color: var(--amber); }
-.d-stop.crossed { border-color: #b8413f; background: color-mix(in oklab, #b8413f 10%, transparent); }
+.d-stop.intraday { border-color: var(--amber); }
+.d-stop.closed { border-color: #b8413f; background: color-mix(in oklab, #b8413f 10%, transparent); }
 .d-st { font-size: 11px; color: var(--muted); }
 .d-st b { color: var(--ink); text-transform: uppercase; letter-spacing: .03em; }
 .d-sv { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -360,7 +368,7 @@ footer details summary { cursor: pointer; }
         <button class="chip" data-f="down" aria-pressed="false">Downtrend <span class="n"></span></button>
         <button class="chip" data-f="sq" aria-pressed="false">Squeeze <span class="n"></span></button>
         <button class="chip" data-f="cross" aria-pressed="false">Recent cross <span class="n"></span></button>
-        <button class="chip" data-f="stop" aria-pressed="false">🛑 Stop crossed <span class="n"></span></button>
+        <button class="chip" data-f="stop" aria-pressed="false">🛑 Closed past stop <span class="n"></span></button>
       </div>
     </div>
     <div class="spacer"></div>
@@ -549,13 +557,17 @@ function compute(ser) {
   // Today's candle is still forming, so anchor on the one before it.
   const anchor = Math.floor(t[n - 1] / DAY) >= Math.floor(Date.now() / DAY) ? n - 2 : n - 1;
   const lv = anchor > 0 ? SIG.stopLevels(c, anchor, p) : null;
+  const prev = anchor > 1 ? SIG.stopLevels(c, anchor - 1, p) : null;   // the stop that applied during the last full day
   if (lv) {
     const room = (a, b) => (a - b) / (lv.anchor * lv.dist);         // share of the stop distance still left
+    // 'closed'   = the last daily close finished past the stop that applied that day: exit (what the scorecard measures)
+    // 'intraday' = the live price is past today's stop, but no daily close has confirmed it yet: watch
+    const closedLong = !!prev && c[anchor] < prev.long, closedShort = !!prev && c[anchor] > prev.short;
     r.stop = {
-      ...lv, anchorIdx: anchor,
+      ...lv, anchorIdx: anchor, prevLong: prev?.long, prevShort: prev?.short,
       longPct: (lv.long / last - 1) * 100, shortPct: (lv.short / last - 1) * 100,
-      longState: last <= lv.long ? 'crossed' : room(last, lv.long) < 0.25 ? 'near' : 'ok',
-      shortState: last >= lv.short ? 'crossed' : room(lv.short, last) < 0.25 ? 'near' : 'ok',
+      longState: closedLong ? 'closed' : last <= lv.long ? 'intraday' : room(last, lv.long) < 0.25 ? 'near' : 'ok',
+      shortState: closedShort ? 'closed' : last >= lv.short ? 'intraday' : room(lv.short, last) < 0.25 ? 'near' : 'ok',
     };
   }
   return r;
@@ -571,7 +583,7 @@ const match = (ind, f) => {
     case 'down': return ind.trend === 'down';
     case 'sq': return ind.bbState === 'tight' || ind.bbState === 'squeeze';
     case 'cross': return !!ind.cross;
-    case 'stop': return ind.stop?.longState === 'crossed' || ind.stop?.shortState === 'crossed';
+    case 'stop': return ind.stop?.longState === 'closed' || ind.stop?.shortState === 'closed';
   }
   return true;
 };
@@ -613,11 +625,13 @@ function indHTML(ind) {
   // Recommended stop-loss for long and short positions
   const st = ind.stop;
   if (st) {
-    const cell = (side, pct, state) => state === 'crossed'
-      ? `<span class="tag stop-x" title="Recommended ${side} stop crossed: exit ${side} positions">🛑 ${side} stop crossed</span>`
+    const past = side => side === 'long' ? 'below' : 'above';
+    const cell = (side, pct, state) =>
+      state === 'closed' ? `<span class="tag stop-x" title="The last daily close finished ${past(side)} the recommended ${side} stop: suggested exit for ${side} positions">🛑 closed ${past(side)} ${side} stop</span>`
+      : state === 'intraday' ? `<span class="tag stop-i" title="Price is ${past(side)} today's recommended ${side} stop, not yet confirmed by a daily close: watch">⚠ ${past(side)} ${side} stop intraday</span>`
       : `<span class="sl ${state === 'near' ? 'near' : ''}" title="Recommended stop for ${side} positions${state === 'near' ? ': price is close to it' : ''}">${state === 'near' ? '⚠️ ' : ''}${side === 'long' ? 'L' : 'S'} ${fmtPct(pct, 1)}</span>`;
-    const crossed = st.longState === 'crossed' ? cell('long', st.longPct, 'crossed') : st.shortState === 'crossed' ? cell('short', st.shortPct, 'crossed') : '';
-    rows.push(`<div class="row"><span class="k">STOP</span>${crossed || `${cell('long', st.longPct, st.longState)}<span class="s">·</span>${cell('short', st.shortPct, st.shortState)}`}</div>`);
+    const alert = ['closed', 'intraday'].map(s => st.longState === s ? cell('long', st.longPct, s) : st.shortState === s ? cell('short', st.shortPct, s) : '').find(Boolean);
+    rows.push(`<div class="row"><span class="k">STOP</span>${alert || `${cell('long', st.longPct, st.longState)}<span class="s">·</span>${cell('short', st.shortPct, st.shortState)}`}</div>`);
   } else rows.push('<div class="row"><span class="k">STOP</span><span class="s">n/a</span></div>');
   return rows.join('');
 }
@@ -634,6 +648,7 @@ function legendName(k) {
     trendUp: `strong uptrend (${p.maFast}/${p.maSlow} MA)`, trendDown: `strong downtrend (${p.maFast}/${p.maSlow} MA)`,
     oversold: `RSI(${p.rsiPeriod}) under ${p.rsiLow}`, overbought: `RSI(${p.rsiPeriod}) over ${p.rsiHigh}`,
     bbTight: `BB width in bottom ${p.bbTightPct}%`, bbWide: `BB width in top ${100 - p.bbWidePct}%`,
+    momUp: `30-day move above +${p.momPct}%`, momDown: `30-day move below −${p.momPct}%`,
   }[k];
 }
 // Apply signal settings everywhere they show (RSI gauge zones, labels) and recompute every tile
@@ -667,8 +682,8 @@ function tileHTML(c) {
   const ind = S.ind[c.id], ch = chgOf(c, S.colorBy);
   const sg = signals(ind);
   const label = `${c.name}, ${fmtPrice(c.current_price)}, ${S.colorBy} ${fmtPct(ch)}, ${sg.good.length} rockets, ${sg.bad.length} cry faces${S.ind[c.id]?.sig?.squeeze ? ", squeeze: big move likely" : ""}`;
-  const stopX = ind?.stop && (ind.stop.longState === 'crossed' || ind.stop.shortState === 'crossed');
-  return `<button class="tile ${heatClass(ch, S.colorBy)}${stopX ? ' stop-crossed' : ''}" data-id="${esc(c.id)}" aria-label="${esc(label)}">
+  const stopCls = !ind?.stop ? '' : [ind.stop.longState, ind.stop.shortState].includes('closed') ? ' stop-closed' : [ind.stop.longState, ind.stop.shortState].includes('intraday') ? ' stop-intraday' : '';
+  return `<button class="tile ${heatClass(ch, S.colorBy)}${stopCls}" data-id="${esc(c.id)}" aria-label="${esc(label)}">
     <div class="top">
       <div class="sym">${logo(c, 18)}<span>${esc(c.symbol.toUpperCase())}</span>${verifyMark(c)}<span class="rk">#${c.market_cap_rank}</span></div>
       <div class="chg">${fmtPct(ch, ch != null && Math.abs(ch) >= 10 ? 1 : 2)}</div>
@@ -677,6 +692,25 @@ function tileHTML(c) {
     </div>
     <div class="ind">${indHTML(ind)}</div>
   </button>`;
+}
+
+// The signals' own track record, where people look: last 90 days, next-day moves, from the daily scorecard.
+// Until it shows a real edge (t ≥ 2), the 🚀/😢 are dimmed so they don't look more certain than they are.
+function signalEdge() {
+  const w = S.scorecard?.windows?.d90;
+  const s = w && (w[1] || (w.byScore ? w : null));
+  if (!s?.ic || s.ic.mean == null) return null;
+  return { proven: s.ic.t >= 2, backwards: s.ic.t <= -2, rocketsUp: s.rockets?.upRate, baseUp: s.all?.upRate, sadDown: s.sad?.downRate };
+}
+function edgeLegend() {
+  const e = signalEdge();
+  if (!e) return '';
+  const verdict = e.proven ? '<b>a real edge</b>' : e.backwards ? '<b>backwards</b> (😢 did better than 🚀)' : '<b>no reliable edge yet</b>, so treat them as hints, not calls';
+  return `<span class="leg-item edge ${e.proven ? 'ok' : 'weak'}">Track record, last 90 days: 🚀 coins went up next day ${pc(e.rocketsUp)} of the time vs ${pc(e.baseUp)} for all coins. Verdict: ${verdict} <a href="#" data-goto-score>(Scorecard)</a></span>`;
+}
+function applyEdge() {
+  const e = signalEdge();
+  document.body.classList.toggle('signals-unproven', !!e && !e.proven);
 }
 
 function renderLegend() {
@@ -691,7 +725,8 @@ function renderLegend() {
     <span class="leg-item"><span class="gauge" style="width:60px;flex:none"><i style="left:50%"></i></span> RSI 0–100 (under ${P().rsiLow} oversold · over ${P().rsiHigh} overbought)</span>
     <span class="leg-item"><span class="up-t" style="display:inline-flex">${ICON.up}</span>/<span class="dn-t" style="display:inline-flex">${ICON.down}</span> ${P().maFast}MA vs ${P().maSlow}MA</span>
     <span class="leg-item">⚡ BB width in bottom ${P().bbTightPct}%: big move likely, direction unknown</span>
-    <span class="leg-item"><b>STOP</b> = recommended stop-loss: <b>L</b> for long positions, <b>S</b> for short, ${P().stopMult}× the coin's average daily move from yesterday's close · 🛑 crossed = get out</span>
+    <span class="leg-item"><b>STOP</b> = recommended stop-loss: <b>L</b> for long positions, <b>S</b> for short, ${P().stopMult}× the coin's average daily move from the last daily close (00:00 UTC) · ⚠ past it intraday = watch · 🛑 a daily close past it = suggested exit</span>
+    ${edgeLegend()}
     ${['🚀', '😢'].map(e => {
       const ks = Object.keys(SIG.COMPONENTS).filter(k => roleOf(k) === e);
       return ks.length ? `<span class="leg-item">${e} each: ${ks.map(legendName).join(' · ')}</span>` : '';
@@ -740,11 +775,12 @@ function renderCounts() {
   }
 }
 
-// "−3.1% ($82,190)" for a recommended stop, or "🛑 crossed" once price is past it
+// "−3.1% ($82,190)" for a recommended stop; "🛑 closed past" once a daily close confirms it, "⚠ intraday" before that
 function stopCell(st, side) {
   if (!st) return '—';
   const state = st[side + 'State'], pct = st[side + 'Pct'], price = st[side];
-  if (state === 'crossed') return `<b class="sc-warn">🛑 crossed</b> <span style="color:var(--ink-2)">${fmtPrice(price)}</span>`;
+  if (state === 'closed') return `<b class="sc-warn">🛑 closed past</b> <span style="color:var(--ink-2)">${fmtPrice(price)}</span>`;
+  if (state === 'intraday') return `⚠ past intraday <span style="color:var(--ink-2)">${fmtPrice(price)}</span>`;
   return `${state === 'near' ? '⚠️ ' : ''}${fmtPct(pct, 1)} <span style="color:var(--ink-2)">${fmtPrice(price)}</span>`;
 }
 
@@ -899,7 +935,8 @@ function wireChart() {
 function stopsHTML(stp, h, hw) {
   if (!stp?.n) return '';
   const side = (s, name, dir) => !s.hits ? `<b>${name}</b>: never crossed.`
-    : `<b>${name}</b>: crossed within ${hw} ${pc(s.hitRate)} of the time. After getting out, price kept ${dir} for ${hw} (a good exit) <b>${pc(s.goodRate)}</b> of the time, and came back (you'd have been shaken out) ${s.goodRate == null ? '—' : pc(1 - s.goodRate)}.`;
+    : `<b>${name}</b>: crossed within ${hw} ${pc(s.hitRate)} of the time. After getting out, price kept ${dir} for ${hw} (a good exit) <b>${pc(s.goodRate)}</b> of the time, and came back (you'd have been shaken out) ${s.goodRate == null ? '—' : pc(1 - s.goodRate)}.`
+      + (s.avgSaved != null ? ` On average the exit ${s.avgSaved >= 0 ? 'saved' : 'cost'} <b>${pc(Math.abs(s.avgSaved), 2)}</b>.` : '');
   return `<div class="sc-stops"><p><b>🛑 Recommended stops, judged over ${hw}</b> <span class="sc-muted">(average distance ${pc(stp.avgDist)} from the close, crossed on a daily close)</span></p>
     <ul><li>${side(stp.long, 'Long stops', 'falling')}</li><li>${side(stp.short, 'Short stops', 'rising')}</li></ul></div>`;
 }
@@ -942,6 +979,7 @@ function renderScorecard() {
   const tuneHTML = !t.lastRun ? '<p class="sc-muted">The tuner hasn\'t run yet. It runs every Sunday.</p>' : `
     <p><b>Last run ${new Date(t.lastRun).toLocaleDateString()}</b>: ${last.adopted ? '✅ <b>adopted new settings</b>: they beat the current ones on periods they weren\'t tuned on.' : 'kept the current settings. The alternative didn\'t clearly beat them on periods it wasn\'t tuned on.'}
       ${last.folds ? `Won <b>${last.wins} of ${last.folds.length}</b> check periods · average score (rank correlation over 1/3/7 days): current <b>${last.testIC.before?.toFixed(3) ?? '—'}</b> vs candidate <b>${last.testIC.after?.toFixed(3) ?? '—'}</b>.` : `Check-period score: current <b>${last.testIC.before?.toFixed(3) ?? '—'}</b> vs candidate <b>${last.testIC.after?.toFixed(3) ?? '—'}</b>.`}</p>
+    ${last.stop ? `<p><b>Stop distance</b>: tested ${last.stop.table.map(s => `${s.m}× (exits ${s.avg >= 0 ? 'saved' : 'cost'} ${pc(Math.abs(s.avg), 2)} over 3 days)`).join(', ')}. ${last.stop.adopt ? `✅ <b>Switched from ${last.stop.from}× to ${last.stop.to}×</b>: it did better in ${last.stop.wins} of 3 check periods.` : `Kept <b>${last.stop.from}×</b>: no other distance did clearly better.`}</p>` : ''}
     ${foldsHTML ? `<details><summary>Check periods</summary>${foldsHTML}</details>` : ''}
     <details><summary>What the tuner found for each signal</summary><ul>${(last.notes || []).map(n => `<li>${esc(n)}</li>`).join('')}</ul></details>
     ${(t.history || []).length ? `<details><summary>Settings changes (${t.history.length})</summary><ul>${t.history.map(x => `<li>${x.date}: score ${x.testIC.before?.toFixed(3)} → ${x.testIC.after?.toFixed(3)}</li>`).join('')}</ul></details>` : ''}`;
@@ -1055,8 +1093,14 @@ function showDetail(id, anchor, keepPos) {
       <dt>BB width</dt><dd>${ind.bbw != null ? `${ind.bbw.toFixed(2)}% · ${ordinal(Math.round(ind.bbPct))} pctl · ${BB_LABEL[ind.bbState]}` : '—'}</dd>
     </dl>
     ${ind.stop ? `<div class="d-stops">
-      <div class="d-stop ${ind.stop.longState}"><div class="d-st">Recommended stop · <b>long</b> positions</div><div class="d-sv">${fmtPrice(ind.stop.long)} <span>${fmtPct(ind.stop.longPct, 1)}</span></div><div class="d-sn">${ind.stop.longState === 'crossed' ? '🛑 <b>Crossed: exit long positions.</b>' : ind.stop.longState === 'near' ? '⚠️ Price is close to the stop.' : 'Exit a long if price falls below this.'}</div></div>
-      <div class="d-stop ${ind.stop.shortState}"><div class="d-st">Recommended stop · <b>short</b> positions</div><div class="d-sv">${fmtPrice(ind.stop.short)} <span>${fmtPct(ind.stop.shortPct, 1)}</span></div><div class="d-sn">${ind.stop.shortState === 'crossed' ? '🛑 <b>Crossed: exit short positions.</b>' : ind.stop.shortState === 'near' ? '⚠️ Price is close to the stop.' : 'Exit a short if price rises above this.'}</div></div>
+      ${['long', 'short'].map(side => {
+        const s = ind.stop[side + 'State'], below = side === 'long' ? 'below' : 'above';
+        const note = s === 'closed' ? `🛑 <b>The last daily close finished ${below} the stop (${fmtPrice(ind.stop[side === 'long' ? 'prevLong' : 'prevShort'])}): suggested exit for ${side} positions.</b>`
+          : s === 'intraday' ? `⚠ Price is ${below} the stop now, but a daily close hasn't confirmed it. Watch the close (00:00 UTC).`
+          : s === 'near' ? '⚠️ Price is close to the stop.'
+          : `Exit a ${side} if the price closes ${below} this.`;
+        return `<div class="d-stop ${s}"><div class="d-st">Recommended stop · <b>${side}</b> positions</div><div class="d-sv">${fmtPrice(ind.stop[side])} <span>${fmtPct(ind.stop[side + 'Pct'], 1)}</span></div><div class="d-sn">${note}</div></div>`;
+      }).join('')}
     </div>
     <div class="d-src">Stops = ${P().stopMult}× the average daily move (${(ind.stop.dist / P().stopMult * 100).toFixed(1)}%) from the ${new Date(ind.t[ind.stop.anchorIdx ?? ind.n - 2] ?? Date.now()).toISOString().slice(0, 10)} close. Suggested levels, not advice: set them on your exchange, as this page isn't real-time.</div>` : ''}
     <div class="d-src">${h ? `${h.src} ${h.pair} · ${h.ok ? '✓ verified by CoinGecko ID' : '⚠ matched by ticker only (not verified)'} · ${ind.n} daily candles` : ''}${ind.bbShort ? ' · BBW percentile uses under 90 days' : ''}</div>`;
@@ -1176,7 +1220,10 @@ $('#filters').addEventListener('click', e => {
   const b = e.target.closest('.chip'); if (!b) return;
   setFilter(S.filter === b.dataset.f && b.dataset.f !== 'all' ? 'all' : b.dataset.f);
 });
-document.addEventListener('click', e => { if (e.target.closest('[data-show-all]')) setFilter('all'); });
+document.addEventListener('click', e => {
+  if (e.target.closest('[data-show-all]')) setFilter('all');
+  if (e.target.closest('[data-goto-score]')) { e.preventDefault(); $('#view button[data-v=score]').click(); window.scrollTo({ top: $('#scorewrap').offsetTop - 12 }); }
+});
 $('#pegged').checked = S.pegged;
 $('#pegged').addEventListener('change', e => { S.pegged = e.target.checked; savePrefs(); pickCoins(); renderAll(); applyHist(); done(); });
 
@@ -1267,7 +1314,7 @@ async function show(data, live) {
   S.hist = {};
   for (const [id, h] of Object.entries(data.hist || {})) S.hist[id] = unpack(h);
   const paramsChanged = applyParams(data.params);
-  if (isNew || !S.scorecard) await loadScorecard();
+  if (isNew || !S.scorecard) { await loadScorecard(); applyEdge(); }
   if (isNew || paramsChanged || !S.coins.length) { pickCoins(); renderAll(); }
   applyHist();
   done();

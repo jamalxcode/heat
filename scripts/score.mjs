@@ -68,4 +68,5 @@ for (const h of SIG.HORIZONS) {
 if (t && card.tuning.lastRun && Date.now() - Date.parse(card.tuning.lastRun) < 3600e3) {
   console.log(`Tuning: ${t.adopted ? 'ADOPTED new settings' : 'kept current settings'} · won ${t.wins}/${t.folds.length} check periods · avg IC ${t.testIC.before?.toFixed(4)} → ${t.testIC.after?.toFixed(4)}`);
   for (const n of t.notes) console.log('  ' + n);
+  if (t.stop) console.log(`  stop distance: ${t.stop.table.map(s => s.m + 'x ' + (s.avg * 100).toFixed(2) + '%').join(', ')} → ${t.stop.adopt ? 'switched to ' + t.stop.to + 'x' : 'kept ' + t.stop.from + 'x'}`);
 }

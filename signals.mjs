@@ -7,18 +7,26 @@ export const DEFAULT_PARAMS = {
   bbPeriod: 20, bbK: 2, bbLookback: 180, bbTightPct: 10, bbWidePct: 80,
   // Recommended stop-loss: stopMult × the coin's average daily move over the last stopLookback days
   stopMult: 2, stopLookback: 20,
+  // Momentum: the coin's move over the last 30 days is above +momPct% (momUp) or below −momPct% (momDown)
+  momPct: 20,
   // +1 = counts as a 🚀, -1 = counts as a 😢, 0 = switched off. The tuner may flip or disable a signal.
-  weights: { trendUp: 1, oversold: 1, trendDown: -1, overbought: -1, bbWide: -1 },
+  // Momentum starts off: it's on trial, and the tuner switches it on only if it proves itself on unseen data.
+  weights: { trendUp: 1, oversold: 1, trendDown: -1, overbought: -1, bbWide: -1, momUp: 0, momDown: 0 },
 };
 
-// Directional signals: each one adds a 🚀 or a 😢
+// Directional signals: each one adds a 🚀 or a 😢 (or nothing while its weight is 0)
 export const COMPONENTS = {
   trendUp:    'strong uptrend',
   oversold:   'RSI oversold',
   trendDown:  'strong downtrend',
   overbought: 'RSI overbought',
   bbWide:     'wide Bollinger band',
+  momUp:      'strong 30-day momentum',
+  momDown:    'weak 30-day momentum',
 };
+
+// Stop distances the tuner compares (× the average daily move)
+export const STOP_MULTS = [1.5, 2, 2.5];
 // Non-directional: a Bollinger squeeze says a big move is likely, not which way, so it's ⚡ rather than 🚀 or 😢
 export const SQUEEZE_LABEL = 'tight Bollinger band (big move likely, direction unknown)';
 
@@ -103,7 +111,10 @@ export function componentsAt(s, i, p) {
   const P = withDefaults(p);
   const c = s.c[i], r = s.rsi[i], f = s.maF[i], sl = s.maS[i], q = s.bbPct[i];
   const trend = f != null && sl != null;
+  const m30 = i >= 30 ? (c / s.c[i - 30] - 1) * 100 : null;
   return {
+    momUp:      m30 != null ? m30 >= P.momPct : null,
+    momDown:    m30 != null ? m30 <= -P.momPct : null,
     trendUp:    trend ? f > sl && c > f : null,
     trendDown:  trend ? f < sl && c < f : null,
     oversold:   r != null ? r < P.rsiLow : null,
@@ -178,7 +189,9 @@ export function signalRows(coins, p) {
             if (jS < 0 && coin.c[k] > hi) jS = k;
           }
           const after = (j, dir) => j < 0 || j + h >= n ? null : dir < 0 ? coin.c[j + h] < coin.c[j] : coin.c[j + h] > coin.c[j];
-          stop[h] = { longHit: jL >= 0, longGood: after(jL, -1), shortHit: jS >= 0, shortGood: after(jS, 1) };
+          // how much the exit saved over the next h days (negative = it cost you: price came back)
+          const saved = (j, dir) => j < 0 || j + h >= n ? null : dir < 0 ? (coin.c[j] - coin.c[j + h]) / coin.c[j] : (coin.c[j + h] - coin.c[j]) / coin.c[j];
+          stop[h] = { longHit: jL >= 0, longGood: after(jL, -1), longSaved: saved(jL, -1), shortHit: jS >= 0, shortGood: after(jS, 1), shortSaved: saved(jS, 1) };
         }
       }
       rows.push({ day: d0 + i, id: coin.id, sym: coin.symbol, a, good, bad, score, squeeze, raw, ret, mkt: {}, exc: {}, stopD, stop });
@@ -258,7 +271,7 @@ export function stats(rows, h = 1) {
   const st = rows.filter(r => r.stop?.[h]);
   const side = k => {
     const hits = st.filter(r => r.stop[h][k + 'Hit']), judged = hits.filter(r => r.stop[h][k + 'Good'] != null);
-    return { hitRate: st.length ? hits.length / st.length : null, goodRate: judged.length ? judged.filter(r => r.stop[h][k + 'Good']).length / judged.length : null, hits: hits.length };
+    return { hitRate: st.length ? hits.length / st.length : null, goodRate: judged.length ? judged.filter(r => r.stop[h][k + 'Good']).length / judged.length : null, hits: hits.length, avgSaved: mean(judged.map(r => r.stop[h][k + 'Saved'])) };
   };
   out.stops = { n: st.length, avgDist: mean(st.map(r => r.stopD)), long: side('long'), short: side('short') };
 
@@ -338,6 +351,16 @@ function selectParams(cur, rowsFor, until, minT) {
   // Wide Bollinger band threshold (the ⚡ squeeze threshold stays fixed: it isn't a direction call)
   const wide = best([75, 80, 85, 90, 95].map(bbWidePct => ({ bbWidePct })), 'bbWide');
   if (wide) { next.bbWidePct = wide.v.bbWidePct; setSign('bbWide', wide.e); }
+
+  // Momentum (on trial): which 30-day threshold, and whether strong/weak momentum should be a 🚀, a 😢 or off
+  let bestMom = null;
+  for (const momPct of [10, 20, 30]) {
+    const rows = rowsFor({ ...next, momPct });
+    const u = effect(rows, 'momUp'), d = effect(rows, 'momDown');
+    const t = Math.abs(u.t) + Math.abs(d.t);
+    if (u.n >= 20 && d.n >= 20 && (!bestMom || t > bestMom.t)) bestMom = { momPct, u, d, t };
+  }
+  if (bestMom) { next.momPct = bestMom.momPct; setSign('momUp', bestMom.u); setSign('momDown', bestMom.d); }
   return { params: next, notes };
 }
 
@@ -372,8 +395,33 @@ export function tune(coins, current, { folds = 3, minT = 2.5, margin = 0.003 } =
   const anyOn = Object.values(final.params.weights).some(w => w !== 0);
   const changed = JSON.stringify(final.params) !== JSON.stringify(cur);
   const adopt = changed && anyOn && after > 0 && after > before + margin && wins >= Math.ceil(folds / 2);
+
+  // Stop distance: on the same check periods, which multiplier's exits saved the most over the next 3 days
+  // (averaged over long and short exits; negative = exits were mostly shake-outs)? Switch only if one beats the
+  // current multiplier in most periods and on average by at least 0.1%.
+  const stopScore = (m, from, to) => {
+    const v = [];
+    for (const r of rowsFor({ ...cur, stopMult: m })) {
+      if (r.day < from || r.day >= to || !r.stop?.[3]) continue;
+      for (const k of ['longSaved', 'shortSaved']) if (r.stop[3][k] != null) v.push(r.stop[3][k]);
+    }
+    return v.length ? mean(v) : 0;
+  };
+  const periods = results.map(f => [f.from, f.to + 1]);
+  const stopTable = STOP_MULTS.map(m => ({ m, perFold: periods.map(([a, b]) => stopScore(m, a, b)) }));
+  const curRow = stopTable.find(s => s.m === cur.stopMult) || { m: cur.stopMult, perFold: periods.map(([a, b]) => stopScore(cur.stopMult, a, b)) };
+  let bestStop = null;
+  for (const s of stopTable) {
+    if (s.m === cur.stopMult) continue;
+    const winsS = s.perFold.filter((v, i) => v > curRow.perFold[i]).length, gain = mean(s.perFold) - mean(curRow.perFold);
+    if (winsS >= Math.ceil(folds / 2) && gain >= 0.001 && (!bestStop || gain > bestStop.gain)) bestStop = { m: s.m, wins: winsS, gain };
+  }
+  const stop = { adopt: !!bestStop, from: cur.stopMult, to: bestStop?.m ?? cur.stopMult, table: stopTable.map(s => ({ m: s.m, avg: mean(s.perFold) })), wins: bestStop?.wins ?? 0 };
+
+  const params = withDefaults(adopt ? final.params : cur);
+  if (stop.adopt) params.stopMult = stop.to;
   return {
-    adopt, params: adopt ? final.params : cur, proposed: final.params, notes: final.notes,
+    adopt, params, proposed: final.params, notes: final.notes, stop,
     folds: results, wins, split: { trainFrom: days[0], cut: days[start], testTo: days[days.length - 1] },
     testIC: { before, after },
   };
@@ -408,10 +456,11 @@ export function buildScorecard(coins, current, { prev = null, tuneNow = false, n
     tuning.last = {
       adopted: res.adopt, notes: res.notes, testIC: res.testIC, wins: res.wins, folds: res.folds.map(f => ({ from: isoDay(f.from), to: isoDay(f.to), before: f.before, after: f.after, won: f.won })),
       trainFrom: isoDay(res.split.trainFrom), testFrom: isoDay(res.split.cut), testTo: isoDay(res.split.testTo),
+      stop: res.stop,
     };
-    if (res.adopt) {
+    if (res.adopt || res.stop.adopt) {
       newParams = res.params;
-      tuning.history = [{ date: isoDay(Math.floor(now / DAY)), from: params, to: newParams, testIC: res.testIC, notes: res.notes }, ...(tuning.history || [])].slice(0, 30);
+      tuning.history = [{ date: isoDay(Math.floor(now / DAY)), from: params, to: newParams, testIC: res.testIC, notes: res.notes, stop: res.stop.adopt ? `stops ${res.stop.from}× → ${res.stop.to}×` : null }, ...(tuning.history || [])].slice(0, 30);
     }
   }
 

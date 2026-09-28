@@ -1,0 +1,13 @@
+{
+  "name": "heat-sala-company",
+  "private": true,
+  "description": "Crypto heatmap with self-checking signals: https://heat.sala.company",
+  "scripts": {
+    "dev": "node tests/e2e/serve.mjs",
+    "test": "node --test",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0"
+  }
+}
