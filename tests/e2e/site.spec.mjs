@@ -47,6 +47,11 @@ test('filters show only matching coins, and "All coins" restores them', async ({
   await expect(tiles(page)).toHaveCount(N);
 });
 
+test('filter counts match the tiles as soon as the page loads', async ({ page }) => {
+  const shown = await page.locator('#grid .tile.stop-closed').count();
+  await expect(page.locator('#filters .chip[data-f="stop"] .n')).toHaveText(String(shown));
+});
+
 test('stops: a daily close past the stop is an exit; intraday is only a warning', async ({ page }) => {
   await expect(tile(page, 'closed-coin')).toHaveClass(/stop-closed/);
   await expect(tile(page, 'closed-coin')).toContainText('closed below long stop');

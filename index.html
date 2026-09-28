@@ -1302,6 +1302,7 @@ function tick() {
 
 function done() {
   renderFooter();
+  renderCounts();   // right away: the deferred refresh is paused in background tabs
   const ok = S.coins.filter(c => S.ind[c.id] && !S.ind[c.id].error).length;
   const via = S.mode === 'live' ? ` · built in your browser from ${S.marketSrc}` : '';
   setStatus(`${ok}/${S.coins.length} coins with indicators${via}`, S.stale ? '' : 'live');

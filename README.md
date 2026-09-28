@@ -17,11 +17,13 @@ A crypto heatmap of the top 50 coins by market cap. Every tile combines the pric
   - 😢 for a strong downtrend, RSI overbought, or a wide band (top 20%)
   - ⚡ for a very tight band (bottom 10%): a big move is likely, but not its direction, so ⚡ never counts as a 🚀 or 😢
 
-  The weekly tuner can change the thresholds, flip a signal from 🚀 to 😢, or switch it off. The legend always shows the current rules.
+  The weekly tuner can change the thresholds, flip a signal from 🚀 to 😢, or switch it off. Two **momentum** signals (30-day move above +20% or below −20%) are on trial: they stay off until the tuner proves they work. The legend always shows the current rules, plus the signals' **90-day track record**. While that shows no proven edge, the 🚀/😢 are **dimmed**, as hints rather than calls.
 - **Recommended stop-loss** for **long** and **short** positions (the STOP row):
-  - distance = **2× the coin's average daily move** over the last 20 days: about 3% for BTC, about 7% for a typical coin
+  - distance = **2× the coin's average daily move** over the last 20 days: about 3% for BTC, about 7% for a typical coin. The weekly tuner compares 1.5×, 2× and 2.5× and switches only if another distance's exits saved more in 2 of 3 check periods.
   - set once a day from the last daily close: exit a long below it, or a short above it
-  - ⚠️ when price is within a quarter of the distance, and 🛑 **crossed: get out** with a red tile border once price is past it
+  - ⚠️ when price is within a quarter of the distance
+  - **⚠ past the stop intraday** (amber border): the live price is beyond today's stop, but no daily close has confirmed it. Watch the 00:00 UTC close.
+  - **🛑 closed past the stop** (red border): the last daily close finished beyond the stop that applied that day. This is the suggested exit, and it's what the scorecard measures. The **🛑 Closed past stop** filter lists these coins.
   - shown in the tile, the table, and the detail chart (as lines). These are suggested levels only: the page isn't real-time, so set stops on your exchange.
 
 - **✓ / ? next to the ticker**: ✓ means the coin's price history comes from an exchange pair confirmed by its CoinGecko ID. ? means it was matched by ticker only (a best guess, checked against the price). Hover the mark to see the exchange and pair.
@@ -53,7 +55,7 @@ Every day at **00:20 UTC** a GitHub job scores the previous day:
 
 Statistics cap moves at ±30% a day (wider for 3 and 7 days), so a bad price print can't dominate the averages. The Scorecard still shows each coin's real move. A signal needs at least 20 firings before it gets a verdict.
 
-*Honest baseline (first runs, Sept 2026):* the default signals showed **no reliable next-day edge**. The daily rank correlation was about 0, and 🚀 coins went up 48% of the time, the same as all coins. Two signals pointed the wrong way: overbought and wide-band coins tended to *keep* outperforming (momentum). So far the tuner has kept the defaults, because the momentum settings didn't hold up on the most recent months. And ⚡ squeezes (bottom 10% of band width) were followed by *smaller* moves than usual (about 0.85×), not bigger ones. The recommended stops were crossed about 22% of the time within 3 days, and after an exit the next move was roughly a coin flip. That's typical: a stop doesn't predict direction, it caps how much you can lose.
+*Honest baseline (first runs, Sept 2026):* the default signals showed **no reliable next-day edge**. The daily rank correlation was about 0, and 🚀 coins went up 48% of the time, the same as all coins. Two signals pointed the wrong way: overbought and wide-band coins tended to *keep* outperforming (momentum). So far the tuner has kept the defaults, because the momentum settings didn't hold up on the most recent months. And ⚡ squeezes (bottom 10% of band width) were followed by *smaller* moves than usual (about 0.85×), not bigger ones. The recommended stops were crossed about 22% of the time within 3 days, and after an exit the next move was roughly a coin flip. Among the three distances, **2.5×** exits saved the most (about 0.43% over 3 days, vs 0.18% at 2×), so the tuner is set to switch to it at its next run. **30-day momentum** was the strongest single signal found (t ≈ 2.9), but the full set of proposed settings hasn't yet beaten the current ones on recent data. That's typical: a stop doesn't predict direction, it caps how much you can lose.
 
 ## How it works
 
@@ -83,6 +85,8 @@ GitHub Actions: daily 00:20 UTC (via cron-job.org)
 | `.github/workflows/update-data.yml` | Builds `data.json` and deploys the site to GitHub Pages every 10 minutes and on every push to `main` |
 | `.github/workflows/score-signals.yml` | Daily scoring (plus Sunday tuning). It commits the results, which also keeps the schedules from being paused for inactivity. |
 | `.github/workflows/test.yml` | Runs the unit tests on every push |
+| `.github/workflows/e2e.yml` | **Browser tests** (Playwright, headless Chrome) on every push: no outside API calls, filters, both stop states, the popup (fits a 13-inch screen, stays put under a real mouse, pins and closes), the phone bottom sheet, and the Scorecard view |
+| `tests/e2e/` | The browser tests, deterministic test data (`fixtures.mjs`) and a local server (`serve.mjs`, also `npm run dev`) |
 
 **How the data stays safe and fresh:**
 - The deploy job publishes to Pages without committing. The daily scorecard commit keeps the repo active, since GitHub pauses scheduled workflows after 60 days without commits.
@@ -94,7 +98,7 @@ GitHub Actions: daily 00:20 UTC (via cron-job.org)
 
 - **Rebuild from scratch:** [`docs/rebuild-prompts.md`](docs/rebuild-prompts.md) has the 12 prompts, in order, that built this project with Claude.
 - **Manual runs:** go to **Actions → Update heatmap data → Run workflow**, or **Actions → Score signals → Run workflow**. Tick *"Run the tuner now"* to tune immediately.
-- **Locally:** `node scripts/build-data.mjs data.json`, then serve the folder (for example `npx serve .`). Scoring: `node scripts/score.mjs --tune` (needs the live `data.json`, via `SITE_URL`). Tests: `node --test`.
+- **Locally:** `node scripts/build-data.mjs data.json`, then serve the folder (for example `npx serve .`). Scoring: `node scripts/score.mjs --tune` (needs the live `data.json`, via `SITE_URL`). Tests: `npm test` (unit) and `npm run test:e2e` (browser). Preview with test data: `npm run dev`.
 - **Timers:** GitHub's own schedules proved unreliable (about 1 run in 15, and no daily runs), so **cron-job.org** starts both workflows through GitHub's API, using a fine-grained token limited to this repo (Actions: read and write). The token expires in September 2027 and must then be renewed in both cron-job.org jobs. GitHub's schedules stay on as a backup, and the page's in-browser fallback covers any gaps.
 
 ## Hosting setup
