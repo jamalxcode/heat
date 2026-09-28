@@ -1,0 +1,295 @@
+{
+ "t": 1790585253208,
+ "pairs": {
+  "bitcoin": {
+   "Binance": "BTC",
+   "MEXC": "BTC",
+   "OKX": "BTC",
+   "Gate.io": "BTC",
+   "KuCoin": "BTC"
+  },
+  "ethereum": {
+   "Binance": "ETH",
+   "OKX": "ETH",
+   "Gate.io": "ETH",
+   "KuCoin": "ETH"
+  },
+  "binancecoin": {
+   "Binance": "BNB",
+   "KuCoin": "BNB",
+   "MEXC": "BNB",
+   "Gate.io": "BNB",
+   "OKX": "BNB"
+  },
+  "ripple": {
+   "Binance": "XRP",
+   "OKX": "XRP",
+   "KuCoin": "XRP",
+   "Gate.io": "XRP",
+   "MEXC": "XRP"
+  },
+  "solana": {
+   "Binance": "SOL",
+   "OKX": "SOL",
+   "MEXC": "SOL",
+   "Gate.io": "SOL",
+   "KuCoin": "SOL"
+  },
+  "zcash": {
+   "Binance": "ZEC",
+   "OKX": "ZEC",
+   "KuCoin": "ZEC",
+   "Gate.io": "ZEC"
+  },
+  "hyperliquid": {
+   "Gate.io": "HYPE",
+   "Binance": "HYPE",
+   "OKX": "HYPE",
+   "KuCoin": "HYPE",
+   "MEXC": "HYPE"
+  },
+  "dogecoin": {
+   "Binance": "DOGE",
+   "OKX": "DOGE",
+   "Gate.io": "DOGE",
+   "KuCoin": "DOGE"
+  },
+  "chainlink": {
+   "Binance": "LINK",
+   "KuCoin": "LINK",
+   "OKX": "LINK",
+   "Gate.io": "LINK",
+   "MEXC": "LINK"
+  },
+  "monero": {
+   "KuCoin": "XMR",
+   "MEXC": "XMR"
+  },
+  "cardano": {
+   "Binance": "ADA",
+   "OKX": "ADA",
+   "MEXC": "ADA",
+   "Gate.io": "ADA",
+   "KuCoin": "ADA"
+  },
+  "rain": {
+   "MEXC": "RAIN",
+   "KuCoin": "RAIN",
+   "Gate.io": "RAIN"
+  },
+  "leo-token": {
+   "OKX": "LEO",
+   "Gate.io": "LEO"
+  },
+  "stellar": {
+   "Binance": "XLM",
+   "OKX": "XLM",
+   "KuCoin": "XLM",
+   "Gate.io": "XLM",
+   "MEXC": "XLM"
+  },
+  "near": {
+   "Binance": "NEAR",
+   "KuCoin": "NEAR",
+   "OKX": "NEAR",
+   "Gate.io": "NEAR",
+   "MEXC": "NEAR"
+  },
+  "bitcoin-cash": {
+   "Binance": "BCH",
+   "OKX": "BCH",
+   "MEXC": "BCH",
+   "Gate.io": "BCH",
+   "KuCoin": "BCH"
+  },
+  "uniswap": {
+   "Binance": "UNI",
+   "OKX": "UNI",
+   "KuCoin": "UNI",
+   "Gate.io": "UNI",
+   "MEXC": "UNI"
+  },
+  "canton-network": {
+   "OKX": "CC",
+   "Gate.io": "CC",
+   "KuCoin": "CC",
+   "MEXC": "CC"
+  },
+  "litecoin": {
+   "Binance": "LTC",
+   "KuCoin": "LTC",
+   "OKX": "LTC",
+   "MEXC": "LTC",
+   "Gate.io": "LTC"
+  },
+  "avalanche-2": {
+   "Binance": "AVAX",
+   "KuCoin": "AVAX",
+   "OKX": "AVAX",
+   "Gate.io": "AVAX",
+   "MEXC": "AVAX"
+  },
+  "sui": {
+   "Binance": "SUI",
+   "KuCoin": "SUI",
+   "OKX": "SUI",
+   "Gate.io": "SUI",
+   "MEXC": "SUI"
+  },
+  "the-open-network": {
+   "Binance": "GRAM",
+   "OKX": "GRAM",
+   "Gate.io": "GRAM",
+   "MEXC": "GRAM"
+  },
+  "hedera-hashgraph": {
+   "Binance": "HBAR",
+   "OKX": "HBAR",
+   "KuCoin": "HBAR",
+   "Gate.io": "HBAR",
+   "MEXC": "HBAR"
+  },
+  "quant-network": {
+   "Binance": "QNT",
+   "KuCoin": "QNT",
+   "Gate.io": "QNT",
+   "MEXC": "QNT"
+  },
+  "bitway": {
+   "Gate.io": "BTW",
+   "MEXC": "BTW"
+  },
+  "bittensor": {
+   "Binance": "TAO",
+   "KuCoin": "TAO",
+   "OKX": "TAO",
+   "Gate.io": "TAO",
+   "MEXC": "TAO"
+  },
+  "shiba-inu": {
+   "KuCoin": "SHIB",
+   "Binance": "SHIB",
+   "OKX": "SHIB",
+   "Gate.io": "SHIB"
+  },
+  "ethena": {
+   "Binance": "ENA",
+   "MEXC": "ENA",
+   "KuCoin": "ENA",
+   "OKX": "ENA",
+   "Gate.io": "ENA"
+  },
+  "memecore": {
+   "Gate.io": "M",
+   "MEXC": "M"
+  },
+  "ondo-finance": {
+   "Binance": "ONDO",
+   "OKX": "ONDO",
+   "KuCoin": "ONDO",
+   "Gate.io": "ONDO",
+   "MEXC": "ONDO"
+  },
+  "okb": {
+   "OKX": "OKB",
+   "Gate.io": "OKB",
+   "MEXC": "OKB"
+  },
+  "aave": {
+   "KuCoin": "AAVE",
+   "Binance": "AAVE",
+   "Gate.io": "AAVE",
+   "OKX": "AAVE",
+   "MEXC": "AAVE"
+  },
+  "pump-fun": {
+   "Binance": "PUMP",
+   "MEXC": "PUMP",
+   "OKX": "PUMP",
+   "KuCoin": "PUMP",
+   "Gate.io": "PUMP"
+  },
+  "mantle": {
+   "Gate.io": "MNT",
+   "MEXC": "MNT",
+   "KuCoin": "MNT"
+  },
+  "polkadot": {
+   "KuCoin": "DOT",
+   "Binance": "DOT",
+   "OKX": "DOT",
+   "MEXC": "DOT",
+   "Gate.io": "DOT"
+  },
+  "worldcoin-wld": {
+   "Binance": "WLD",
+   "OKX": "WLD",
+   "Gate.io": "WLD",
+   "KuCoin": "WLD",
+   "MEXC": "WLD"
+  },
+  "aster-2": {
+   "Binance": "ASTER",
+   "KuCoin": "ASTER",
+   "Gate.io": "ASTER",
+   "MEXC": "ASTER",
+   "OKX": "ASTER"
+  },
+  "sky": {
+   "Binance": "SKY",
+   "KuCoin": "SKY",
+   "OKX": "SKY",
+   "Gate.io": "SKY",
+   "MEXC": "SKY"
+  },
+  "world-liberty-financial": {
+   "Binance": "WLFI",
+   "OKX": "WLFI",
+   "Gate.io": "WLFI",
+   "MEXC": "WLFI",
+   "KuCoin": "WLFI"
+  },
+  "morpho": {
+   "Binance": "MORPHO",
+   "OKX": "MORPHO",
+   "Gate.io": "MORPHO",
+   "MEXC": "MORPHO",
+   "KuCoin": "MORPHO"
+  },
+  "pepe": {
+   "Binance": "PEPE",
+   "OKX": "PEPE",
+   "KuCoin": "PEPE",
+   "Gate.io": "PEPE",
+   "MEXC": "PEPE"
+  },
+  "internet-computer": {
+   "Binance": "ICP",
+   "OKX": "ICP",
+   "KuCoin": "ICP",
+   "Gate.io": "ICP",
+   "MEXC": "ICP"
+  },
+  "htx-dao": {
+   "MEXC": "HTX",
+   "Gate.io": "HTX",
+   "KuCoin": "HTX"
+  },
+  "ethereum-classic": {
+   "Binance": "ETC",
+   "OKX": "ETC",
+   "Gate.io": "ETC",
+   "KuCoin": "ETC",
+   "MEXC": "ETC"
+  },
+  "bitget-token": {
+   "MEXC": "BGB"
+  },
+  "venice-token": {
+   "KuCoin": "VVV",
+   "Gate.io": "VVV",
+   "OKX": "VVV",
+   "MEXC": "VVV"
+  }
+ }
+}
