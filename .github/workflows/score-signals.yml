@@ -34,6 +34,7 @@ jobs:
       - name: Score signals
         env:
           SITE_URL: https://heat.sala.company
+          NODE_OPTIONS: --max-old-space-size=6144   # tuning holds several 2.7-year row sets at once
         run: node scripts/score.mjs ${{ inputs.tune && '--tune' || '' }}
 
       - name: Commit the scorecard

@@ -376,8 +376,17 @@ function objective(rows, from, to) {
 // all history) are adopted only if that procedure beat the current settings in most folds and on average.
 export function tune(coins, current, { folds = 3, minT = 2.5, margin = 0.003 } = {}) {
   const cur = withDefaults(current);
-  const cache = new Map();
-  const rowsFor = p => { const k = JSON.stringify(withDefaults(p)); if (!cache.has(k)) cache.set(k, signalRows(coins, p)); return cache.get(k); };
+  // Rows for a given setting (~40k rows for 50 coins × 2.7 years). Keep only the 12 most recently used: caching every
+  // variant tried across all folds ran GitHub's runner out of memory (4 GB) once momentum and stop variants were added.
+  const cache = new Map(), CACHE_MAX = 12;
+  const rowsFor = p => {
+    const k = JSON.stringify(withDefaults(p));
+    let rows = cache.get(k);
+    if (rows) cache.delete(k); else rows = signalRows(coins, p);
+    cache.set(k, rows);                                     // most recently used goes last
+    if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value);
+    return rows;
+  };
 
   const days = [...new Set(rowsFor(cur).map(r => r.day))].sort((a, b) => a - b);
   const start = Math.floor(days.length * 0.5), block = Math.floor((days.length - start) / folds);
