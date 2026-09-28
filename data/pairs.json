@@ -1,11 +1,11 @@
 {
- "t": 1790585253208,
+ "t": 1790618849190,
  "pairs": {
   "bitcoin": {
    "Binance": "BTC",
    "MEXC": "BTC",
-   "OKX": "BTC",
    "Gate.io": "BTC",
+   "OKX": "BTC",
    "KuCoin": "BTC"
   },
   "ethereum": {
@@ -23,10 +23,10 @@
   },
   "ripple": {
    "Binance": "XRP",
-   "OKX": "XRP",
    "KuCoin": "XRP",
-   "Gate.io": "XRP",
-   "MEXC": "XRP"
+   "OKX": "XRP",
+   "MEXC": "XRP",
+   "Gate.io": "XRP"
   },
   "solana": {
    "Binance": "SOL",
@@ -42,9 +42,9 @@
    "Gate.io": "ZEC"
   },
   "hyperliquid": {
-   "Gate.io": "HYPE",
-   "Binance": "HYPE",
    "OKX": "HYPE",
+   "Binance": "HYPE",
+   "Gate.io": "HYPE",
    "KuCoin": "HYPE",
    "MEXC": "HYPE"
   },
@@ -198,8 +198,8 @@
   "aave": {
    "KuCoin": "AAVE",
    "Binance": "AAVE",
-   "Gate.io": "AAVE",
    "OKX": "AAVE",
+   "Gate.io": "AAVE",
    "MEXC": "AAVE"
   },
   "pump-fun": {
@@ -231,8 +231,8 @@
   "aster-2": {
    "Binance": "ASTER",
    "KuCoin": "ASTER",
-   "Gate.io": "ASTER",
    "MEXC": "ASTER",
+   "Gate.io": "ASTER",
    "OKX": "ASTER"
   },
   "sky": {
@@ -290,6 +290,22 @@
    "Gate.io": "VVV",
    "OKX": "VVV",
    "MEXC": "VVV"
+  },
+  "tron": {
+   "Binance": "TRX",
+   "KuCoin": "TRX",
+   "MEXC": "TRX",
+   "OKX": "TRX",
+   "Gate.io": "TRX"
+  },
+  "whitebit": {
+   "MEXC": "WBT"
+  },
+  "crypto-com-chain": {
+   "OKX": "CRO",
+   "Gate.io": "CRO",
+   "KuCoin": "CRO",
+   "MEXC": "CRO"
   }
  }
 }
