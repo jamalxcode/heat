@@ -40,7 +40,9 @@ jobs:
           PREV_URL: ${{ steps.pages.outputs.base_url }}/data.json
         run: |
           mkdir -p _site
+          mkdir -p _site/scripts
           cp index.html signals.mjs _site/
+          cp scripts/build-data.mjs _site/scripts/   # the page runs it itself if data.json ever goes stale
           [ -f data/scorecard.json ] && cp data/scorecard.json _site/ || true
           node scripts/build-data.mjs _site/data.json
 

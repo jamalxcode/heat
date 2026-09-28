@@ -128,7 +128,8 @@ export async function pool(items, n, fn) {
 }
 
 /* ---------- main ---------- */
-export async function build({ prev = null, log = console.log, params = null } = {}) {
+// cgCandles: false skips the slow CoinGecko candle fallback (used when a visitor's browser runs this as a backup)
+export async function build({ prev = null, log = console.log, params = null, cgCandles = true } = {}) {
   const started = Date.now();
   const { src, markets, stale } = await loadMarkets(prev, log);
   const cats = await loadCategories(prev, log);
@@ -143,7 +144,7 @@ export async function build({ prev = null, log = console.log, params = null } = 
     if (old && started - old.t < maxAge) { hist[c.id] = old; reused++; return; }
     const h = await fromExchanges(c, old?.src);
     if (h) { h.t = started; hist[c.id] = pack(h); }
-    else if (!pegged.has(c.id)) slow.push(c);
+    else if (!pegged.has(c.id) && cgCandles) slow.push(c);
     else if (old) hist[c.id] = old;
   });
   for (const c of slow) { // CoinGecko fallback, spaced out for its free tier

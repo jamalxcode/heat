@@ -150,6 +150,13 @@ h1 .tld { color: var(--ink-2); font-weight: 600; }
 .sc-warn { color: var(--down-text); }
 .sc-card details { margin-top: 8px; font-size: 13px; }
 .sc-card summary { cursor: pointer; color: var(--ink-2); }
+.sc-segs { display: flex; flex-wrap: wrap; gap: 8px; }
+.sc-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12.5px; color: var(--ink-2); margin: 2px 0 6px; }
+.sc-legend i { display: inline-block; width: 12px; height: 3px; border-radius: 2px; vertical-align: 3px; margin-right: 6px; }
+.sc-legend b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.sc-chart { position: relative; }
+.sc-chart svg { display: block; width: 100%; height: auto; touch-action: pan-y; }
+.sc-tip { position: absolute; top: 4px; z-index: 2; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); padding: 6px 9px; font-size: 12px; line-height: 1.45; white-space: nowrap; font-variant-numeric: tabular-nums; }
 @media (max-width: 640px) { .wip { flex-wrap: wrap; } .wip .wip-ok { width: 100%; } }
 .sub { color: var(--ink-2); margin: 0; font-size: 13px; }
 .status { color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -211,7 +218,6 @@ h1 .tld { color: var(--ink-2); font-weight: 600; }
 .tile .sym { font-weight: 700; font-size: 16px; display: flex; align-items: center; gap: 6px; min-width: 0; }
 .tile .sym img { width: 18px; height: 18px; border-radius: 50%; flex: none; background: var(--surface); }
 .ph { display: inline-grid; place-items: center; flex: none; border-radius: 50%; background: rgba(127,127,127,.28); font-size: 10px; font-weight: 700; }
-#clock { font-variant-numeric: tabular-nums; }
 .tile .sym .rk { font-weight: 500; font-size: 11px; opacity: .75; }
 .tile .chg { font-weight: 700; font-size: 16px; text-align: right; }
 .tile .name { font-size: 12px; display: flex; align-items: center; gap: 4px; min-width: 0; white-space: nowrap; }
@@ -304,7 +310,6 @@ footer details summary { cursor: pointer; }
     </div>
     <div class="status">
       <span id="status"><span class="dot"></span>Starting…</span>
-      <span id="clock"></span>
       <button class="btn" id="refresh" title="Fetch fresh data">↻ Refresh</button>
       <button class="btn" id="theme" title="Switch theme">◐ Auto</button>
       <button class="btn" id="wipBtn" title="Work in progress: read the warning">⚠ WIP</button>
@@ -354,7 +359,7 @@ footer details summary { cursor: pointer; }
   <footer>
     <div><b>How to read a tile.</b> <b>RSI</b>: below the lower line is <i>oversold</i> and above the upper line is <i>overbought</i> (the exact levels are in the legend and can be retuned). The marker shows where RSI sits on 0–100.
       <b>Trend</b>: the fast moving average above the slow one (50/200-day by default) is an uptrend, below is a downtrend. The note says whether price agrees ("strong") or not ("pullback" / "bounce"). ✦ marks a golden or death cross in the last 14 days.
-      <b>BB width</b>: (upper − lower) / middle band, ranked against the last 180 days. Bottom 25% is a <i>squeeze</i> (volatility is compressed, and a big move often follows, in either direction). Top 20% is <i>expanded</i>.</div>
+      <b>BB width</b>: (upper − lower) / middle band, ranked against the last 180 days. Bottom 25% is a <i>squeeze</i> (volatility is compressed, and a big move often follows, in either direction). Top 20% is <i>expanded</i>. The very tightest bands get a ⚡ next to the name: a big move is likely, but not its direction, so ⚡ never counts as a 🚀 or 😢.</div>
     <div id="srcinfo"></div>
     <details id="excluded"><summary>Excluded tokens</summary><div></div></details>
     <div>Data is collected every 10 minutes from CoinGecko (CoinLore as backup) for prices and rankings, and from Binance, Gate.io, OKX, MEXC, KuCoin and CoinGecko for daily candles. Prices are not real-time. Today's candle is still forming, so indicators move during the day. Not financial advice.</div>
@@ -378,40 +383,19 @@ import * as SIG from './signals.mjs';
 
 /* ================= config ================= */
 const TOP_N = 50;
-const CANDLES = 260;
 const REFRESH_MIN = 10;              // data.json is rebuilt by GitHub Actions every 10 minutes
 const MARKETS_TTL = REFRESH_MIN * 60e3;
 const SNAPSHOT_GRACE = 2 * 60e3;     // Actions runs start late and Pages takes a minute to publish
 const SNAPSHOT_RETRY = 2 * 60e3;     // poll this often once a new snapshot is due
-const SNAPSHOT_MAX_AGE = 45 * 60e3;  // older than this: the job is stuck, fetch live instead
+const SNAPSHOT_MAX_AGE = 45 * 60e3;  // older than this: the job is stuck, so build the data in the browser instead
+const LIVE_EVERY = REFRESH_MIN * 60e3; // ...but at most once per 10 minutes per browser
 const DAY = 864e5;
-const MIN_MANUAL = 60e3;             // Refresh button: at most once a minute
-const HIST_TTL = 60 * 60e3;          // exchange candles (live price patches the last one in between)
-const HIST_TTL_CG = 6 * 60 * 60e3;   // CoinGecko candles: its free quota is scarce
-const CATS_TTL = 24 * 60 * 60e3;
-const MISS_TTL = 24 * 60 * 60e3;     // remember "coin not listed on this exchange"
-const CG = 'api.coingecko.com';
-const CL = 'api.coinlore.net';
-// Request budget per API host, shared by every open tab: at most `max` calls per `per` ms, `gap` ms apart.
-// Kept well under each API's published free limit.
-const LIMITS = {
-  [CG]:                      { max: 5,   per: 60e3, gap: 3000 },
-  [CL]:                      { max: 2,   per: 60e3, gap: 1000 },
-  'data-api.binance.vision': { max: 200, per: 60e3, gap: 0 },
-  'api.gateio.ws':           { max: 60,  per: 10e3, gap: 0 },
-  'www.okx.com':             { max: 10,  per: 2e3,  gap: 0 },
-};
 const BINS = { '24h': [1, 3, 6, 10], '7d': [2.5, 7, 15, 25], '30d': [5, 15, 30, 50] };
-// Exchange tickers that differ from CoinGecko's symbol
-const ALIASES = { 'the-open-network': ['TON'], 'polygon-ecosystem-token': ['POL', 'MATIC'] };
-const EXCLUDE_NAME = /\b(fund|treasur\w*|t-bills?|securities|money market|heloc|wrapped|staked|bridged|restaked|gold|yield)\b/i;
-// Wrapped / staked / liquid-staking copies of other coins (wBTC, stETH, cbBTC, JitoSOL, WBNB…)
-const EXCLUDE_SYMBOL = /^(w|st|wst|cb|we|bn|jito|m|r|ez|rs|l|solv|t)(btc|eth|bnb|sol|steth|beth|eeth)$/i;
 
 /* ================= helpers ================= */
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-const sleep = ms => new Promise(r => setTimeout(r, ms));
+
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const store = {
   get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
@@ -446,77 +430,14 @@ const logo = (c, px) => c.image
   ? `<img src="${esc(c.image)}" alt="" loading="lazy" width="${px}" height="${px}">`
   : `<span class="ph" style="width:${px}px;height:${px}px" aria-hidden="true">${esc(c.symbol.slice(0, 1).toUpperCase())}</span>`;
 
-/* ================= rate limiter (the internal clock) ================= */
-const rlMem = {};
-const rlGet = host => store.get('hm.rl.' + host) || rlMem[host] || { hits: [], until: 0, strikes: 0 };
-const rlSet = (host, v) => { rlMem[host] = v; store.set('hm.rl.' + host, v); };
-// Earliest timestamp at which `host` may be called again
-function nextSlot(host) {
-  const L = LIMITS[host];
-  if (!L) return 0;
-  const s = rlGet(host), now = Date.now();
-  const hits = (s.hits || []).filter(t => now - t < L.per);
-  let at = Math.max(s.until || 0, hits.length ? hits[hits.length - 1] + L.gap : 0);
-  if (hits.length >= L.max) at = Math.max(at, hits[hits.length - L.max] + L.per);
-  return at;
-}
-function spend(host) {
-  const L = LIMITS[host];
-  if (!L) return;
-  const s = rlGet(host), now = Date.now();
-  s.hits = (s.hits || []).filter(t => now - t < L.per).concat(now);
-  rlSet(host, s);
-}
-// Blocked: pause this host 1, 2, 4, 8… minutes (max 15) and don't call it until then
-function penalize(host) {
-  const s = rlGet(host);
-  s.strikes = (s.strikes || 0) + 1;
-  s.until = Date.now() + Math.min(60e3 * 2 ** (s.strikes - 1), 15 * 60e3);
-  rlSet(host, s);
-}
-function absolve(host) {
-  const s = rlGet(host);
-  if (s.strikes) { s.strikes = 0; rlSet(host, s); }
-}
-const pausedUntil = host => Math.max(0, (rlGet(host).until || 0));
-
-class RateLimited extends Error {
-  constructor(host, at) { super(host + ' paused'); this.host = host; this.at = at; }
-}
-
-async function fetchJSON(url, { wait = true, maxWait = 120e3, timeout = 15000 } = {}) {
-  const host = new URL(url).hostname;
-  for (;;) { // wait for our turn; re-check each second because other tabs share the budget
-    const d = nextSlot(host) - Date.now();
-    if (d <= 0) break;
-    if (!wait || d > maxWait) throw new RateLimited(host, Date.now() + d);
-    await sleep(Math.min(d, 1000) + 25);
-  }
-  spend(host);
-  const ctl = new AbortController();
-  const t = setTimeout(() => ctl.abort(), timeout);
-  try {
-    const r = await fetch(url, { signal: ctl.signal });
-    if (r.status === 429 || r.status === 418) penalize(host);
-    if (!r.ok) { const e = new Error('HTTP ' + r.status); e.status = r.status; throw e; }
-    const j = await r.json();
-    absolve(host);
-    return j;
-  } catch (e) {
-    // CoinGecko's 429 carries no CORS header, so the browser reports it as a bare network error
-    if (host === CG && !e.status && e.name !== 'AbortError' && navigator.onLine !== false) penalize(host);
-    throw e;
-  } finally { clearTimeout(t); }
-}
-
 /* ================= state ================= */
 const S = {
   markets: [], coins: [], excluded: [], stable: new Set(), gold: new Set(),
   hist: {}, ind: {},
   colorBy: '24h', filter: 'all', view: 'grid', pegged: false,
   sort: { key: 'rank', dir: 1 }, pinned: null, busy: false,
-  updated: null, marketSrc: '', stale: false, nextAuto: 0, waitingFor: '',
-  params: SIG.withDefaults(null), scorecard: null, scoreWin: 'd30',
+  updated: null, marketSrc: '', stale: false, nextAuto: 0,
+  params: SIG.withDefaults(null), scorecard: null, scoreWin: 'd30', scoreH: 1,
 };
 const prefs = store.get('hm.prefs') || {};
 Object.assign(S, { colorBy: prefs.colorBy || '24h', view: prefs.view || 'grid', pegged: !!prefs.pegged });
@@ -524,191 +445,40 @@ const savePrefs = () => store.set('hm.prefs', { colorBy: S.colorBy, view: S.view
 
 function setStatus(text, kind = '') { $('#status').innerHTML = `<span class="dot ${kind}"></span>${esc(text)}`; }
 
-/* ================= data: rankings (CoinGecko → CoinLore → cache) ================= */
-const CG_MARKETS = `https://${CG}/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&price_change_percentage=24h,7d,30d`;
-async function loadMarkets(force) {
-  const cached = store.get('hm.markets');
-  if (!force && cached && Date.now() - cached.t < MARKETS_TTL) return cached;
-  try {
-    const data = await fetchJSON(CG_MARKETS, { wait: false });
-    const rec = { t: Date.now(), src: 'CoinGecko', data };
-    store.set('hm.markets', rec);
-    store.set('hm.markets.cg', rec); // CoinLore rows borrow ids & logos from here
-    return rec;
-  } catch { /* paused or failed */ }
-  try {
-    const d = await fetchJSON(`https://${CL}/api/tickers/?start=0&limit=100`, { wait: false });
-    const rec = { t: Date.now(), src: 'CoinLore', data: fromCoinLore(d.data || []) };
-    if (rec.data.length) { store.set('hm.markets', rec); return rec; }
-  } catch { /* paused or failed */ }
-  if (cached) return { ...cached, stale: true };
-  throw new Error('Price sources are busy');
-}
-function fromCoinLore(rows) {
-  const known = {};
-  for (const c of store.get('hm.markets.cg')?.data || []) known[c.symbol.toLowerCase()] ??= c;
-  return rows.map(r => {
-    const sym = String(r.symbol).toLowerCase(), k = known[sym];
-    return {
-      id: k ? k.id : 'cl-' + r.nameid, symbol: sym, name: r.name, image: k?.image || '',
-      market_cap_rank: +r.rank, current_price: +r.price_usd, market_cap: +r.market_cap_usd,
-      price_change_percentage_24h_in_currency: +r.percent_change_24h,
-      price_change_percentage_7d_in_currency: +r.percent_change_7d,
-      price_change_percentage_30d_in_currency: null,
-    };
-  });
-}
-
-async function loadCategories() {
-  const cached = store.get('hm.cats');
-  if (cached && Date.now() - cached.t < CATS_TTL) return cached;
-  try {
-    const stable = (await fetchJSON(`https://${CG}/api/v3/coins/markets?vs_currency=usd&category=stablecoins&per_page=250&order=market_cap_desc`, { wait: false })).map(c => c.id);
-    const gold = (await fetchJSON(`https://${CG}/api/v3/coins/markets?vs_currency=usd&category=tokenized-gold&per_page=100&order=market_cap_desc`, { maxWait: 10e3 })).map(c => c.id);
-    const out = { t: Date.now(), stable, gold };
-    store.set('hm.cats', out);
-    return out;
-  } catch { return cached || { t: 0, stable: [], gold: [] }; } // name rules below still catch most
-}
-
-function isPegged(c) {
-  if (S.stable.has(c.id) || S.gold.has(c.id)) return true;
-  if (EXCLUDE_NAME.test(c.name) || EXCLUDE_SYMBOL.test(c.symbol)) return true;
-  if (/usd|eur/i.test(c.symbol) && c.current_price > 0.9 && c.current_price < 1.1) return true;
-  // near-flat price in the $0.85-1.35 range = stablecoin or yield-bearing dollar token
-  const a = Math.abs(chgOf(c, '24h') ?? 9), b = Math.abs(chgOf(c, '7d') ?? 9), d = Math.abs(chgOf(c, '30d') ?? 0);
-  return a < 0.6 && b < 1.5 && d < 3 && c.current_price > 0.85 && c.current_price < 1.35;
-}
-
+/* ================= data ================= */
+// Everything normally comes from data.json, rebuilt every 10 minutes by GitHub Actions. If that file is missing or
+// stale, the page runs the same build script (scripts/build-data.mjs) itself: see buildLive() below.
 function pickCoins() {
+  const cats = { stable: [...S.stable], gold: [...S.gold] };
   S.excluded = [];
   const list = [];
   for (const c of S.markets) {
-    if (!S.pegged && isPegged(c)) { S.excluded.push(c); continue; }
+    if (!S.pegged && SIG.isPegged(c, cats)) { S.excluded.push(c); continue; }
     if (list.length < TOP_N) list.push(c);
   }
   S.coins = list;
 }
 
-/* ================= data: daily candles (Binance → Gate.io → OKX → CoinGecko) ================= */
-function symbolsFor(c) {
-  const base = c.symbol.toUpperCase();
-  const list = [...(ALIASES[c.id] || []), base];
-  return [...new Set(list)].filter(s => /^[A-Z0-9]+$/.test(s));
-}
-const sane = (closes, price) => closes.length >= 20 && price > 0 && Math.abs(closes[closes.length - 1][1] / price - 1) < 0.15;
-
-async function fromBinance(c) {
-  for (const s of symbolsFor(c)) {
-    try {
-      const rows = await fetchJSON(`https://data-api.binance.vision/api/v3/klines?symbol=${s}USDT&interval=1d&limit=${CANDLES}`);
-      const closes = rows.map(r => [r[0], +r[4]]);
-      if (sane(closes, c.current_price)) return { src: 'Binance', pair: s + '/USDT', closes };
-    } catch { /* not listed */ }
-  }
-  return null;
-}
-async function fromGate(c) {
-  for (const s of symbolsFor(c)) {
-    try {
-      const rows = await fetchJSON(`https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair=${s}_USDT&interval=1d&limit=${CANDLES}`);
-      const closes = rows.map(r => [+r[0] * 1000, +r[2]]).sort((a, b) => a[0] - b[0]);
-      if (sane(closes, c.current_price)) return { src: 'Gate.io', pair: s + '/USDT', closes };
-    } catch { /* not listed */ }
-  }
-  return null;
-}
-async function fromOKX(c) {
-  for (const s of symbolsFor(c)) {
-    try {
-      const d = await fetchJSON(`https://www.okx.com/api/v5/market/candles?instId=${s}-USDT&bar=1Dutc&limit=${CANDLES}`);
-      const closes = (d.data || []).map(r => [+r[0], +r[4]]).sort((a, b) => a[0] - b[0]);
-      if (sane(closes, c.current_price)) return { src: 'OKX', pair: s + '/USDT', closes };
-    } catch { /* not listed */ }
-  }
-  return null;
-}
-// Throws RateLimited when CoinGecko is paused for longer than we're willing to wait
-async function fromCoinGecko(c) {
-  if (c.id.startsWith('cl-')) return null; // no CoinGecko id known
-  const d = await fetchJSON(`https://${CG}/api/v3/coins/${encodeURIComponent(c.id)}/market_chart?vs_currency=usd&days=${CANDLES - 1}&interval=daily`, { maxWait: 3 * 60e3 });
-  const closes = (d.prices || []).map(p => [p[0], p[1]]);
-  return closes.length >= 20 ? { src: 'CoinGecko', pair: c.symbol.toUpperCase() + '/USD', closes } : null;
-}
-
-// Exchanges, trying first the one that worked last time and skipping ones known not to list the coin
-const EXCHANGES = [['Binance', fromBinance], ['Gate.io', fromGate], ['OKX', fromOKX]];
-async function fromExchanges(c) {
-  const miss = store.get('hm.miss.' + c.id) || {};
-  const pref = store.get('hm.src.' + c.id);
-  const order = [...EXCHANGES].sort((a, b) => (b[0] === pref) - (a[0] === pref));
-  for (const [name, fn] of order) {
-    if (miss[name] && Date.now() - miss[name] < MISS_TTL) continue;
-    const h = await fn(c);
-    if (h) {
-      store.set('hm.src.' + c.id, name);
-      if (miss[name]) { delete miss[name]; store.set('hm.miss.' + c.id, miss); }
-      return h;
-    }
-    if (navigator.onLine !== false) { miss[name] = Date.now(); store.set('hm.miss.' + c.id, miss); }
-  }
-  return null;
-}
-
-async function pool(items, n, fn) {
-  let i = 0;
-  await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => { while (i < items.length) await fn(items[i++]); }));
-}
-
-const histTTL = h => h.src === 'CoinGecko' ? HIST_TTL_CG : HIST_TTL;
-async function loadHistories({ onlyMissing = false } = {}) {
-  const need = [];
-  for (const c of S.coins) {
-    const cached = S.hist[c.id] || store.get('hm.h.' + c.id);
-    if (cached) setHist(c, cached);                       // show what we have right away, even if old
-    if (!cached || (!onlyMissing && Date.now() - cached.t >= histTTL(cached))) need.push(c);
-  }
-  if (!need.length) return;
-  let done = S.coins.length - need.length;
-  const progress = () => setStatus(`Loading candles ${done}/${S.coins.length}…`, 'busy');
-  progress();
-  const slow = [];
-  await pool(need, 6, async c => {
-    const h = await fromExchanges(c);
-    if (h) { saveHist(c, h); done++; progress(); } else slow.push(c);
-  });
-  for (const c of slow) { // CoinGecko fallback, one at a time inside its budget
-    S.waitingFor = c.symbol.toUpperCase();
-    try {
-      const h = await fromCoinGecko(c);
-      if (h) saveHist(c, h);
-      else if (!S.hist[c.id]) { S.ind[c.id] = { error: true }; updateCoin(c); }
-    } catch {
-      if (!S.hist[c.id]) { S.ind[c.id] = { error: true, later: true }; updateCoin(c); } // retried next cycle
-    }
-    done++; progress();
-  }
-  S.waitingFor = '';
-}
-function saveHist(c, h) {
-  h.t = Date.now();
-  store.set('hm.h.' + c.id, h);
-  setHist(c, h);
-}
-
-// Swap today's (still forming) candle close for the live price, so indicators track the market between candle fetches
+// Swap today's (still forming) candle close for the latest price, so indicators track the market between candle fetches
 function withLive(closes, price) {
   if (!(price > 0) || !closes.length) return closes;
   const out = closes.slice(), last = out[out.length - 1];
-  const today = Math.floor(Date.now() / 864e5), day = Math.floor(last[0] / 864e5);
+  const today = Math.floor(Date.now() / DAY), day = Math.floor(last[0] / DAY);
   if (day === today) out[out.length - 1] = [last[0], price];
-  else if (day === today - 1) out.push([today * 864e5, price]);
+  else if (day === today - 1) out.push([today * DAY, price]);
   return out;
 }
 function setHist(c, h) {
   S.hist[c.id] = h;
   S.ind[c.id] = compute(withLive(h.closes, c.current_price));
   updateCoin(c);
+}
+// Compute every tile from the candles we have; coins without any show a note
+function applyHist() {
+  for (const c of S.coins) {
+    if (S.hist[c.id]) setHist(c, S.hist[c.id]);
+    else { S.ind[c.id] = { error: true }; updateCoin(c); }
+  }
 }
 
 /* ================= indicators (shared engine: signals.mjs) ================= */
@@ -828,16 +598,17 @@ function applyParams(p) {
 }
 function emojiHTML(ind) {
   const { good, bad } = signals(ind);
-  if (!good.length && !bad.length) return '';
-  const title = [good.length && '🚀 ' + good.join(', '), bad.length && '😢 ' + bad.join(', ')].filter(Boolean).join(' · ');
-  return `<span class="emo" title="${esc(title)}" aria-label="${esc(title)}">${'🚀'.repeat(good.length)}${'😢'.repeat(bad.length)}</span>`;
+  const sq = !!ind?.sig?.squeeze;
+  if (!good.length && !bad.length && !sq) return '';
+  const title = [good.length && '🚀 ' + good.join(', '), bad.length && '😢 ' + bad.join(', '), sq && '⚡ ' + SIG.SQUEEZE_LABEL].filter(Boolean).join(' · ');
+  return `<span class="emo" title="${esc(title)}" aria-label="${esc(title)}">${'🚀'.repeat(good.length)}${'😢'.repeat(bad.length)}${sq ? '⚡' : ''}</span>`;
 }
 
 function tileHTML(c) {
   const ind = S.ind[c.id], ch = chgOf(c, S.colorBy);
   const dim = S.filter !== 'all' && !match(ind, S.filter);
   const sg = signals(ind);
-  const label = `${c.name}, ${fmtPrice(c.current_price)}, ${S.colorBy} ${fmtPct(ch)}, ${sg.good.length} rockets, ${sg.bad.length} cry faces`;
+  const label = `${c.name}, ${fmtPrice(c.current_price)}, ${S.colorBy} ${fmtPct(ch)}, ${sg.good.length} rockets, ${sg.bad.length} cry faces${S.ind[c.id]?.sig?.squeeze ? ", squeeze: big move likely" : ""}`;
   return `<button class="tile ${heatClass(ch, S.colorBy)}${dim ? ' dim' : ''}" data-id="${esc(c.id)}" aria-label="${esc(label)}">
     <div class="top">
       <div class="sym">${logo(c, 18)}<span>${esc(c.symbol.toUpperCase())}</span><span class="rk">#${c.market_cap_rank}</span></div>
@@ -860,7 +631,7 @@ function renderLegend() {
     <span class="scale">${cells.map(([k, l]) => `<span class="${k}">${l}</span>`).join('')}</span>
     <span class="leg-item"><span class="gauge" style="width:60px;flex:none"><i style="left:50%"></i></span> RSI 0–100 (under ${P().rsiLow} oversold · over ${P().rsiHigh} overbought)</span>
     <span class="leg-item"><span class="up-t" style="display:inline-flex">${ICON.up}</span>/<span class="dn-t" style="display:inline-flex">${ICON.down}</span> ${P().maFast}MA vs ${P().maSlow}MA</span>
-    <span class="leg-item">${ICON.squeeze} BBW squeeze = move likely</span>
+    <span class="leg-item">⚡ BB width in bottom ${P().bbTightPct}%: big move likely, direction unknown</span>
     ${['🚀', '😢'].map(e => {
       const ks = Object.keys(SIG.COMPONENTS).filter(k => roleOf(k) === e);
       return ks.length ? `<span class="leg-item">${e} each: ${ks.map(legendName).join(' · ')}</span>` : '';
@@ -971,23 +742,95 @@ const icVerdict = ic => ic?.mean == null ? 'not enough data yet'
   : ic.t <= -2 ? 'backwards: more 🚀 meant worse next days'
   : 'no reliable edge yet, about as good as a coin flip';
 
+const H_WORD = { 1: 'the next day', 3: 'the next 3 days', 7: 'the next 7 days' };
+// v1 scorecards had one horizon per window; v2 has { 1: stats, 3: stats, 7: stats }
+const byH = W => W && W.byScore ? { 1: W } : (W || {});
+
+// 60-day chart: what you'd have made holding each day's 🚀 coins (or 😢 coins, or all coins) for one day, compounded
+function basketChart(daily) {
+  if (!daily?.length) return '';
+  let r = 1, s = 1, m = 1;
+  const pts = daily.map(d => {
+    r *= 1 + (d.rockets ?? 0); s *= 1 + (d.sad ?? 0); m *= 1 + (d.mkt ?? 0);
+    return { ...d, R: r - 1, S: s - 1, M: m - 1 };
+  });
+  const W = 720, H = 230, L = 46, Rp = 14, T = 12, B = 26;
+  const vals = pts.flatMap(p => [p.R, p.S, p.M, 0]);
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  const pad = (hi - lo) * 0.08 || 0.01; lo -= pad; hi += pad;
+  const x = i => L + (pts.length === 1 ? 0 : i / (pts.length - 1)) * (W - L - Rp);
+  const y = v => T + (hi - v) / (hi - lo) * (H - T - B);
+  const path = k => pts.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(p[k]).toFixed(1)}`).join('');
+  const ticks = [hi - pad, (hi + lo) / 2, lo + pad];
+  const xl = [0, Math.floor((pts.length - 1) / 2), pts.length - 1];
+  S.chartPts = pts; S.chartGeom = { W, L, Rp, x };
+  const end = pts[pts.length - 1];
+  return `
+    <div class="sc-legend">
+      <span><i style="background:#0077be"></i>🚀 coins <b>${spc(end.R, 1)}</b></span>
+      <span><i style="background:#b8413f"></i>😢 coins <b>${spc(end.S, 1)}</b></span>
+      <span><i style="background:var(--muted)"></i>All coins <b>${spc(end.M, 1)}</b></span>
+    </div>
+    <div class="sc-chart">
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Last ${pts.length} days: 🚀 coins ${spc(end.R, 1)}, 😢 coins ${spc(end.S, 1)}, all coins ${spc(end.M, 1)}">
+        ${ticks.map(v => `<line x1="${L}" x2="${W - Rp}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${L - 6}" y="${y(v) + 3.5}" text-anchor="end" font-size="11" fill="var(--muted)">${spc(v, 0)}</text>`).join('')}
+        <line x1="${L}" x2="${W - Rp}" y1="${y(0)}" y2="${y(0)}" stroke="var(--axis)"/>
+        ${xl.map(i => `<text x="${x(i)}" y="${H - 6}" text-anchor="${i === 0 ? 'start' : i === pts.length - 1 ? 'end' : 'middle'}" font-size="11" fill="var(--muted)">${pts[i].day.slice(5)}</text>`).join('')}
+        <path d="${path('M')}" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-linejoin="round"/>
+        <path d="${path('S')}" fill="none" stroke="#b8413f" stroke-width="2" stroke-linejoin="round"/>
+        <path d="${path('R')}" fill="none" stroke="#0077be" stroke-width="2" stroke-linejoin="round"/>
+        <line class="sc-cross" x1="0" x2="0" y1="${T}" y2="${H - B}" stroke="var(--ink-2)" stroke-width="1" visibility="hidden"/>
+        <rect class="sc-hit" x="${L}" y="${T}" width="${W - L - Rp}" height="${H - T - B}" fill="transparent"/>
+      </svg>
+      <div class="sc-tip" hidden></div>
+    </div>
+    <p class="sc-muted">Each day: the average next-day move of that day's 🚀 coins, 😢 coins and all coins, compounded over the last ${pts.length} days. It's a scorekeeping line, not a trading result: there are no fees or slippage, and the coins are today's top 50, several of which made the list <i>because</i> they rose, so all three lines look better than reality. Compare the lines with each other, not with zero.</p>`;
+}
+function wireChart() {
+  const box = $('#scorewrap .sc-chart');
+  if (!box || !S.chartPts) return;
+  const svg = box.querySelector('svg'), cross = box.querySelector('.sc-cross'), tip = box.querySelector('.sc-tip');
+  const { W, L, Rp, x } = S.chartGeom, pts = S.chartPts;
+  const at = e => {
+    const r = svg.getBoundingClientRect(), vx = (e.clientX - r.left) / r.width * W;
+    return Math.max(0, Math.min(pts.length - 1, Math.round((vx - L) / (W - L - Rp) * (pts.length - 1))));
+  };
+  const show = e => {
+    const i = at(e), p = pts[i], r = svg.getBoundingClientRect();
+    cross.setAttribute('x1', x(i)); cross.setAttribute('x2', x(i)); cross.setAttribute('visibility', 'visible');
+    tip.innerHTML = `<b>${p.day}</b><br>🚀 ${p.nR} coins: ${spc(p.rockets)} · total ${spc(p.R, 1)}<br>😢 ${p.nS} coins: ${spc(p.sad)} · total ${spc(p.S, 1)}<br>All coins: ${spc(p.mkt)} · total ${spc(p.M, 1)}`;
+    tip.hidden = false;
+    const px = x(i) / W * r.width;
+    tip.style.left = Math.min(Math.max(0, px - tip.offsetWidth / 2), r.width - tip.offsetWidth) + 'px';
+  };
+  const hide = () => { cross.setAttribute('visibility', 'hidden'); tip.hidden = true; };
+  svg.addEventListener('pointermove', show);
+  svg.addEventListener('pointerdown', show);
+  svg.addEventListener('pointerleave', hide);
+}
+
 function renderScorecard() {
   const box = $('#scorewrap'), sc = S.scorecard;
   if (!sc) {
-    box.innerHTML = `<div class="sc-card"><h2>Scorecard</h2><p class="sc-muted">The first scorecard appears after the daily scoring job runs (00:20 UTC). It checks every 🚀 and 😢 against what the coin actually did the next day.</p></div>`;
+    box.innerHTML = `<div class="sc-card"><h2>Scorecard</h2><p class="sc-muted">The first scorecard appears after the daily scoring job runs (00:20 UTC). It checks every 🚀 and 😢 against what the coin actually did afterwards.</p></div>`;
     return;
   }
-  const y = sc.yesterday, ys = y.stats, w = sc.windows[S.scoreWin] || sc.windows.d30;
+  const y = sc.yesterday, ys = y.stats;
+  const Hs = sc.horizons || [1];
+  if (!Hs.includes(S.scoreH)) S.scoreH = 1;
+  const h = S.scoreH, hw = H_WORD[h];
+  const w = byH(sc.windows[S.scoreWin] || sc.windows.d30)[h];
   const winName = { d30: 'last 30 days', d90: 'last 90 days', all: 'all history' }[S.scoreWin];
-  const moved = y.coins.filter(c => c.score !== 0);
+  const moved = y.coins.filter(c => c.score !== 0 || c.squeeze);
   const tile = (title, big, lines) => `<div class="sc-tile"><div class="sc-t">${title}</div><div class="sc-big">${big}</div>${lines.map(l => `<div class="sc-l">${l}</div>`).join('')}</div>`;
+  const segBtns = (id, attr, cur, opts) => `<div class="seg" id="${id}">${opts.map(([v, l]) => `<button data-${attr}="${v}" aria-pressed="${String(cur) === String(v)}">${l}</button>`).join('')}</div>`;
 
   const scoreRows = [3, 2, 1, 0, -1, -2, -3].map(s => {
     const b = w.byScore[s];
     if (!b || !b.n) return '';
-    const exc = b.avgExc ?? 0, width = Math.min(50, Math.abs(exc) * 100 * 25);
+    const exc = b.avgExc ?? 0, width = Math.min(50, Math.abs(exc) * 100 * 25 / Math.sqrt(h));
     return `<tr><td class="sc-emo">${emo(s)}</td><td>${b.n.toLocaleString()}</td><td>${pc(b.upRate)}</td><td>${spc(b.avgRet)}</td>
-      <td><span class="sc-bar"><i class="${exc >= 0 ? 'pos' : 'neg'}" style="${exc >= 0 ? 'left:50%' : `right:50%`};width:${width}%"></i></span> ${spc(b.avgExc)}</td></tr>`;
+      <td><span class="sc-bar"><i class="${exc >= 0 ? 'pos' : 'neg'}" style="${exc >= 0 ? 'left:50%' : 'right:50%'};width:${width}%"></i></span> ${spc(b.avgExc)}</td></tr>`;
   }).join('');
 
   const compRows = Object.keys(SIG.COMPONENTS).map(k => {
@@ -996,14 +839,17 @@ function renderScorecard() {
     return `<tr><td>${esc(legendName(k))}</td><td class="sc-emo">${role}</td><td>${(c.n || 0).toLocaleString()}</td><td>${pc(c.upRate)}</td>
       <td>${spc(c.avgExc)}</td><td>${edgeWord(c.t, c.n)}${wrong ? ' · <b class="sc-warn">⚠ pointing the wrong way</b>' : ''}</td></tr>`;
   }).join('');
+  const sq = w.squeeze;
+  const sqLine = sq?.n ? `${sq.ratio >= 1.1 ? 'Yes' : sq.ratio <= 0.9 ? 'No, smaller' : 'About the same'}: moves over ${hw} were <b>${sq.ratio.toFixed(2)}×</b> the usual size (${spc(sq.avgAbs, 1)} vs ${spc(sq.baseAbs, 1)}), and ${pc(sq.upRate)} went up.` : 'No squeezes in this period.';
 
   const t = sc.tuning || {}, last = t.last;
+  const foldsHTML = last?.folds ? `<ul>${last.folds.map(f => `<li>${f.from} → ${f.to}: current ${f.before?.toFixed(3) ?? '—'} vs candidate ${f.after?.toFixed(3) ?? '—'} ${f.won ? '✅' : '❌'}</li>`).join('')}</ul>` : '';
   const tuneHTML = !t.lastRun ? '<p class="sc-muted">The tuner hasn\'t run yet. It runs every Sunday.</p>' : `
-    <p><b>Last run ${new Date(t.lastRun).toLocaleDateString()}</b>: ${last.adopted ? '✅ <b>adopted new settings</b>, because they predicted better on data they were not tuned on.' : 'kept the current settings. The alternative did not beat them on data it wasn\'t tuned on.'}
-      Tuned on ${last.trainFrom} to ${last.testFrom}, checked on ${last.testFrom} to ${last.testTo}.
-      Score on the check period (rank correlation): current <b>${last.testIC.before?.toFixed(3) ?? '—'}</b> vs candidate <b>${last.testIC.after?.toFixed(3) ?? '—'}</b>.</p>
+    <p><b>Last run ${new Date(t.lastRun).toLocaleDateString()}</b>: ${last.adopted ? '✅ <b>adopted new settings</b>: they beat the current ones on periods they weren\'t tuned on.' : 'kept the current settings. The alternative didn\'t clearly beat them on periods it wasn\'t tuned on.'}
+      ${last.folds ? `Won <b>${last.wins} of ${last.folds.length}</b> check periods · average score (rank correlation over 1/3/7 days): current <b>${last.testIC.before?.toFixed(3) ?? '—'}</b> vs candidate <b>${last.testIC.after?.toFixed(3) ?? '—'}</b>.` : `Check-period score: current <b>${last.testIC.before?.toFixed(3) ?? '—'}</b> vs candidate <b>${last.testIC.after?.toFixed(3) ?? '—'}</b>.`}</p>
+    ${foldsHTML ? `<details><summary>Check periods</summary>${foldsHTML}</details>` : ''}
     <details><summary>What the tuner found for each signal</summary><ul>${(last.notes || []).map(n => `<li>${esc(n)}</li>`).join('')}</ul></details>
-    ${(t.history || []).length ? `<details><summary>Settings changes (${t.history.length})</summary><ul>${t.history.map(h => `<li>${h.date}: check-period score ${h.testIC.before?.toFixed(3)} → ${h.testIC.after?.toFixed(3)}</li>`).join('')}</ul></details>` : ''}`;
+    ${(t.history || []).length ? `<details><summary>Settings changes (${t.history.length})</summary><ul>${t.history.map(x => `<li>${x.date}: score ${x.testIC.before?.toFixed(3)} → ${x.testIC.after?.toFixed(3)}</li>`).join('')}</ul></details>` : ''}`;
 
   box.innerHTML = `
     <div class="sc-card">
@@ -1013,29 +859,36 @@ function renderScorecard() {
         ${tile('😢 coins', ys.sad.n ? `${Math.round(ys.sad.downRate * ys.sad.n)} of ${ys.sad.n} went down` : 'none', ys.sad.n ? [`average ${spc(ys.sad.avgRet)}`, `vs market ${spc(ys.sad.avgExc)}`] : [])}
         ${tile('Whole market', spc(y.market), [`average of all ${sc.coins} coins`])}
       </div>
-      ${moved.length ? `<div class="sc-chips">${moved.map(c => `<span class="sc-chip ${heatClass(c.ret * 100, '24h')}" title="${esc(c.sym)}: ${c.good.map(k => '🚀 ' + SIG.COMPONENTS[k]).concat(c.bad.map(k => '😢 ' + SIG.COMPONENTS[k])).join(', ')}">${esc(c.sym)} ${emo(c.score)} ${spc(c.ret, 1)}</span>`).join('')}</div>` : ''}
+      ${moved.length ? `<div class="sc-chips">${moved.map(c => `<span class="sc-chip ${heatClass(c.ret * 100, '24h')}" title="${esc(c.sym)}: ${c.good.map(k => '🚀 ' + SIG.COMPONENTS[k]).concat(c.bad.map(k => '😢 ' + SIG.COMPONENTS[k])).concat(c.squeeze ? ['⚡ squeeze'] : []).join(', ')}">${esc(c.sym)} ${c.score ? emo(c.score) : ''}${c.squeeze ? '⚡' : ''} ${spc(c.ret, 1)}</span>`).join('')}</div>` : ''}
     </div>
 
+    ${sc.daily?.length ? `<div class="sc-card"><h2>Last ${sc.daily.length} days <span class="sc-muted">holding each day's 🚀 coins vs 😢 coins for one day</span></h2>${basketChart(sc.daily)}</div>` : ''}
+
     <div class="sc-card">
-      <div class="sc-head"><h2>Track record <span class="sc-muted">${winName}</span></h2>
-        <div class="seg" id="scoreWin">${['d30', 'd90', 'all'].map(k => `<button data-w="${k}" aria-pressed="${S.scoreWin === k}">${{ d30: '30 days', d90: '90 days', all: 'All' }[k]}</button>`).join('')}</div></div>
+      <div class="sc-head"><h2>Track record <span class="sc-muted">${winName}, judged over ${hw}</span></h2>
+        <div class="sc-segs">
+          ${Hs.length > 1 ? segBtns('scoreH', 'h', h, Hs.map(v => [v, v === 1 ? 'Next day' : `${v} days`])) : ''}
+          ${segBtns('scoreWin', 'w', S.scoreWin, [['d30', '30 days'], ['d90', '90 days'], ['all', 'All']])}
+        </div></div>
       <div class="sc-tiles">
-        ${tile('When a coin had more 🚀 than 😢', `${pc(w.rockets.upRate)} went up next day`, [`${pc(w.rockets.beatRate)} beat the market · ${w.rockets.n.toLocaleString()} calls`])}
-        ${tile('When a coin had more 😢 than 🚀', `${pc(w.sad.downRate)} went down next day`, [`${pc(w.sad.lagRate)} lagged the market · ${w.sad.n.toLocaleString()} calls`])}
+        ${tile('When a coin had more 🚀 than 😢', `${pc(w.rockets.upRate)} went up over ${hw}`, [`${pc(w.rockets.beatRate)} beat the market · ${w.rockets.n.toLocaleString()} calls`])}
+        ${tile('When a coin had more 😢 than 🚀', `${pc(w.sad.downRate)} went down over ${hw}`, [`${pc(w.sad.lagRate)} lagged the market · ${w.sad.n.toLocaleString()} calls`])}
         ${tile('Coin-flip baseline', `${pc(w.all.upRate)} of all coins went up`, [`${w.days} days · ${w.rows.toLocaleString()} coin-days`])}
       </div>
-      <p class="sc-verdict">Verdict: <b>${icVerdict(w.ic)}</b>. <span class="sc-muted">(Daily rank correlation between score and next-day move: ${w.ic.mean?.toFixed(3) ?? '—'}, t = ${w.ic.t?.toFixed(1) ?? '—'}. Around 0 means no link, and t above 2 means it's unlikely to be luck.)</span></p>
+      <p class="sc-verdict">Verdict: <b>${icVerdict(w.ic)}</b>. <span class="sc-muted">(Daily rank correlation between score and the move over ${hw}: ${w.ic.mean?.toFixed(3) ?? '—'}, t = ${w.ic.t?.toFixed(1) ?? '—'}. Around 0 means no link; t above 2 means it's unlikely to be luck.${h > 1 ? ' Multi-day moves overlap, so t is scaled down to stay honest.' : ''})</span></p>
+      <p><b>⚡ Did a squeeze lead to bigger moves?</b> ${sqLine}${sq?.n ? ` <span class="sc-muted">${sq.n.toLocaleString()} squeezes.</span>` : ''}</p>
       <h3>More 🚀 → bigger move?</h3>
-      <div class="tablewrap"><table class="sc-table"><thead><tr><th>Signals</th><th>Coin-days</th><th>Up next day</th><th>Avg next day</th><th>vs market</th></tr></thead><tbody>${scoreRows}</tbody></table></div>
+      <div class="tablewrap"><table class="sc-table"><thead><tr><th>Signals</th><th>Coin-days</th><th>Up</th><th>Avg move</th><th>vs market</th></tr></thead><tbody>${scoreRows}</tbody></table></div>
       <h3>Each signal on its own</h3>
-      <div class="tablewrap"><table class="sc-table"><thead><tr><th>Signal</th><th>Counts as</th><th>Fired</th><th>Up next day</th><th>Avg vs market</th><th>Reliability</th></tr></thead><tbody>${compRows}</tbody></table></div>
+      <div class="tablewrap"><table class="sc-table"><thead><tr><th>Signal</th><th>Counts as</th><th>Fired</th><th>Up</th><th>Avg vs market</th><th>Reliability</th></tr></thead><tbody>${compRows}</tbody></table></div>
     </div>
 
     <div class="sc-card">
-      <h2>Self-tuning <span class="sc-muted">weekly, on about 2 years of history</span></h2>
+      <h2>Self-tuning <span class="sc-muted">weekly, on about 2.7 years of history</span></h2>
       ${tuneHTML}
-      <p class="sc-muted">How it works: each Sunday the tuner tries other RSI levels, moving-average pairs and Bollinger thresholds. For each signal it decides whether it should count as a 🚀, a 😢, or be switched off. It tunes on the older 70% of the history and checks on the newest 30%, which it never tuned on. New settings are only adopted if they do better on that newest 30%, which protects against fitting to noise.</p>
+      <p class="sc-muted">How it works: each Sunday the tuner tries other RSI levels, moving-average pairs and wide-band thresholds. For each signal it decides whether it should count as a 🚀, a 😢, or be switched off, and it judges them over the next 1, 3 and 7 days. The newest half of history is cut into three check periods. For each one, settings are chosen using only earlier days, then compared with the current settings on that period. New settings are adopted only if they win at least 2 of the 3 and do better on average. A signal also needs a stronger-than-usual result (t ≥ 2.5) to be switched on, because trying many variants makes some look good by luck. ⚡ squeezes are never counted as 🚀 or 😢.</p>
     </div>`;
+  wireChart();
 }
 
 /* ================= detail popover ================= */
@@ -1176,7 +1029,9 @@ seg('colorBy', 'colorBy', renderAll);
 seg('view', 'view', () => { hideDetail(true); renderAll(); });
 $('#scorewrap').addEventListener('click', e => {
   const b = e.target.closest('[data-w]');
-  if (b) { S.scoreWin = b.dataset.w; renderScorecard(); }
+  if (b) { S.scoreWin = b.dataset.w; renderScorecard(); return; }
+  const hb = e.target.closest('[data-h]');
+  if (hb) { S.scoreH = +hb.dataset.h; renderScorecard(); }
 });
 $('#filters').addEventListener('click', e => {
   const b = e.target.closest('.chip'); if (!b) return;
@@ -1185,14 +1040,14 @@ $('#filters').addEventListener('click', e => {
   renderAll();
 });
 $('#pegged').checked = S.pegged;
-$('#pegged').addEventListener('change', e => { S.pegged = e.target.checked; savePrefs(); pickCoins(); renderAll(); loadHistories({ onlyMissing: S.mode === 'snapshot' }).then(done); });
+$('#pegged').addEventListener('change', e => { S.pegged = e.target.checked; savePrefs(); pickCoins(); renderAll(); applyHist(); done(); });
 
 const THEMES = ['', 'light', 'dark'], THEME_LABEL = { '': '◐ Auto', light: '☀ Light', dark: '☾ Dark' };
 const applyTheme = th => { if (th) document.documentElement.dataset.theme = th; else delete document.documentElement.dataset.theme; $('#theme').textContent = THEME_LABEL[th]; };
 applyTheme(prefs.theme || '');
 $('#theme').addEventListener('click', () => { const cur = document.documentElement.dataset.theme || ''; applyTheme(THEMES[(THEMES.indexOf(cur) + 1) % 3]); savePrefs(); });
 
-$('#refresh').addEventListener('click', () => { if (Date.now() >= manualAt()) run(true); });
+$('#refresh').addEventListener('click', () => { if (Date.now() >= (S.nextAuto || 0)) run(); });
 
 // Work-in-progress notice: shown on first visit, then again 30 days after it was dismissed
 const WIP_AGAIN = 30 * DAY;
@@ -1216,12 +1071,22 @@ async function loadSnapshot() {
 }
 const unpack = h => ({ src: h.src, pair: h.pair, t: h.t, closes: h.c.map((v, i) => [h.t0 + i * DAY, v]) });
 
-/* ================= main ================= */
-// Snapshot mode: nothing new exists before the next scheduled build. Live mode: once a minute, within API budgets.
-const manualAt = () => S.mode === 'snapshot'
-  ? S.nextAuto
-  : Math.max((S.updated || 0) + MIN_MANUAL, Math.min(nextSlot(CG), nextSlot(CL)));
+// Backup when data.json is missing or stale: run the same build script GitHub runs, right here in the browser
+// (without the slow CoinGecko candle fallback), at most once per 10 minutes per browser, shared across tabs.
+async function buildLive(stale) {
+  const cached = store.get('hm.live');
+  if (cached?.v === 1 && Date.now() - cached.generated < LIVE_EVERY) return cached;
+  if (Date.now() - (store.get('hm.liveAt') || 0) < LIVE_EVERY) return cached || stale; // another tab or reload just tried
+  store.set('hm.liveAt', Date.now());
+  setStatus('Fetching live prices…', 'busy');
+  const { build } = await import('./scripts/build-data.mjs');
+  const prev = cached && (!stale || cached.generated > stale.generated) ? cached : stale;
+  const data = await build({ prev, params: stale?.params ?? cached?.params ?? null, cgCandles: false, log: () => {} });
+  store.set('hm.live', data);
+  return data;
+}
 
+/* ================= main ================= */
 function renderFresh(now) {
   const el = $('#fresh');
   if (!S.updated) return;
@@ -1237,69 +1102,58 @@ function renderFresh(now) {
   if (el.innerHTML !== html) el.innerHTML = html;
 }
 
-// One-second clock: shows countdowns and starts the next update only when it's allowed
+// One-second clock: shows the countdown and starts the next update when it's due
 function tick() {
   const now = Date.now(), btn = $('#refresh');
-  const wait = manualAt() - now;
+  const wait = (S.nextAuto || 0) - now;
   btn.disabled = S.busy || wait > 0;
   btn.textContent = S.busy ? '↻ Updating…' : wait > 0 ? `↻ Refresh in ${fmtWait(wait)}` : '↻ Refresh';
-  const bits = [];
-  if (S.mode !== 'snapshot') {
-    const cg = pausedUntil(CG) - now;
-    if (cg > 0) bits.push(`CoinGecko paused ${fmtWait(cg)}`);
-    if (S.busy && S.waitingFor) bits.push(`${S.waitingFor} waiting for a CoinGecko slot (${fmtWait(nextSlot(CG) - now)})`);
-  }
-  $('#clock').textContent = bits.join(' · ');
   renderFresh(now);
-  if (!S.busy && !document.hidden && S.nextAuto && now >= S.nextAuto) run(false);
+  if (!S.busy && !document.hidden && S.nextAuto && now >= S.nextAuto) run();
 }
 
 function done() {
   renderFooter();
   const ok = S.coins.filter(c => S.ind[c.id] && !S.ind[c.id].error).length;
-  const via = S.mode === 'snapshot' ? '' : ` · live from ${S.marketSrc}${S.stale ? ' (saved)' : ''}`;
+  const via = S.mode === 'live' ? ` · built in your browser from ${S.marketSrc}` : '';
   setStatus(`${ok}/${S.coins.length} coins with indicators${via}`, S.stale ? '' : 'live');
 }
 
-async function runSnapshot(snap) {
-  const isNew = snap.generated !== S.updated;
-  S.mode = 'snapshot';
-  S.markets = snap.markets; S.updated = snap.generated; S.marketSrc = snap.marketSrc; S.stale = !!snap.marketStale;
-  S.stable = new Set(snap.cats?.stable || []); S.gold = new Set(snap.cats?.gold || []);
-  for (const [id, h] of Object.entries(snap.hist || {})) S.hist[id] = unpack(h);
-  const paramsChanged = applyParams(snap.params);
-  if (isNew) await loadScorecard();
+async function show(data, live) {
+  const isNew = data.generated !== S.updated;
+  S.mode = live ? 'live' : 'snapshot';
+  S.markets = data.markets; S.updated = data.generated; S.marketSrc = data.marketSrc; S.stale = !!data.marketStale;
+  S.stable = new Set(data.cats?.stable || []); S.gold = new Set(data.cats?.gold || []);
+  S.hist = {};
+  for (const [id, h] of Object.entries(data.hist || {})) S.hist[id] = unpack(h);
+  const paramsChanged = applyParams(data.params);
+  if (isNew || !S.scorecard) await loadScorecard();
   if (isNew || paramsChanged || !S.coins.length) { pickCoins(); renderAll(); }
-  await loadHistories({ onlyMissing: true }); // only coins the job had no candles for
+  applyHist();
   done();
-  // next build lands ~10 min after this one; if it hasn't appeared yet, look again every 2 min
-  S.nextAuto = isNew ? Math.max(S.updated + MARKETS_TTL + SNAPSHOT_GRACE, Date.now() + 30e3) : Date.now() + SNAPSHOT_RETRY;
+  return isNew;
 }
 
-async function runLive(force) {
-  S.mode = 'live';
-  const m = await loadMarkets(force);
-  S.markets = m.data; S.updated = m.t; S.marketSrc = m.src || 'CoinGecko'; S.stale = !!m.stale;
-  const cats = await loadCategories();
-  S.stable = new Set(cats.stable); S.gold = new Set(cats.gold);
-  if (!S.scorecard) await loadScorecard();
-  pickCoins();
-  renderAll();
-  await loadHistories();
-  done();
-  // next automatic update: when prices go stale, or in a minute if every source was busy
-  S.nextAuto = S.stale ? Date.now() + 60e3 : S.updated + MARKETS_TTL;
-}
-
-async function run(force) {
+async function run() {
   if (S.busy) return;
   S.busy = true;
   tick();
   try {
     if (!S.coins.length) setStatus('Loading prices…', 'busy');
     const snap = S.noSnapshot ? null : await loadSnapshot();
-    if (snap && Date.now() - snap.generated < SNAPSHOT_MAX_AGE) await runSnapshot(snap);
-    else await runLive(force); // no data.json (local preview) or the scheduled job is stuck
+    if (snap && Date.now() - snap.generated < SNAPSHOT_MAX_AGE) {
+      const isNew = await show(snap, false);
+      // the next build lands ~10 min after this one; if it hasn't appeared yet, look again every 2 min
+      S.nextAuto = isNew ? Math.max(S.updated + MARKETS_TTL + SNAPSHOT_GRACE, Date.now() + 30e3) : Date.now() + SNAPSHOT_RETRY;
+    } else {
+      // no data.json (local preview) or the scheduled job is stuck
+      let data = null;
+      try { data = await buildLive(snap); } catch { data = null; }
+      if (!data) data = snap;
+      if (!data) throw new Error('No price data available right now');
+      await show(data, data !== snap);
+      S.nextAuto = Math.max(Date.now() + 60e3, (store.get('hm.liveAt') || 0) + LIVE_EVERY);
+    }
   } catch (e) {
     setStatus(`${e.message}. Retrying automatically.`);
     S.nextAuto = Date.now() + 60e3;
@@ -1308,7 +1162,7 @@ async function run(force) {
     tick();
   }
 }
-run(false);
+run();
 setInterval(tick, 1000);
 document.addEventListener('visibilitychange', tick);
 })();

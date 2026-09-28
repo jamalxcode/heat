@@ -6,19 +6,28 @@ export const DEFAULT_PARAMS = {
   maFast: 50, maSlow: 200,
   bbPeriod: 20, bbK: 2, bbLookback: 180, bbTightPct: 10, bbWidePct: 80,
   // +1 = counts as a 🚀, -1 = counts as a 😢, 0 = switched off. The tuner may flip or disable a signal.
-  weights: { trendUp: 1, oversold: 1, bbTight: 1, trendDown: -1, overbought: -1, bbWide: -1 },
+  weights: { trendUp: 1, oversold: 1, trendDown: -1, overbought: -1, bbWide: -1 },
 };
 
+// Directional signals: each one adds a 🚀 or a 😢
 export const COMPONENTS = {
   trendUp:    'strong uptrend',
   oversold:   'RSI oversold',
-  bbTight:    'tight Bollinger band',
   trendDown:  'strong downtrend',
   overbought: 'RSI overbought',
   bbWide:     'wide Bollinger band',
 };
+// Non-directional: a Bollinger squeeze says a big move is likely, not which way, so it's ⚡ rather than 🚀 or 😢
+export const SQUEEZE_LABEL = 'tight Bollinger band (big move likely, direction unknown)';
 
-export const withDefaults = p => ({ ...DEFAULT_PARAMS, ...(p || {}), weights: { ...DEFAULT_PARAMS.weights, ...(p?.weights || {}) } });
+// How far ahead each signal is judged, in days
+export const HORIZONS = [1, 3, 7];
+
+export const withDefaults = p => {
+  const out = { ...DEFAULT_PARAMS, ...(p || {}), weights: { ...DEFAULT_PARAMS.weights } };
+  for (const k of Object.keys(COMPONENTS)) if (p?.weights?.[k] != null) out.weights[k] = p.weights[k];
+  return out;
+};
 
 /* ---------- indicators (full series, null until warmed up) ---------- */
 export function sma(a, n) {
@@ -49,7 +58,7 @@ export function rsi(a, n = 14) {
   return out;
 }
 
-// Bollinger Bands; w = band width as % of the middle band
+// Bollinger Bands (population standard deviation); w = band width as % of the middle band
 export function bollinger(a, n = 20, k = 2) {
   const mid = sma(a, n), up = [], lo = [], w = [];
   for (let i = 0; i < a.length; i++) {
@@ -97,8 +106,8 @@ export function componentsAt(s, i, p) {
     trendDown:  trend ? f < sl && c < f : null,
     oversold:   r != null ? r < P.rsiLow : null,
     overbought: r != null ? r > P.rsiHigh : null,
-    bbTight:    q != null ? q <= P.bbTightPct : null,
     bbWide:     q != null ? q >= P.bbWidePct : null,
+    squeeze:    q != null ? q <= P.bbTightPct : null,
   };
 }
 
@@ -110,40 +119,51 @@ export function scoreOf(active, p) {
     const wgt = P.weights[k] || 0;
     if (wgt > 0) good.push(k); else if (wgt < 0) bad.push(k);
   }
-  return { good, bad, score: good.length - bad.length };
+  return { good, bad, score: good.length - bad.length, squeeze: !!active.squeeze };
 }
 
 /* ---------- evaluation ---------- */
 const DAY = 864e5;
+const cap = h => 0.3 * Math.sqrt(h);   // ±30% a day, wider for longer horizons: stops one bad print swamping averages
 
 // coins: [{ id, symbol, t0 (ms, UTC midnight of first close), c: [daily closes, complete days only] }]
-// Returns one row per coin per day: the signals at that day's close and the return over the following day.
+// One row per coin per day: the signals at that close and the move over the following 1 / 3 / 7 days.
 export function signalRows(coins, p) {
   const P = withDefaults(p);
   const warm = Math.max(P.maSlow, P.bbPeriod + 20, P.rsiPeriod + 1);
   const rows = [];
   for (const coin of coins) {
     const s = series(coin.c, P);
-    const d0 = Math.floor(coin.t0 / DAY);
-    for (let i = warm; i < coin.c.length - 1; i++) {
+    const d0 = Math.floor(coin.t0 / DAY), n = coin.c.length;
+    for (let i = warm; i < n - 1; i++) {
       const a = componentsAt(s, i, P);
       if (Object.values(a).some(v => v == null)) continue;
-      const { good, bad, score } = scoreOf(a, P);
-      // Cap at ±30%: a relisting or bad price print can show +500% in a day and swamp every average
-      const raw = coin.c[i + 1] / coin.c[i] - 1;
-      rows.push({ day: d0 + i, id: coin.id, sym: coin.symbol, a, good, bad, score, raw, ret: Math.max(-0.3, Math.min(0.3, raw)) });
+      const { good, bad, score, squeeze } = scoreOf(a, P);
+      const raw = {}, ret = {};
+      for (const h of HORIZONS) {
+        if (i + h >= n) { raw[h] = ret[h] = null; continue; }
+        raw[h] = coin.c[i + h] / coin.c[i] - 1;
+        ret[h] = Math.max(-cap(h), Math.min(cap(h), raw[h]));
+      }
+      rows.push({ day: d0 + i, id: coin.id, sym: coin.symbol, a, good, bad, score, squeeze, raw, ret, mkt: {}, exc: {} });
     }
   }
-  // excess return = coin's next-day return minus the average of every coin that day (removes the market's move)
-  const byDay = new Map();
-  for (const r of rows) { if (!byDay.has(r.day)) byDay.set(r.day, []); byDay.get(r.day).push(r); }
-  for (const list of byDay.values()) {
-    const m = list.reduce((s, r) => s + r.ret, 0) / list.length;
-    for (const r of list) { r.mkt = m; r.exc = r.ret - m; }
+  // excess = coin's move minus the average of every coin over the same days (removes the market's move)
+  for (const list of byDay(rows).values()) {
+    for (const h of HORIZONS) {
+      const g = list.filter(r => r.ret[h] != null);
+      const m = g.length ? g.reduce((s, r) => s + r.ret[h], 0) / g.length : null;
+      for (const r of list) { r.mkt[h] = m; r.exc[h] = r.ret[h] == null ? null : r.ret[h] - m; }
+    }
   }
   return rows;
 }
 
+function byDay(rows) {
+  const m = new Map();
+  for (const r of rows) { if (!m.has(r.day)) m.set(r.day, []); m.get(r.day).push(r); }
+  return m;
+}
 const mean = a => a.length ? a.reduce((s, v) => s + v, 0) / a.length : null;
 function tStat(a) {
   if (a.length < 3) return 0;
@@ -160,7 +180,7 @@ function ranks(a) {
   }
   return r;
 }
-function spearman(x, y) {
+export function spearman(x, y) {
   const rx = ranks(x), ry = ranks(y), mx = mean(rx), my = mean(ry);
   let n = 0, dx = 0, dy = 0;
   for (let i = 0; i < x.length; i++) { n += (rx[i] - mx) * (ry[i] - my); dx += (rx[i] - mx) ** 2; dy += (ry[i] - my) ** 2; }
@@ -173,83 +193,85 @@ function dailyMeans(rows, f) {
   return [...m.values()].map(mean);
 }
 
-export function stats(rows) {
+// Stats for one horizon h (days). Multi-day moves overlap from one day to the next, so t-values are divided
+// by √h: without that, a 7-day horizon would look ~2.6× more certain than it is.
+export function stats(rows, h = 1) {
+  rows = rows.filter(r => r.ret[h] != null);
+  const adj = Math.sqrt(h);
   const days = [...new Set(rows.map(r => r.day))].sort((a, b) => a - b);
-  const out = { rows: rows.length, days: days.length, from: days[0] ?? null, to: days[days.length - 1] ?? null };
+  const out = { h, rows: rows.length, days: days.length, from: days[0] ?? null, to: days[days.length - 1] ?? null };
+  const up = g => g.length ? g.filter(r => r.ret[h] > 0).length / g.length : null;
+  const beat = g => g.length ? g.filter(r => r.exc[h] > 0).length / g.length : null;
 
   // by net score (🚀 minus 😢), clamped to ±3
   out.byScore = {};
   for (let s = -3; s <= 3; s++) {
     const g = rows.filter(r => Math.max(-3, Math.min(3, r.score)) === s);
-    out.byScore[s] = g.length ? {
-      n: g.length, avgRet: mean(g.map(r => r.ret)), avgExc: mean(g.map(r => r.exc)),
-      upRate: g.filter(r => r.ret > 0).length / g.length, beatRate: g.filter(r => r.exc > 0).length / g.length,
-    } : { n: 0 };
+    out.byScore[s] = g.length ? { n: g.length, avgRet: mean(g.map(r => r.ret[h])), avgExc: mean(g.map(r => r.exc[h])), upRate: up(g), beatRate: beat(g) } : { n: 0 };
   }
 
-  // each signal on its own: how did coins do the day after it fired?
+  // each signal on its own: how did coins do after it fired?
   out.components = {};
   for (const k of Object.keys(COMPONENTS)) {
     const g = rows.filter(r => r.a[k]);
-    const dm = dailyMeans(g, r => r.exc);
-    out.components[k] = g.length ? {
-      n: g.length, avgRet: mean(g.map(r => r.ret)), avgExc: mean(dm), t: tStat(dm),
-      upRate: g.filter(r => r.ret > 0).length / g.length, beatRate: g.filter(r => r.exc > 0).length / g.length,
-    } : { n: 0 };
+    const dm = dailyMeans(g, r => r.exc[h]);
+    out.components[k] = g.length ? { n: g.length, avgRet: mean(g.map(r => r.ret[h])), avgExc: mean(dm), t: tStat(dm) / adj, upRate: up(g), beatRate: beat(g) } : { n: 0 };
   }
+
+  // ⚡ squeeze: are the following moves really bigger than usual?
+  const sq = rows.filter(r => r.squeeze);
+  const absAll = mean(rows.map(r => Math.abs(r.ret[h]))), absSq = mean(sq.map(r => Math.abs(r.ret[h])));
+  out.squeeze = { n: sq.length, avgAbs: absSq, baseAbs: absAll, ratio: absSq != null && absAll ? absSq / absAll : null, upRate: up(sq) };
 
   // headline hit rates
   const pos = rows.filter(r => r.score > 0), neg = rows.filter(r => r.score < 0);
-  out.rockets = { n: pos.length, upRate: pos.length ? pos.filter(r => r.ret > 0).length / pos.length : null, beatRate: pos.length ? pos.filter(r => r.exc > 0).length / pos.length : null, avgRet: mean(pos.map(r => r.ret)), avgExc: mean(pos.map(r => r.exc)) };
-  out.sad = { n: neg.length, downRate: neg.length ? neg.filter(r => r.ret < 0).length / neg.length : null, lagRate: neg.length ? neg.filter(r => r.exc < 0).length / neg.length : null, avgRet: mean(neg.map(r => r.ret)), avgExc: mean(neg.map(r => r.exc)) };
-  out.all = { avgRet: mean(rows.map(r => r.ret)), upRate: rows.length ? rows.filter(r => r.ret > 0).length / rows.length : null };
+  out.rockets = { n: pos.length, upRate: up(pos), beatRate: beat(pos), avgRet: mean(pos.map(r => r.ret[h])), avgExc: mean(pos.map(r => r.exc[h])) };
+  out.sad = { n: neg.length, downRate: neg.length ? neg.filter(r => r.ret[h] < 0).length / neg.length : null, lagRate: neg.length ? neg.filter(r => r.exc[h] < 0).length / neg.length : null, avgRet: mean(neg.map(r => r.ret[h])), avgExc: mean(neg.map(r => r.exc[h])) };
+  out.all = { avgRet: mean(rows.map(r => r.ret[h])), upRate: up(rows) };
 
-  // information coefficient: daily rank correlation between score and next-day excess return
+  // information coefficient: daily rank correlation between score and excess move
   const ics = [];
-  for (const d of days) {
-    const g = rows.filter(r => r.day === d);
+  for (const g of byDay(rows).values()) {
     if (g.length < 10 || new Set(g.map(r => r.score)).size < 2) continue;
-    const v = spearman(g.map(r => r.score), g.map(r => r.exc));
+    const v = spearman(g.map(r => r.score), g.map(r => r.exc[h]));
     if (v != null) ics.push(v);
   }
-  out.ic = { mean: mean(ics), t: tStat(ics), days: ics.length };
+  out.ic = { mean: mean(ics), t: tStat(ics) / adj, days: ics.length };
   return out;
 }
 
 /* ---------- tuning ---------- */
-// Walk-forward: pick each signal's setting (and whether it's a 🚀, a 😢 or off) on the older `train` share of days,
-// then compare against the current settings on the newer days it never saw. Adopt only if clearly better there.
-export function tune(coins, current, { train = 0.7, minT = 2, margin = 0.005 } = {}) {
-  const cur = withDefaults(current);
-  const probe = signalRows(coins, { ...cur, maSlow: 200 });
-  const days = [...new Set(probe.map(r => r.day))].sort((a, b) => a - b);
-  const cut = days[Math.floor(days.length * train)];
-  const isTrain = r => r.day < cut, isTest = r => r.day >= cut;
-
-  const effect = (rows, k) => {
-    const dm = dailyMeans(rows.filter(r => isTrain(r) && r.a[k]), r => r.exc);
-    return { t: tStat(dm), n: dm.length, avg: mean(dm) };
-  };
-  const choose = (variants, k) => {
-    let best = null;
-    for (const v of variants) {
-      const e = effect(signalRows(coins, { ...cur, ...v }), k);
-      if (e.n >= 20 && (!best || Math.abs(e.t) > Math.abs(best.e.t))) best = { v, e };
-    }
-    return best;
-  };
-
+// For each signal, pick its setting and whether it's a 🚀, a 😢 or off, using only days before `until`.
+// A signal is switched on only if its effect clears |t| ≥ minT on average across the 1/3/7-day horizons;
+// the bar is above the usual 2 because about 30 variants get tried, and some would clear 2 by luck.
+function selectParams(cur, rowsFor, until, minT) {
   const next = withDefaults(cur), notes = [];
+  const effect = (rows, k) => {
+    let tSum = 0, avgSum = 0, n = Infinity;
+    for (const h of HORIZONS) {
+      const dm = dailyMeans(rows.filter(r => r.day < until && r.a[k]), r => r.exc[h]);
+      tSum += tStat(dm) / Math.sqrt(h); avgSum += mean(dm) ?? 0; n = Math.min(n, dm.length);
+    }
+    return { t: tSum / HORIZONS.length, avg: avgSum / HORIZONS.length, n };
+  };
   const setSign = (k, e) => {
     next.weights[k] = Math.abs(e.t) >= minT ? Math.sign(e.avg) : 0;
-    notes.push(`${COMPONENTS[k]}: ${next.weights[k] > 0 ? '🚀' : next.weights[k] < 0 ? '😢' : 'off'} (t=${e.t.toFixed(2)}, ${(e.avg * 100).toFixed(2)}%/day vs market)`);
+    notes.push(`${COMPONENTS[k]}: ${next.weights[k] > 0 ? '🚀' : next.weights[k] < 0 ? '😢' : 'off'} (t=${e.t.toFixed(2)}, ${(e.avg * 100).toFixed(2)}% vs market, avg over 1/3/7 days)`);
+  };
+  const best = (variants, k) => {
+    let b = null;
+    for (const v of variants) {
+      const e = effect(rowsFor({ ...next, ...v }), k);
+      if (e.n >= 20 && (!b || Math.abs(e.t) > Math.abs(b.e.t))) b = { v, e };
+    }
+    return b;
   };
 
-  // RSI: period shared by both sides, each threshold chosen on its own
+  // RSI: the period is shared by both sides, each threshold chosen on its own
   let bestRsi = null;
   for (const rsiPeriod of [7, 14, 21]) {
-    const lo = choose([20, 25, 30, 35].map(rsiLow => ({ rsiPeriod, rsiLow })), 'oversold');
-    const hi = choose([65, 70, 75, 80].map(rsiHigh => ({ rsiPeriod, rsiHigh })), 'overbought');
+    const lo = best([20, 25, 30, 35].map(rsiLow => ({ rsiPeriod, rsiLow })), 'oversold');
+    const hi = best([65, 70, 75, 80].map(rsiHigh => ({ rsiPeriod, rsiHigh })), 'overbought');
     const t = Math.abs(lo?.e.t || 0) + Math.abs(hi?.e.t || 0);
     if (!bestRsi || t > bestRsi.t) bestRsi = { rsiPeriod, lo, hi, t };
   }
@@ -260,30 +282,56 @@ export function tune(coins, current, { train = 0.7, minT = 2, margin = 0.005 } =
   }
 
   // Trend: which moving-average pair
-  const pairs = [{ maFast: 20, maSlow: 50 }, { maFast: 20, maSlow: 100 }, { maFast: 50, maSlow: 200 }];
   let bestPair = null;
-  for (const v of pairs) {
-    const rows = signalRows(coins, { ...next, ...v });
+  for (const v of [{ maFast: 20, maSlow: 50 }, { maFast: 20, maSlow: 100 }, { maFast: 50, maSlow: 200 }]) {
+    const rows = rowsFor({ ...next, ...v });
     const u = effect(rows, 'trendUp'), d = effect(rows, 'trendDown');
     const t = Math.abs(u.t) + Math.abs(d.t);
     if (u.n >= 20 && d.n >= 20 && (!bestPair || t > bestPair.t)) bestPair = { v, u, d, t };
   }
   if (bestPair) { Object.assign(next, bestPair.v); setSign('trendUp', bestPair.u); setSign('trendDown', bestPair.d); }
 
-  // Bollinger: tight and wide thresholds
-  const tight = choose([5, 10, 15, 20, 25].map(bbTightPct => ({ ...next, bbTightPct })), 'bbTight');
-  if (tight) { next.bbTightPct = tight.v.bbTightPct; setSign('bbTight', tight.e); }
-  const wide = choose([75, 80, 85, 90, 95].map(bbWidePct => ({ ...next, bbWidePct })), 'bbWide');
+  // Wide Bollinger band threshold (the ⚡ squeeze threshold stays fixed: it isn't a direction call)
+  const wide = best([75, 80, 85, 90, 95].map(bbWidePct => ({ bbWidePct })), 'bbWide');
   if (wide) { next.bbWidePct = wide.v.bbWidePct; setSign('bbWide', wide.e); }
+  return { params: next, notes };
+}
 
-  const testIC = p => stats(signalRows(coins, p).filter(isTest)).ic;
-  const before = testIC(cur), after = testIC(next);
-  const anyOn = Object.values(next.weights).some(w => w !== 0);
-  const adopt = anyOn && after.mean != null && after.mean > 0 && after.mean > (before.mean ?? -1) + margin;
+// Average information coefficient across the 1/3/7-day horizons, on days in [from, to).
+// Settings that make no calls at all (every signal off) score 0: no edge, rather than "unknown".
+function objective(rows, from, to) {
+  const g = rows.filter(r => r.day >= from && r.day < to);
+  return mean(HORIZONS.map(h => stats(g, h).ic.mean ?? 0));
+}
+
+// Walk-forward in several folds: the newest half of history is cut into `folds` check periods. For each one, settings
+// are chosen only on the days before it, then compared with the current settings on it. The new settings (chosen on
+// all history) are adopted only if that procedure beat the current settings in most folds and on average.
+export function tune(coins, current, { folds = 3, minT = 2.5, margin = 0.003 } = {}) {
+  const cur = withDefaults(current);
+  const cache = new Map();
+  const rowsFor = p => { const k = JSON.stringify(withDefaults(p)); if (!cache.has(k)) cache.set(k, signalRows(coins, p)); return cache.get(k); };
+
+  const days = [...new Set(rowsFor(cur).map(r => r.day))].sort((a, b) => a - b);
+  const start = Math.floor(days.length * 0.5), block = Math.floor((days.length - start) / folds);
+  const results = [];
+  for (let k = 0; k < folds; k++) {
+    const from = days[start + k * block], to = k === folds - 1 ? Infinity : days[start + (k + 1) * block];
+    const sel = selectParams(cur, rowsFor, from, minT).params;
+    const before = objective(rowsFor(cur), from, to), after = objective(rowsFor(sel), from, to);
+    results.push({ from, to: Number.isFinite(to) ? to - 1 : days[days.length - 1], before, after, won: after > before });
+  }
+  const avg = f => mean(results.map(f));
+  const before = avg(r => r.before), after = avg(r => r.after), wins = results.filter(r => r.won).length;
+
+  const final = selectParams(cur, rowsFor, Infinity, minT);
+  const anyOn = Object.values(final.params.weights).some(w => w !== 0);
+  const changed = JSON.stringify(final.params) !== JSON.stringify(cur);
+  const adopt = changed && anyOn && after > 0 && after > before + margin && wins >= Math.ceil(folds / 2);
   return {
-    adopt, params: adopt ? next : cur, proposed: next, notes,
-    split: { trainFrom: days[0], cut, testTo: days[days.length - 1] },
-    testIC: { before: before.mean, after: after.mean, beforeT: before.t, afterT: after.t },
+    adopt, params: adopt ? final.params : cur, proposed: final.params, notes: final.notes,
+    folds: results, wins, split: { trainFrom: days[0], cut: days[start], testTo: days[days.length - 1] },
+    testIC: { before, after },
   };
 }
 
@@ -293,16 +341,19 @@ const isoDay = d => new Date(d * DAY).toISOString().slice(0, 10);
 export function buildScorecard(coins, current, { prev = null, tuneNow = false, now = Date.now() } = {}) {
   const params = withDefaults(current);
   const rows = signalRows(coins, params);
-  const lastDay = Math.max(...rows.map(r => r.day));             // latest close whose next day is complete
+  const lastDay = Math.max(...rows.filter(r => r.ret[1] != null).map(r => r.day)); // latest close whose next day is complete
   const since = n => rows.filter(r => r.day > lastDay - n);
-  const y = rows.filter(r => r.day === lastDay).sort((a, b) => b.score - a.score || b.ret - a.ret);
+  const y = rows.filter(r => r.day === lastDay).sort((a, b) => b.score - a.score || b.raw[1] - a.raw[1]);
+  const perH = g => Object.fromEntries(HORIZONS.map(h => [h, stats(g, h)]));
 
+  // last 60 days: average next-day move of the 🚀 coins, the 😢 coins and all coins (for the chart)
   const daily = [];
+  const days = byDay(rows);
   for (let d = lastDay - 59; d <= lastDay; d++) {
-    const g = rows.filter(r => r.day === d);
+    const g = (days.get(d) || []).filter(r => r.ret[1] != null);
     if (!g.length) continue;
-    const s = stats(g);
-    daily.push({ day: isoDay(d), mkt: g[0].mkt, rockets: s.rockets.n ? s.rockets.avgRet : null, sad: s.sad.n ? s.sad.avgRet : null, nR: s.rockets.n, nS: s.sad.n });
+    const pos = g.filter(r => r.score > 0), neg = g.filter(r => r.score < 0);
+    daily.push({ day: isoDay(d), mkt: g[0].mkt[1], rockets: pos.length ? mean(pos.map(r => r.ret[1])) : null, sad: neg.length ? mean(neg.map(r => r.ret[1])) : null, nR: pos.length, nS: neg.length });
   }
 
   const tuning = structuredClone(prev?.tuning || { history: [] });
@@ -310,7 +361,10 @@ export function buildScorecard(coins, current, { prev = null, tuneNow = false, n
   if (tuneNow || !tuning.lastRun) {
     const res = tune(coins, params);
     tuning.lastRun = new Date(now).toISOString();
-    tuning.last = { adopted: res.adopt, notes: res.notes, testIC: res.testIC, trainFrom: isoDay(res.split.trainFrom), testFrom: isoDay(res.split.cut), testTo: isoDay(res.split.testTo) };
+    tuning.last = {
+      adopted: res.adopt, notes: res.notes, testIC: res.testIC, wins: res.wins, folds: res.folds.map(f => ({ from: isoDay(f.from), to: isoDay(f.to), before: f.before, after: f.after, won: f.won })),
+      trainFrom: isoDay(res.split.trainFrom), testFrom: isoDay(res.split.cut), testTo: isoDay(res.split.testTo),
+    };
     if (res.adopt) {
       newParams = res.params;
       tuning.history = [{ date: isoDay(Math.floor(now / DAY)), from: params, to: newParams, testIC: res.testIC, notes: res.notes }, ...(tuning.history || [])].slice(0, 30);
@@ -318,14 +372,15 @@ export function buildScorecard(coins, current, { prev = null, tuneNow = false, n
   }
 
   const card = {
-    v: 1, generated: now, params: newParams || params, coins: coins.length,
+    v: 2, generated: now, params: newParams || params, coins: coins.length, horizons: HORIZONS,
     signalDay: isoDay(lastDay), outcomeDay: isoDay(lastDay + 1),
     yesterday: {
-      market: y[0]?.mkt ?? null,
-      coins: y.map(r => ({ id: r.id, sym: r.sym, score: r.score, good: r.good, bad: r.bad, ret: r.raw, exc: r.exc })), // real move shown; averages use the capped one
-      stats: stats(y),
+      market: y[0]?.mkt[1] ?? null,
+      // real move shown per coin; the averages use the capped one
+      coins: y.map(r => ({ id: r.id, sym: r.sym, score: r.score, squeeze: r.squeeze, good: r.good, bad: r.bad, ret: r.raw[1], exc: r.exc[1] })),
+      stats: stats(y, 1),
     },
-    windows: { d30: stats(since(30)), d90: stats(since(90)), all: stats(rows) },
+    windows: { d30: perH(since(30)), d90: perH(since(90)), all: perH(rows) },
     daily, tuning,
   };
   return { card, newParams };

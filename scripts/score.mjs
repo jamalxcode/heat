@@ -45,10 +45,13 @@ await writeFile(new URL('data/scorecard.json', root), JSON.stringify(card));
 if (newParams) await writeFile(new URL('params.json', root), JSON.stringify(newParams, null, 2) + '\n');
 
 const pct = v => v == null ? '—' : (v * 100).toFixed(1) + '%';
-const y = card.yesterday.stats, w = card.windows.d30, t = card.tuning.last;
+const y = card.yesterday.stats, t = card.tuning.last;
 console.log(`Signals of ${card.signalDay} → ${card.outcomeDay}: ${y.rockets.n} 🚀 coins (${pct(y.rockets.upRate)} up), ${y.sad.n} 😢 coins (${pct(y.sad.downRate)} down), market ${pct(card.yesterday.market)}`);
-console.log(`Last 30 days: 🚀 up ${pct(w.rockets.upRate)} · 😢 down ${pct(w.sad.downRate)} · IC ${w.ic.mean?.toFixed(4) ?? '—'} (t=${w.ic.t?.toFixed(2) ?? '—'})`);
+for (const h of SIG.HORIZONS) {
+  const w = card.windows.d30[h];
+  console.log(`Last 30 days, ${h}d ahead: 🚀 up ${pct(w.rockets.upRate)} · 😢 down ${pct(w.sad.downRate)} · ⚡ moves ${w.squeeze.ratio?.toFixed(2) ?? '—'}× usual · IC ${w.ic.mean?.toFixed(4) ?? '—'} (t=${w.ic.t?.toFixed(2) ?? '—'})`);
+}
 if (t && card.tuning.lastRun && Date.now() - Date.parse(card.tuning.lastRun) < 3600e3) {
-  console.log(`Tuning: ${t.adopted ? 'ADOPTED new settings' : 'kept current settings'} · check-period IC ${t.testIC.before?.toFixed(4)} → ${t.testIC.after?.toFixed(4)}`);
+  console.log(`Tuning: ${t.adopted ? 'ADOPTED new settings' : 'kept current settings'} · won ${t.wins}/${t.folds.length} check periods · avg IC ${t.testIC.before?.toFixed(4)} → ${t.testIC.after?.toFixed(4)}`);
   for (const n of t.notes) console.log('  ' + n);
 }
