@@ -213,7 +213,6 @@ h1 .tld { color: var(--ink-2); font-weight: 600; }
   transition: opacity .2s, transform .12s;
 }
 .tile:hover { transform: translateY(-1px); }
-.tile.dim { opacity: .22; }
 .tile .top { background: var(--tint, var(--neutral)); color: var(--tint-ink, var(--ink)); padding: 10px 12px 9px; display: grid; grid-template-columns: 1fr auto; gap: 1px 8px; align-items: baseline; }
 .tile .sym { font-weight: 700; font-size: 16px; display: flex; align-items: center; gap: 6px; min-width: 0; }
 .tile .sym img { width: 18px; height: 18px; border-radius: 50%; flex: none; background: var(--surface); }
@@ -237,6 +236,8 @@ h1 .tld { color: var(--ink-2); font-weight: 600; }
 .row .sl { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink-2); }
 .row .sl.near { color: var(--ink); background: color-mix(in oklab, var(--amber) 30%, transparent); border-radius: 4px; padding: 0 3px; }
 .tile.stop-crossed { box-shadow: inset 0 0 0 2px #b8413f; }
+.empty { grid-column: 1 / -1; background: var(--surface); border: 1px dashed var(--axis); border-radius: 12px; padding: 22px 16px; text-align: center; color: var(--ink-2); font-size: 14px; }
+.empty .btn { margin-left: 8px; }
 .tile .sym .vf { font-size: 10px; font-weight: 700; line-height: 14px; width: 14px; height: 14px; border-radius: 50%; display: inline-grid; place-items: center; flex: none; }
 .tile .sym .vf.ok { background: color-mix(in oklab, currentColor 18%, transparent); }
 .tile .sym .vf.guess { background: var(--amber); color: #1a1206; }
@@ -270,7 +271,6 @@ th:nth-child(-n+2), td:nth-child(-n+2) { text-align: left; }
 th { position: sticky; top: 0; background: var(--surface); font-weight: 600; color: var(--ink-2); font-size: 12px; }
 th button { all: unset; cursor: pointer; }
 th button[data-dir]::after { content: attr(data-dir); margin-left: 4px; color: var(--muted); }
-tr.dim td { opacity: .35; }
 td .cell-heat { display: inline-block; padding: 1px 6px; border-radius: 4px; background: var(--tint); }
 
 /* ---------- detail popover / sheet ---------- */
@@ -353,7 +353,7 @@ footer details summary { cursor: pointer; }
     </div>
     <div class="ctl"><span class="lab">Highlight</span>
       <div class="chips" id="filters">
-        <button class="chip" data-f="all" aria-pressed="true">All</button>
+        <button class="chip" data-f="all" aria-pressed="true">All coins</button>
         <button class="chip" data-f="os" aria-pressed="false">Oversold <span class="n"></span></button>
         <button class="chip" data-f="ob" aria-pressed="false">Overbought <span class="n"></span></button>
         <button class="chip" data-f="up" aria-pressed="false">Uptrend <span class="n"></span></button>
@@ -665,11 +665,10 @@ function verifyMark(c) {
 
 function tileHTML(c) {
   const ind = S.ind[c.id], ch = chgOf(c, S.colorBy);
-  const dim = S.filter !== 'all' && !match(ind, S.filter);
   const sg = signals(ind);
   const label = `${c.name}, ${fmtPrice(c.current_price)}, ${S.colorBy} ${fmtPct(ch)}, ${sg.good.length} rockets, ${sg.bad.length} cry faces${S.ind[c.id]?.sig?.squeeze ? ", squeeze: big move likely" : ""}`;
   const stopX = ind?.stop && (ind.stop.longState === 'crossed' || ind.stop.shortState === 'crossed');
-  return `<button class="tile ${heatClass(ch, S.colorBy)}${dim ? ' dim' : ''}${stopX ? ' stop-crossed' : ''}" data-id="${esc(c.id)}" aria-label="${esc(label)}">
+  return `<button class="tile ${heatClass(ch, S.colorBy)}${stopX ? ' stop-crossed' : ''}" data-id="${esc(c.id)}" aria-label="${esc(label)}">
     <div class="top">
       <div class="sym">${logo(c, 18)}<span>${esc(c.symbol.toUpperCase())}</span>${verifyMark(c)}<span class="rk">#${c.market_cap_rank}</span></div>
       <div class="chg">${fmtPct(ch, ch != null && Math.abs(ch) >= 10 ? 1 : 2)}</div>
@@ -699,18 +698,32 @@ function renderLegend() {
     }).join('')}`;
 }
 
+// Highlight buttons filter the coins: non-matching ones are left out entirely ("All coins" brings them back)
+const FILTER_WORDS = { os: 'oversold', ob: 'overbought', up: 'in an uptrend', down: 'in a downtrend', sq: 'in a squeeze', cross: 'showing a recent moving-average cross', stop: 'past a recommended stop' };
+const visibleCoins = () => S.filter === 'all' ? S.coins : S.coins.filter(c => match(S.ind[c.id], S.filter));
+const emptyHTML = () => `<div class="empty">No coins are ${FILTER_WORDS[S.filter] || 'matching'} right now. <button class="btn" data-show-all>Show all coins</button></div>`;
+
 function renderGrid() {
-  $('#grid').innerHTML = S.coins.map(tileHTML).join('');
+  const list = visibleCoins();
+  $('#grid').innerHTML = list.length ? list.map(tileHTML).join('') : emptyHTML();
 }
 
 function updateCoin(c) {
   const el = $(`.tile[data-id="${CSS.escape(c.id)}"]`);
+  // with a filter on, a coin can start or stop matching when its numbers update: redraw the grid
+  if (S.filter !== 'all' && S.view === 'grid' && !!el !== match(S.ind[c.id], S.filter)) { scheduleGrid(); return; }
   if (el) {
     const tmp = document.createElement('div');
     tmp.innerHTML = tileHTML(c);
     el.replaceWith(tmp.firstElementChild);
   }
   scheduleSide();
+}
+let gridQueued = false;
+function scheduleGrid() {
+  if (gridQueued) return;
+  gridQueued = true;
+  requestAnimationFrame(() => { gridQueued = false; renderGrid(); scheduleSide(); });
 }
 let sideQueued = false;
 function scheduleSide() {
@@ -755,7 +768,7 @@ const COLS = [
 ];
 function renderTable() {
   const col = COLS.find(x => x[0] === S.sort.key) || COLS[0];
-  const rows = [...S.coins].sort((a, b) => {
+  const rows = visibleCoins().sort((a, b) => {
     const x = col[2](a), y = col[2](b);
     if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1;
     return (x < y ? -1 : x > y ? 1 : 0) * S.sort.dir;
@@ -763,18 +776,17 @@ function renderTable() {
   const head = COLS.map(([k, l]) => `<th scope="col"><button data-k="${k}"${S.sort.key === k ? ` data-dir="${S.sort.dir > 0 ? '▲' : '▼'}"` : ''}>${l}</button></th>`).join('');
   const body = rows.map(c => {
     const i = S.ind[c.id] || {};
-    const dim = S.filter !== 'all' && !match(S.ind[c.id], S.filter);
     const heat = tf => `<span class="cell-heat ${heatClass(chgOf(c, tf), tf)}">${fmtPct(chgOf(c, tf))}</span>`;
     const rsi = i.rsiNow != null ? `${i.rsiNow.toFixed(0)}${i.rsiState === 'os' ? ' · Oversold' : i.rsiState === 'ob' ? ' · Overbought' : ''}` : '—';
     const trend = i.trend ? `<span class="${i.trend === 'up' ? 'up-t' : 'dn-t'}">${i.trend === 'up' ? '▲ Up' : '▼ Down'}</span>${i.cross ? ' ✦' : ''}` : '—';
     const bbp = i.bbPct != null ? `${i.bbPct.toFixed(0)}${i.bbState === 'tight' || i.bbState === 'squeeze' ? ' · Squeeze' : ''}` : '—';
-    return `<tr class="${dim ? 'dim' : ''}" data-id="${esc(c.id)}"><td>${c.market_cap_rank}</td><td><b>${esc(c.symbol.toUpperCase())}</b> <span style="color:var(--ink-2)">${esc(c.name)}</span></td><td style="text-align:left">${emojiHTML(S.ind[c.id]) || ''}</td>
+    return `<tr data-id="${esc(c.id)}"><td>${c.market_cap_rank}</td><td><b>${esc(c.symbol.toUpperCase())}</b> <span style="color:var(--ink-2)">${esc(c.name)}</span></td><td style="text-align:left">${emojiHTML(S.ind[c.id]) || ''}</td>
       <td>${fmtPrice(c.current_price)}</td><td>${heat('24h')}</td><td>${heat('7d')}</td><td>${heat('30d')}</td><td>${fmtBig(c.market_cap)}</td>
       <td>${rsi}</td><td>${trend}</td><td>${fmtPct(i.mF ? (i.last / i.mF - 1) * 100 : null, 1)}</td><td>${fmtPct(i.mS ? (i.last / i.mS - 1) * 100 : null, 1)}</td>
       <td>${i.bbw != null ? i.bbw.toFixed(1) + '%' : '—'}</td><td>${bbp}</td>
       <td>${stopCell(i.stop, 'long')}</td><td>${stopCell(i.stop, 'short')}</td></tr>`;
   }).join('');
-  $('#tablewrap').innerHTML = `<table><caption class="sr">Top ${TOP_N} coins with indicators</caption><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+  $('#tablewrap').innerHTML = `<table><caption class="sr">Top ${TOP_N} coins with indicators</caption><thead><tr>${head}</tr></thead><tbody>${body || `<tr><td colspan="${COLS.length}" style="text-align:left">${emptyHTML()}</td></tr>`}</tbody></table>`;
 }
 
 function renderFooter() {
@@ -1153,12 +1165,18 @@ $('#scorewrap').addEventListener('click', e => {
   const hb = e.target.closest('[data-h]');
   if (hb) { S.scoreH = +hb.dataset.h; renderScorecard(); }
 });
+function setFilter(f) {
+  S.filter = f;
+  $$('#filters .chip').forEach(x => x.setAttribute('aria-pressed', x.dataset.f === S.filter));
+  hideDetail(true);
+  renderAll();
+}
+// clicking the active filter again (or "All coins") shows every coin
 $('#filters').addEventListener('click', e => {
   const b = e.target.closest('.chip'); if (!b) return;
-  S.filter = S.filter === b.dataset.f && b.dataset.f !== 'all' ? 'all' : b.dataset.f;
-  $$('#filters .chip').forEach(x => x.setAttribute('aria-pressed', x.dataset.f === S.filter));
-  renderAll();
+  setFilter(S.filter === b.dataset.f && b.dataset.f !== 'all' ? 'all' : b.dataset.f);
 });
+document.addEventListener('click', e => { if (e.target.closest('[data-show-all]')) setFilter('all'); });
 $('#pegged').checked = S.pegged;
 $('#pegged').addEventListener('change', e => { S.pegged = e.target.checked; savePrefs(); pickCoins(); renderAll(); applyHist(); done(); });
 

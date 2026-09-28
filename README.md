@@ -32,6 +32,8 @@ A crypto heatmap of the top 50 coins by market cap. Every tile combines the pric
 
 The popup stays on the coin you opened while the mouse is on it. Crossing other tiles only switches it if you stop on one for about 0.2 seconds. Click the popup (or the tile) to pin it open, and click outside it to close it. On phones, tapping a tile opens the same details as a bottom sheet.
 
+**Filters.** The Highlight buttons (Oversold, Overbought, Uptrend, Downtrend, Squeeze, Recent cross, 🛑 Stop crossed) show only the matching coins, in both grid and table. Each button shows its count. **All coins** (or clicking the active button again) brings everything back.
+
 The **Table** view sorts by any column, including the recommended stops. The **Scorecard** view shows how the signals have actually performed.
 
 ## Scorecard: are the 🚀 / 😢 right?
