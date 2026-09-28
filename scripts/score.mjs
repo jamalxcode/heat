@@ -4,7 +4,7 @@
 // Writes data/scorecard.json, and params.json when the tuner finds settings that do better on unseen data.
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
-import { getJSON, fromExchanges, fromCoinGecko, pool } from './build-data.mjs';
+import { getJSON, fromExchanges, fromCoinGecko, loadPairs, pool } from './build-data.mjs';
 import * as SIG from '../signals.mjs';
 
 const SITE = process.env.SITE_URL || 'https://heat.sala.company';
@@ -21,10 +21,25 @@ const prev = await readJSON('data/scorecard.json', null);
 const snap = await getJSON(`${SITE}/data.json?b=${Date.now()}`);
 const universe = SIG.pickUniverse(snap.markets, snap.cats, 50);
 
-// 2. Long daily history, complete days only (today's candle is still forming), gaps forward-filled
+// 2. Exact trading pairs by CoinGecko ID: refreshed weekly (and for coins new to the top 50), saved to data/pairs.json
+const tuneNow = process.argv.includes('--tune') || new Date().getUTCDay() === 0;
+let pairsFile = await readJSON('data/pairs.json', { t: 0, pairs: {} });
+const stalePairs = tuneNow || Date.now() - pairsFile.t > 7 * DAY;
+const pairIds = universe.map(c => c.id).filter(id => !id.startsWith('cl-') && (stalePairs || !pairsFile.pairs[id]));
+if (pairIds.length) {
+  const fresh = await loadPairs(pairIds);
+  pairsFile = { t: stalePairs ? Date.now() : pairsFile.t, pairs: { ...pairsFile.pairs, ...fresh } };
+  await mkdir(new URL('data/', root), { recursive: true });
+  await writeFile(new URL('data/pairs.json', root), JSON.stringify(pairsFile, null, 1) + '\n');
+  console.log(`Pairs by ID: fetched ${Object.keys(fresh).length}/${pairIds.length}, ${Object.values(fresh).filter(p => Object.keys(p).length).length} with at least one exchange`);
+}
+
+// 3. Long daily history, complete days only (today's candle is still forming), gaps forward-filled
 const coins = [], missing = [];
+let verified = 0;
 await pool(universe, 5, async c => {
-  let h = await fromExchanges(c, snap.hist?.[c.id]?.src, HISTORY);
+  let h = await fromExchanges(c, snap.hist?.[c.id]?.src, HISTORY, pairsFile.pairs);
+  if (h?.verified) verified++;
   if (!h) { try { h = await fromCoinGecko(c, HISTORY); } catch { h = null; } }
   const closes = (h?.closes || []).filter(([t]) => Math.floor(t / DAY) < today);
   if (closes.length < 260) { missing.push(c.symbol.toUpperCase()); return; }
@@ -34,10 +49,9 @@ await pool(universe, 5, async c => {
   for (let d = days[0]; d <= days[days.length - 1]; d++) { if (byDay.has(d)) last = byDay.get(d); filled.push(last); }
   coins.push({ id: c.id, symbol: c.symbol.toUpperCase(), name: c.name, t0: days[0] * DAY, c: filled });
 });
-console.log(`History for ${coins.length}/${universe.length} coins${missing.length ? ' (none for ' + missing.join(', ') + ')' : ''}`);
+console.log(`History for ${coins.length}/${universe.length} coins (${verified} on pairs verified by ID)${missing.length ? ' · none for ' + missing.join(', ') : ''}`);
 
-// 3. Score, and tune on Sundays (or when asked, or the first time)
-const tuneNow = process.argv.includes('--tune') || new Date().getUTCDay() === 0;
+// 4. Score, and tune on Sundays (or when asked, or the first time)
 const { card, newParams } = SIG.buildScorecard(coins, params, { prev, tuneNow });
 
 await mkdir(new URL('data/', root), { recursive: true });

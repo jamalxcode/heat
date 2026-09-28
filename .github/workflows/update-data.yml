@@ -44,6 +44,7 @@ jobs:
           cp index.html signals.mjs _site/
           cp scripts/build-data.mjs _site/scripts/   # the page runs it itself if data.json ever goes stale
           [ -f data/scorecard.json ] && cp data/scorecard.json _site/ || true
+          [ -f data/pairs.json ] && cp data/pairs.json _site/ || true
           node scripts/build-data.mjs _site/data.json
 
       - uses: actions/upload-pages-artifact@v4

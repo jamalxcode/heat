@@ -2,6 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as S from '../signals.mjs';
+import { pairsFromTickers } from '../scripts/build-data.mjs';
 
 const near = (a, b, eps, msg) => assert.ok(Math.abs(a - b) <= eps, `${msg ?? ''} expected ${b}, got ${a}`);
 
@@ -162,6 +163,21 @@ test('buildScorecard: has yesterday, all windows and horizons', () => {
   for (const w of ['d30', 'd90', 'all']) for (const h of S.HORIZONS) assert.ok(card.windows[w][h].rows >= 0);
   assert.ok(card.yesterday.coins.length > 0);
   assert.ok(card.daily.length > 0 && card.daily.length <= 60);
+});
+
+test('pairsFromTickers: keeps the USDT pairs on our exchanges, even after a coin is renamed', () => {
+  // Shape of CoinGecko's /coins/the-open-network/tickers after Toncoin was renamed: coin_id is now "gram"
+  const tickers = [
+    { base: 'GRAM', target: 'USDT', coin_id: 'gram', market: { identifier: 'binance' } },
+    { base: 'GRAM', target: 'USDT', coin_id: 'gram', market: { identifier: 'okex' } },
+    { base: 'GRAM', target: 'USDC', coin_id: 'gram', market: { identifier: 'binance' } },          // not USDT
+    { base: 'GRAM', target: 'USDT', coin_id: 'gram', market: { identifier: 'kucoin' }, is_stale: true },
+    { base: 'GRAM', target: 'USDT', coin_id: 'gram', market: { identifier: 'uniswap_v3' } },       // not an exchange we use
+    { base: 'GRAM', target: 'USDT', coin_id: 'gram', market: { identifier: 'gate' }, is_anomaly: true },
+    { base: 'GRAM', target: 'USDT', coin_id: 'gram', market: { identifier: 'mxc' } },
+  ];
+  assert.deepEqual(pairsFromTickers(tickers), { Binance: 'GRAM', OKX: 'GRAM', MEXC: 'GRAM' });
+  assert.deepEqual(pairsFromTickers(undefined), {});
 });
 
 test('pickUniverse: drops stablecoins and wrapped copies', () => {

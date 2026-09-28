@@ -24,6 +24,8 @@ A crypto heatmap of the top 50 coins by market cap. Every tile combines the pric
   - ⚠️ when price is within a quarter of the distance, and 🛑 **crossed: get out** with a red tile border once price is past it
   - shown in the tile, the table, and the detail chart (as lines). These are suggested levels only: the page isn't real-time, so set stops on your exchange.
 
+- **✓ / ? next to the ticker**: ✓ means the coin's price history comes from an exchange pair confirmed by its CoinGecko ID. ? means it was matched by ticker only (a best guess, checked against the price). Hover the mark to see the exchange and pair.
+
 Hover a tile (tap on a phone) to see a 120-day chart with price, both moving averages, the Bollinger band and RSI. The **Table** view sorts by any column. The **Scorecard** view shows how the signals have actually performed.
 
 ## Scorecard: are the 🚀 / 😢 right?
@@ -69,6 +71,7 @@ GitHub Actions: daily 00:20 UTC (via cron-job.org)
 | `scripts/score.mjs` | Daily scorecard and weekly tuning (about 1,000 days of candles per coin) |
 | `params.json` | Signal settings chosen by the tuner. Missing means the defaults in `signals.mjs` are used. |
 | `data/scorecard.json` | Latest scorecard, committed daily by the bot |
+| `data/pairs.json` | Each coin's exact USDT pair on Binance, Gate.io, OKX, MEXC and KuCoin, from CoinGecko's per-coin tickers. Refreshed weekly by the scorer (and for coins new to the top 50), so a ticker shared by two coins, or a renamed coin (Toncoin now trades as GRAM), can't pull in the wrong price history. |
 | `.github/workflows/update-data.yml` | Builds `data.json` and deploys the site to GitHub Pages every 10 minutes and on every push to `main` |
 | `.github/workflows/score-signals.yml` | Daily scoring (plus Sunday tuning). It commits the results, which also keeps the schedules from being paused for inactivity. |
 | `.github/workflows/test.yml` | Runs the unit tests on every push |

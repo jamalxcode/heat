@@ -237,6 +237,9 @@ h1 .tld { color: var(--ink-2); font-weight: 600; }
 .row .sl { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink-2); }
 .row .sl.near { color: var(--ink); background: color-mix(in oklab, var(--amber) 30%, transparent); border-radius: 4px; padding: 0 3px; }
 .tile.stop-crossed { box-shadow: inset 0 0 0 2px #b8413f; }
+.tile .sym .vf { font-size: 10px; font-weight: 700; line-height: 14px; width: 14px; height: 14px; border-radius: 50%; display: inline-grid; place-items: center; flex: none; }
+.tile .sym .vf.ok { background: color-mix(in oklab, currentColor 18%, transparent); }
+.tile .sym .vf.guess { background: var(--amber); color: #1a1206; }
 .d-stops { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
 .d-stop { border: 1px solid var(--grid); border-radius: 10px; padding: 8px 10px; }
 .d-stop.near { border-color: var(--amber); }
@@ -643,6 +646,15 @@ function emojiHTML(ind) {
   return `<span class="emo" title="${esc(title)}" aria-label="${esc(title)}">${'🚀'.repeat(good.length)}${'😢'.repeat(bad.length)}${sq ? '⚡' : ''}</span>`;
 }
 
+// ✓ = price history comes from a trading pair confirmed by the coin's CoinGecko ID; ? = matched by ticker only
+function verifyMark(c) {
+  const h = S.hist[c.id];
+  if (!h) return '';
+  return h.ok
+    ? `<span class="vf ok" title="Price history: ${esc(h.src)} ${esc(h.pair)}, verified by CoinGecko ID" aria-label="verified">✓</span>`
+    : `<span class="vf guess" title="Price history: ${esc(h.src)} ${esc(h.pair)}, matched by ticker only (not verified)" aria-label="not verified">?</span>`;
+}
+
 function tileHTML(c) {
   const ind = S.ind[c.id], ch = chgOf(c, S.colorBy);
   const dim = S.filter !== 'all' && !match(ind, S.filter);
@@ -651,7 +663,7 @@ function tileHTML(c) {
   const stopX = ind?.stop && (ind.stop.longState === 'crossed' || ind.stop.shortState === 'crossed');
   return `<button class="tile ${heatClass(ch, S.colorBy)}${dim ? ' dim' : ''}${stopX ? ' stop-crossed' : ''}" data-id="${esc(c.id)}" aria-label="${esc(label)}">
     <div class="top">
-      <div class="sym">${logo(c, 18)}<span>${esc(c.symbol.toUpperCase())}</span><span class="rk">#${c.market_cap_rank}</span></div>
+      <div class="sym">${logo(c, 18)}<span>${esc(c.symbol.toUpperCase())}</span>${verifyMark(c)}<span class="rk">#${c.market_cap_rank}</span></div>
       <div class="chg">${fmtPct(ch, ch != null && Math.abs(ch) >= 10 ? 1 : 2)}</div>
       <div class="name"><span class="nm">${esc(c.name)}</span>${emojiHTML(ind)}</div>
       <div class="px">${fmtPrice(c.current_price)}</div>
@@ -761,7 +773,9 @@ function renderFooter() {
   const src = {};
   for (const c of S.coins) { const h = S.hist[c.id]; if (h) src[h.src] = (src[h.src] || 0) + 1; }
   const parts = Object.entries(src).map(([k, v]) => `${v} from ${k}`);
-  $('#srcinfo').textContent = `Prices & rankings: ${S.marketSrc || '—'}${S.stale ? ' (saved copy, sources busy)' : ''}.` + (parts.length ? ` Daily candles: ${parts.join(' · ')}.` : '');
+  const withHist = S.coins.filter(c => S.hist[c.id]), ok = withHist.filter(c => S.hist[c.id].ok).length;
+  $('#srcinfo').textContent = `Prices & rankings: ${S.marketSrc || '—'}${S.stale ? ' (saved copy, sources busy)' : ''}.` + (parts.length ? ` Daily candles: ${parts.join(' · ')}.` : '')
+    + (withHist.length ? ` ✓ ${ok} of ${withHist.length} coins matched to their exchange pair by CoinGecko ID; ? marks a ticker-only match.` : '');
   const ex = $('#excluded');
   ex.hidden = S.pegged || !S.excluded.length;
   ex.querySelector('summary').textContent = `Excluded ${S.excluded.length} stablecoins, pegged and fund tokens (tick "Include stablecoins & pegged" to show them)`;
@@ -1024,7 +1038,7 @@ function showDetail(id, anchor, keepPos) {
       <div class="d-stop ${ind.stop.shortState}"><div class="d-st">Recommended stop · <b>short</b> positions</div><div class="d-sv">${fmtPrice(ind.stop.short)} <span>${fmtPct(ind.stop.shortPct, 1)}</span></div><div class="d-sn">${ind.stop.shortState === 'crossed' ? '🛑 <b>Crossed: exit short positions.</b>' : ind.stop.shortState === 'near' ? '⚠️ Price is close to the stop.' : 'Exit a short if price rises above this.'}</div></div>
     </div>
     <div class="d-src">Stops = ${P().stopMult}× the average daily move (${(ind.stop.dist / P().stopMult * 100).toFixed(1)}%) from the ${new Date(ind.t[ind.stop.anchorIdx ?? ind.n - 2] ?? Date.now()).toISOString().slice(0, 10)} close. Suggested levels, not advice: set them on your exchange, as this page isn't real-time.</div>` : ''}
-    <div class="d-src">${h ? `${h.src} ${h.pair} · ${ind.n} daily candles` : ''}${ind.bbShort ? ' · BBW percentile uses under 90 days' : ''}</div>`;
+    <div class="d-src">${h ? `${h.src} ${h.pair} · ${h.ok ? '✓ verified by CoinGecko ID' : '⚠ matched by ticker only (not verified)'} · ${ind.n} daily candles` : ''}${ind.bbShort ? ' · BBW percentile uses under 90 days' : ''}</div>`;
   } else body += `<div class="d-src">${ind?.error ? 'No daily history found on Binance, Gate.io, OKX or CoinGecko.' : 'Loading candles…'}</div>`;
   box.querySelector('.body').innerHTML = body;
   box.classList.add('show');
@@ -1138,7 +1152,7 @@ async function loadSnapshot() {
     return d && d.v === 1 && Array.isArray(d.markets) ? d : null;
   } catch { return null; }
 }
-const unpack = h => ({ src: h.src, pair: h.pair, t: h.t, closes: h.c.map((v, i) => [h.t0 + i * DAY, v]) });
+const unpack = h => ({ src: h.src, pair: h.pair, ok: !!h.ok, t: h.t, closes: h.c.map((v, i) => [h.t0 + i * DAY, v]) });
 
 // Backup when data.json is missing or stale: run the same build script GitHub runs, right here in the browser
 // (without the slow CoinGecko candle fallback), at most once per 10 minutes per browser, shared across tabs.
@@ -1150,7 +1164,9 @@ async function buildLive(stale) {
   setStatus('Fetching live prices…', 'busy');
   const { build } = await import('./scripts/build-data.mjs');
   const prev = cached && (!stale || cached.generated > stale.generated) ? cached : stale;
-  const data = await build({ prev, params: stale?.params ?? cached?.params ?? null, cgCandles: false, log: () => {} });
+  let pairs = null;
+  try { pairs = (await (await fetch('pairs.json', { cache: 'no-store' })).json()).pairs; } catch { /* none published yet */ }
+  const data = await build({ prev, params: stale?.params ?? cached?.params ?? null, cgCandles: false, pairs, log: () => {} });
   store.set('hm.live', data);
   return data;
 }

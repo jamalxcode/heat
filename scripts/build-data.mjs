@@ -93,13 +93,55 @@ const EXCHANGES = [
   ] : []),
 ];
 
-export async function fromExchanges(c, preferred, n = CANDLES) {
-  const order = [...EXCHANGES].sort((a, b) => (b[0] === preferred) - (a[0] === preferred));
-  for (const [name, url, parse] of order) {
+/* ---------- exact trading pairs, by CoinGecko coin ID ---------- */
+// CoinGecko's exchange ids → our exchange names
+const CG_EXCHANGES = { binance: 'Binance', gate: 'Gate.io', okex: 'OKX', mxc: 'MEXC', kucoin: 'KuCoin' };
+
+// From CoinGecko's /coins/{id}/tickers: the USDT pair base symbol on each exchange we use, e.g. { Binance: 'GRAM' }.
+// That endpoint only lists markets of the requested coin, so a different coin sharing the ticker can't sneak in.
+// (Don't compare t.coin_id with the id asked for: after a rename, e.g. the-open-network → gram, they differ.)
+export function pairsFromTickers(tickers) {
+  const out = {};
+  for (const t of tickers || []) {
+    const ex = CG_EXCHANGES[t.market?.identifier];
+    if (!ex || t.target !== 'USDT' || t.is_stale || t.is_anomaly) continue;
+    if (!/^[A-Z0-9]+$/.test(t.base || '')) continue;
+    out[ex] ??= t.base;
+  }
+  return out;
+}
+
+// One polite CoinGecko call per coin (the free tier allows roughly 5-15 a minute); run weekly by scripts/score.mjs
+export async function loadPairs(ids, log = console.log) {
+  const out = {};
+  for (const id of ids) {
+    await sleep(6000);
+    try {
+      const d = await getJSON(`${CG}/coins/${encodeURIComponent(id)}/tickers?exchange_ids=${Object.keys(CG_EXCHANGES).join(',')}`);
+      out[id] = pairsFromTickers(d.tickers);
+    } catch (e) { log(`Pairs for ${id} failed: ${e.message}`); }
+  }
+  return out;
+}
+
+// pairs = { [coinId]: { Binance: 'BTC', ... } }. Mapped pairs are tried first and marked verified; otherwise the
+// ticker is guessed (with a price check) and marked unverified.
+export async function fromExchanges(c, preferred, n = CANDLES, pairs = null) {
+  const byPref = (a, b) => (b[0] === preferred) - (a[0] === preferred);
+  const mapped = pairs?.[c.id];
+  if (mapped) {
+    for (const [name, url, parse] of [...EXCHANGES].filter(([name]) => mapped[name]).sort(byPref)) {
+      try {
+        const closes = parse(await getJSON(url(mapped[name], n), { tries: 1 })).sort((a, b) => a[0] - b[0]).slice(-n);
+        if (sane(closes, c.current_price)) return { src: name, pair: mapped[name] + '/USDT', closes, verified: true };
+      } catch { /* exchange hiccup: try the next one */ }
+    }
+  }
+  for (const [name, url, parse] of [...EXCHANGES].sort(byPref)) {
     for (const s of symbolsFor(c)) {
       try {
         const closes = parse(await getJSON(url(s, n), { tries: 1 })).sort((a, b) => a[0] - b[0]).slice(-n);
-        if (sane(closes, c.current_price)) return { src: name, pair: s + '/USDT', closes };
+        if (sane(closes, c.current_price)) return { src: name, pair: s + '/USDT', closes, verified: false };
       } catch { /* not listed there */ }
     }
   }
@@ -109,7 +151,7 @@ export async function fromCoinGecko(c, n = CANDLES) {
   if (c.id.startsWith('cl-')) return null;
   const d = await getJSON(`${CG}/coins/${encodeURIComponent(c.id)}/market_chart?vs_currency=usd&days=${n - 1}&interval=daily`);
   const closes = (d.prices || []).map(p => [p[0], p[1]]);
-  return closes.length >= 20 ? { src: 'CoinGecko', pair: c.symbol.toUpperCase() + '/USD', closes } : null;
+  return closes.length >= 20 ? { src: 'CoinGecko', pair: c.symbol.toUpperCase() + '/USD', closes, verified: true } : null;
 }
 
 // Compact form: one close per UTC day starting at day t0 (gaps forward-filled), 7 significant digits
@@ -119,7 +161,7 @@ export function pack(h, n = CANDLES) {
   const c = [];
   let last = byDay.get(days[0]);
   for (let d = days[0]; d <= days[days.length - 1]; d++) { if (byDay.has(d)) last = byDay.get(d); c.push(+last.toPrecision(7)); }
-  return { src: h.src, pair: h.pair, t: h.t, t0: days[0] * DAY, c: c.slice(-n) };
+  return { src: h.src, pair: h.pair, ok: h.verified ? 1 : 0, t: h.t, t0: days[0] * DAY, c: c.slice(-n) };
 }
 
 export async function pool(items, n, fn) {
@@ -129,7 +171,7 @@ export async function pool(items, n, fn) {
 
 /* ---------- main ---------- */
 // cgCandles: false skips the slow CoinGecko candle fallback (used when a visitor's browser runs this as a backup)
-export async function build({ prev = null, log = console.log, params = null, cgCandles = true } = {}) {
+export async function build({ prev = null, log = console.log, params = null, cgCandles = true, pairs = null } = {}) {
   const started = Date.now();
   const { src, markets, stale } = await loadMarkets(prev, log);
   const cats = await loadCategories(prev, log);
@@ -141,8 +183,9 @@ export async function build({ prev = null, log = console.log, params = null, cgC
   await pool(targets, 6, async c => {
     const old = prev?.hist?.[c.id];
     const maxAge = old?.src === 'CoinGecko' ? HIST_REUSE_CG : HIST_REUSE;
-    if (old && started - old.t < maxAge) { hist[c.id] = old; reused++; return; }
-    const h = await fromExchanges(c, old?.src);
+    // reuse recent candles, unless they were a ticker guess and a verified pair is now known
+    if (old && started - old.t < maxAge && (old.ok || !pairs?.[c.id])) { hist[c.id] = old; reused++; return; }
+    const h = await fromExchanges(c, old?.src, CANDLES, pairs);
     if (h) { h.t = started; hist[c.id] = pack(h); }
     else if (!pegged.has(c.id) && cgCandles) slow.push(c);
     else if (old) hist[c.id] = old;
@@ -186,7 +229,9 @@ if (IS_NODE && process.argv[1] && import.meta.url.endsWith(process.argv[1].repla
   const { readFile } = await import('node:fs/promises');
   let params = null; // signal settings chosen by the tuner (scripts/score.mjs); the page falls back to defaults
   try { params = JSON.parse(await readFile(new URL('../params.json', import.meta.url), 'utf8')); } catch { /* none yet */ }
-  const data = await build({ prev, params });
+  let pairs = null; // exact trading pairs by coin ID, refreshed weekly by scripts/score.mjs
+  try { pairs = JSON.parse(await readFile(new URL('../data/pairs.json', import.meta.url), 'utf8')).pairs; } catch { /* none yet */ }
+  const data = await build({ prev, params, pairs });
   await mkdir(dirname(out), { recursive: true });
   await writeFile(out, JSON.stringify(data));
   console.log(`Wrote ${out} (${(JSON.stringify(data).length / 1024).toFixed(0)} KB)`);
