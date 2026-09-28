@@ -111,13 +111,16 @@ export function pairsFromTickers(tickers) {
   return out;
 }
 
-// One polite CoinGecko call per coin (the free tier allows roughly 5-15 a minute); run weekly by scripts/score.mjs
-export async function loadPairs(ids, log = console.log) {
-  const out = {};
+// One polite CoinGecko call per coin (the free tier allows roughly 5-15 a minute); run weekly by scripts/score.mjs.
+// Stops after `budgetMs` and returns what it has: coins it didn't reach are picked up on the next daily run,
+// so a rate-limited day can't push the job past its time limit and lose everything.
+export async function loadPairs(ids, log = console.log, { budgetMs = 8 * 60e3 } = {}) {
+  const out = {}, start = Date.now();
   for (const id of ids) {
+    if (Date.now() - start > budgetMs) { log(`Pairs: time budget used, ${ids.length - Object.keys(out).length} coins left for the next run`); break; }
     await sleep(6000);
     try {
-      const d = await getJSON(`${CG}/coins/${encodeURIComponent(id)}/tickers?exchange_ids=${Object.keys(CG_EXCHANGES).join(',')}`);
+      const d = await getJSON(`${CG}/coins/${encodeURIComponent(id)}/tickers?exchange_ids=${Object.keys(CG_EXCHANGES).join(',')}`, { tries: 2 });
       out[id] = pairsFromTickers(d.tickers);
     } catch (e) { log(`Pairs for ${id} failed: ${e.message}`); }
   }
@@ -129,23 +132,27 @@ export async function loadPairs(ids, log = console.log) {
 export async function fromExchanges(c, preferred, n = CANDLES, pairs = null) {
   const byPref = (a, b) => (b[0] === preferred) - (a[0] === preferred);
   const mapped = pairs?.[c.id];
+  let verified = null;
   if (mapped) {
     for (const [name, url, parse] of [...EXCHANGES].filter(([name]) => mapped[name]).sort(byPref)) {
       try {
         const closes = parse(await getJSON(url(mapped[name], n), { tries: 1 })).sort((a, b) => a[0] - b[0]).slice(-n);
-        if (sane(closes, c.current_price)) return { src: name, pair: mapped[name] + '/USDT', closes, verified: true };
+        if (sane(closes, c.current_price) && closes.length > (verified?.closes.length ?? 0)) verified = { src: name, pair: mapped[name] + '/USDT', closes, verified: true };
+        if (verified && verified.closes.length >= Math.min(n, 220)) return verified;   // long enough for the 200-day average
       } catch { /* exchange hiccup: try the next one */ }
     }
   }
+  // Ticker guess: used when no verified pair exists, or when the verified one is too young (a renamed coin, e.g.
+  // Toncoin's new GRAM/USDT pair, while its years of history sit on the old TON/USDT pair). Longest history wins.
   for (const [name, url, parse] of [...EXCHANGES].sort(byPref)) {
     for (const s of symbolsFor(c)) {
       try {
         const closes = parse(await getJSON(url(s, n), { tries: 1 })).sort((a, b) => a[0] - b[0]).slice(-n);
-        if (sane(closes, c.current_price)) return { src: name, pair: s + '/USDT', closes, verified: false };
+        if (sane(closes, c.current_price) && closes.length > (verified?.closes.length ?? 0)) return { src: name, pair: s + '/USDT', closes, verified: false };
       } catch { /* not listed there */ }
     }
   }
-  return null;
+  return verified;
 }
 export async function fromCoinGecko(c, n = CANDLES) {
   if (c.id.startsWith('cl-')) return null;

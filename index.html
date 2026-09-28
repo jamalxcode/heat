@@ -275,9 +275,18 @@ td .cell-heat { display: inline-block; padding: 1px 6px; border-radius: 4px; bac
 
 /* ---------- detail popover / sheet ---------- */
 #detail {
-  position: fixed; z-index: 20; width: 360px; max-width: calc(100vw - 32px);
+  position: fixed; z-index: 20; width: 720px; max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 24px); overflow-y: auto; overscroll-behavior: contain;
   background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
-  box-shadow: var(--shadow); padding: 14px 14px 12px; display: none; pointer-events: none;
+  box-shadow: var(--shadow); padding: 14px 16px 12px; display: none; pointer-events: none;
+}
+/* two columns on laptops: charts left, numbers and stops right, so the popup is wide rather than tall */
+.d-cols { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 4px 18px; align-items: start; }
+.d-right .kv { margin-top: 0; padding-top: 0; border-top: 0; }
+@media (max-width: 760px) {
+  #detail { width: 400px; }
+  .d-cols { grid-template-columns: 1fr; }
+  .d-right .kv { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--grid); }
 }
 #detail.show { display: block; }
 #detail.pinned { pointer-events: auto; }
@@ -1023,7 +1032,7 @@ function showDetail(id, anchor, keepPos) {
     <div class="d-price">${fmtPrice(c.current_price)}</div>
     <div class="d-chg"><span>24h ${fmtPct(chgOf(c, '24h'))}</span><span>7d ${fmtPct(chgOf(c, '7d'))}</span><span>30d ${fmtPct(chgOf(c, '30d'))}</span><span>Cap ${fmtBig(c.market_cap)}</span></div>`;
   if (ind && !ind.error) {
-    body += detailChart(ind);
+    body += `<div class="d-cols"><div class="d-left">${detailChart(ind)}</div><div class="d-right">`;
     const trendTxt = ind.trend ? `${ind.trend === 'up' ? '▲ Uptrend' : '▼ Downtrend'} (${ind.strong ? 'price agrees' : ind.trend === 'up' ? `price below ${P().maFast}MA` : `price above ${P().maFast}MA`})` : `${P().maSlow}-day history not available yet`;
     body += `<dl class="kv">
       <dt>RSI (14)</dt><dd>${ind.rsiNow != null ? ind.rsiNow.toFixed(1) + (ind.rsiState === 'os' ? ' · Oversold' : ind.rsiState === 'ob' ? ' · Overbought' : ' · Neutral') : '—'}</dd>
@@ -1039,17 +1048,20 @@ function showDetail(id, anchor, keepPos) {
     </div>
     <div class="d-src">Stops = ${P().stopMult}× the average daily move (${(ind.stop.dist / P().stopMult * 100).toFixed(1)}%) from the ${new Date(ind.t[ind.stop.anchorIdx ?? ind.n - 2] ?? Date.now()).toISOString().slice(0, 10)} close. Suggested levels, not advice: set them on your exchange, as this page isn't real-time.</div>` : ''}
     <div class="d-src">${h ? `${h.src} ${h.pair} · ${h.ok ? '✓ verified by CoinGecko ID' : '⚠ matched by ticker only (not verified)'} · ${ind.n} daily candles` : ''}${ind.bbShort ? ' · BBW percentile uses under 90 days' : ''}</div>`;
+    body += '</div></div>';
   } else body += `<div class="d-src">${ind?.error ? 'No daily history found on Binance, Gate.io, OKX or CoinGecko.' : 'Loading candles…'}</div>`;
   box.querySelector('.body').innerHTML = body;
   box.classList.add('show');
   if (keepPos) return;
   if (anchor) {
-    const r = anchor.getBoundingClientRect(), bw = box.offsetWidth, bh = box.offsetHeight, vw = innerWidth, vh = innerHeight;
-    let left = r.right + 10;
-    if (left + bw > vw - 12) left = r.left - bw - 10;
-    if (left < 12) left = Math.min(Math.max(12, r.left), vw - bw - 12);
-    let top = Math.min(Math.max(12, r.top), vh - bh - 12);
-    if (left === r.left || (left < r.right && left + bw > r.left)) top = r.bottom + 10 + bh < vh ? r.bottom + 10 : Math.max(12, r.top - bh - 10);
+    // beside the tile if it fits; otherwise centered below (or above) it; always clamped inside the window
+    const r = anchor.getBoundingClientRect(), bw = box.offsetWidth, bh = box.offsetHeight, vw = innerWidth, vh = innerHeight, gap = 10, m = 12;
+    let left, top;
+    if (r.right + gap + bw <= vw - m) { left = r.right + gap; top = r.top; }
+    else if (r.left - gap - bw >= m) { left = r.left - gap - bw; top = r.top; }
+    else { left = (vw - bw) / 2; top = r.bottom + gap + bh <= vh - m ? r.bottom + gap : r.top - gap - bh; }
+    left = Math.min(Math.max(m, left), Math.max(m, vw - bw - m));
+    top = Math.min(Math.max(m, top), Math.max(m, vh - bh - m));
     box.style.left = left + 'px'; box.style.top = top + 'px';
   }
 }
