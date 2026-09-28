@@ -278,7 +278,7 @@ td .cell-heat { display: inline-block; padding: 1px 6px; border-radius: 4px; bac
   position: fixed; z-index: 20; width: 720px; max-width: calc(100vw - 32px);
   max-height: calc(100vh - 24px); overflow-y: auto; overscroll-behavior: contain;
   background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
-  box-shadow: var(--shadow); padding: 14px 16px 12px; display: none; pointer-events: none;
+  box-shadow: var(--shadow); padding: 14px 16px 12px; display: none;
 }
 /* two columns on laptops: charts left, numbers and stops right, so the popup is wide rather than tall */
 .d-cols { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 4px 18px; align-items: start; }
@@ -289,7 +289,6 @@ td .cell-heat { display: inline-block; padding: 1px 6px; border-radius: 4px; bac
   .d-right .kv { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--grid); }
 }
 #detail.show { display: block; }
-#detail.pinned { pointer-events: auto; }
 #detail .x { position: absolute; top: 8px; right: 8px; display: none; border: 0; background: transparent; font-size: 20px; line-height: 1; cursor: pointer; color: var(--ink-2); padding: 4px 8px; }
 #detail.pinned .x { display: block; }
 .d-head { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; padding-right: 24px; }
@@ -1024,6 +1023,7 @@ function detailChart(ind) {
 }
 
 function showDetail(id, anchor, keepPos) {
+  S.hoverId = id;
   const c = S.coins.find(x => x.id === id);
   const box = $('#detail');
   if (!c) return hideDetail(true);
@@ -1069,6 +1069,7 @@ const ordinal = n => n + (['th', 'st', 'nd', 'rd'][(n % 100 - 20) % 10] || ['th'
 function hideDetail(force) {
   if (S.pinned && !force) return;
   S.pinned = null;
+  S.hoverId = null; overDetail = false;
   $('#detail').classList.remove('show', 'pinned');
   $('#scrim').classList.remove('show');
 }
@@ -1082,12 +1083,31 @@ function pinDetail(id, anchor) {
 
 /* ================= events ================= */
 const finePointer = matchMedia('(hover: hover) and (pointer: fine)');
+// Hover: the popup is solid (the mouse can rest on it without reaching the tiles underneath), and switching to
+// another coin waits ~0.2 s, so crossing other tiles on the way to the popup doesn't change it.
+let hoverTimer = 0, hideTimer = 0, overDetail = false;
+const HOVER_SWITCH_MS = 180, HOVER_HIDE_MS = 250;
 $('#grid').addEventListener('mouseover', e => {
   const t = e.target.closest('.tile');
   if (!t || S.pinned || !finePointer.matches) return;
-  showDetail(t.dataset.id, t);
+  clearTimeout(hideTimer); clearTimeout(hoverTimer);
+  if (!$('#detail').classList.contains('show')) showDetail(t.dataset.id, t);
+  else if (S.hoverId !== t.dataset.id) hoverTimer = setTimeout(() => { if (!overDetail) showDetail(t.dataset.id, t); }, HOVER_SWITCH_MS);
 });
-$('#grid').addEventListener('mouseleave', () => hideDetail());
+$('#grid').addEventListener('mouseleave', () => {
+  clearTimeout(hoverTimer);
+  hideTimer = setTimeout(() => { if (!overDetail) hideDetail(); }, HOVER_HIDE_MS);
+});
+$('#detail').addEventListener('mouseenter', () => { overDetail = true; clearTimeout(hideTimer); clearTimeout(hoverTimer); });
+$('#detail').addEventListener('mouseleave', () => { overDetail = false; hideTimer = setTimeout(() => hideDetail(), HOVER_HIDE_MS); });
+// clicking the hover popup pins it open, like clicking the tile
+$('#detail').addEventListener('click', e => {
+  if (S.pinned || !S.hoverId || e.target.closest('.x')) return;
+  // pin in place: no redraw, no move
+  S.pinned = S.hoverId;
+  $('#detail').classList.add('pinned');
+  $('#scrim').classList.add('show');
+});
 $('#grid').addEventListener('focusin', e => { const t = e.target.closest('.tile'); if (t && !S.pinned) showDetail(t.dataset.id, t); });
 $('#grid').addEventListener('focusout', () => hideDetail());
 $('#grid').addEventListener('click', e => {
@@ -1108,7 +1128,12 @@ $('#tablewrap').addEventListener('click', e => {
 $('#detail .x').addEventListener('click', () => hideDetail(true));
 $('#scrim').addEventListener('click', () => hideDetail(true));
 document.addEventListener('keydown', e => { if (e.key === 'Escape') hideDetail(true); });
-document.addEventListener('click', e => { if (S.pinned && !e.target.closest('#detail, .tile, tr[data-id]')) hideDetail(true); });
+// Close a pinned popup on a click elsewhere. Uses the click's original path, because a redraw can detach e.target.
+document.addEventListener('click', e => {
+  if (!S.pinned) return;
+  const inside = e.composedPath().some(n => n.id === 'detail' || n.classList?.contains('tile') || (n.tagName === 'TR' && n.dataset?.id));
+  if (!inside) hideDetail(true);
+});
 addEventListener('scroll', () => { if (!S.pinned) hideDetail(); }, { passive: true });
 
 function seg(id, key, after) {
