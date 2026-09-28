@@ -88,6 +88,16 @@ test('withDefaults: ignores unknown weights and fills missing ones', () => {
   assert.equal('bbTight' in p.weights, false);
 });
 
+test('stopLevels: 2 × the average daily move, either side of the anchor close', () => {
+  const c = Array.from({ length: 30 }, (_, k) => 100 * 1.01 ** k);   // every day +1% → average move 1%
+  near(S.stopDistance(c, 29, S.DEFAULT_PARAMS), 0.02, 1e-9);
+  const lv = S.stopLevels(c, 29, S.DEFAULT_PARAMS);
+  near(lv.long, c[29] * 0.98, 1e-9);
+  near(lv.short, c[29] * 1.02, 1e-9);
+  assert.equal(S.stopLevels(c, 10, S.DEFAULT_PARAMS), null, 'needs 20 days of moves');
+  near(S.stopDistance(c, 29, { stopMult: 3 }), 0.03, 1e-9, 'multiplier is a setting');
+});
+
 // Deterministic pseudo-random walk so tests are repeatable
 function walk(seed, n, drift = 0) {
   let x = seed, p = 100;
@@ -120,6 +130,16 @@ test('stats: counts add up and horizons are separate', () => {
     assert.ok(st.all.upRate > 0 && st.all.upRate < 1);
   }
   assert.ok(S.stats(rows, 7).rows < S.stats(rows, 1).rows);
+});
+
+test('stats: stop-loss hit and good-exit rates are sane', () => {
+  const rows = S.signalRows(coins, S.DEFAULT_PARAMS);
+  const s3 = S.stats(rows, 3).stops, s7 = S.stats(rows, 7).stops;
+  for (const s of [s3, s7]) for (const k of ['long', 'short']) {
+    assert.ok(s[k].hitRate > 0 && s[k].hitRate < 1, `${k} hit rate in (0,1)`);
+    assert.ok(s[k].goodRate >= 0 && s[k].goodRate <= 1, `${k} good rate in [0,1]`);
+  }
+  assert.ok(s7.long.hitRate >= s3.long.hitRate, 'a longer window can only cross more often');
 });
 
 test('spearman: perfect, inverse and no relationship', () => {

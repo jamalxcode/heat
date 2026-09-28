@@ -5,6 +5,8 @@ export const DEFAULT_PARAMS = {
   rsiPeriod: 14, rsiLow: 30, rsiHigh: 70,
   maFast: 50, maSlow: 200,
   bbPeriod: 20, bbK: 2, bbLookback: 180, bbTightPct: 10, bbWidePct: 80,
+  // Recommended stop-loss: stopMult × the coin's average daily move over the last stopLookback days
+  stopMult: 2, stopLookback: 20,
   // +1 = counts as a 🚀, -1 = counts as a 😢, 0 = switched off. The tuner may flip or disable a signal.
   weights: { trendUp: 1, oversold: 1, trendDown: -1, overbought: -1, bbWide: -1 },
 };
@@ -122,6 +124,24 @@ export function scoreOf(active, p) {
   return { good, bad, score: good.length - bad.length, squeeze: !!active.squeeze };
 }
 
+/* ---------- recommended stop-loss ---------- */
+// Distance (as a fraction of price) = stopMult × average absolute daily move over the last stopLookback closes.
+// Roughly 3% for BTC and 7% for a typical top-50 coin.
+export function stopDistance(closes, i, p) {
+  const P = withDefaults(p), n = P.stopLookback;
+  if (i < n) return null;
+  let s = 0;
+  for (let j = i - n + 1; j <= i; j++) s += Math.abs(closes[j] / closes[j - 1] - 1);
+  return P.stopMult * s / n;
+}
+// Levels anchored at close i: exit a long below `long`, exit a short above `short`
+export function stopLevels(closes, i, p) {
+  const d = stopDistance(closes, i, p);
+  if (d == null) return null;
+  const c = closes[i];
+  return { dist: d, anchor: c, long: c * (1 - d), short: c * (1 + d) };
+}
+
 /* ---------- evaluation ---------- */
 const DAY = 864e5;
 const cap = h => 0.3 * Math.sqrt(h);   // ±30% a day, wider for longer horizons: stops one bad print swamping averages
@@ -145,7 +165,23 @@ export function signalRows(coins, p) {
         raw[h] = coin.c[i + h] / coin.c[i] - 1;
         ret[h] = Math.max(-cap(h), Math.min(cap(h), raw[h]));
       }
-      rows.push({ day: d0 + i, id: coin.id, sym: coin.symbol, a, good, bad, score, squeeze, raw, ret, mkt: {}, exc: {} });
+      // Stops set at this close: were they crossed (on a daily close) within h days? And after the exit, did price
+      // keep going the wrong way for another h days (good exit) or come back (shaken out)? null = too recent to tell.
+      const stopD = stopDistance(coin.c, i, P), stop = {};
+      if (stopD != null) {
+        const lo = coin.c[i] * (1 - stopD), hi = coin.c[i] * (1 + stopD);
+        for (const h of HORIZONS) {
+          if (i + h >= n) { stop[h] = null; continue; }
+          let jL = -1, jS = -1;
+          for (let k = i + 1; k <= i + h; k++) {
+            if (jL < 0 && coin.c[k] < lo) jL = k;
+            if (jS < 0 && coin.c[k] > hi) jS = k;
+          }
+          const after = (j, dir) => j < 0 || j + h >= n ? null : dir < 0 ? coin.c[j + h] < coin.c[j] : coin.c[j + h] > coin.c[j];
+          stop[h] = { longHit: jL >= 0, longGood: after(jL, -1), shortHit: jS >= 0, shortGood: after(jS, 1) };
+        }
+      }
+      rows.push({ day: d0 + i, id: coin.id, sym: coin.symbol, a, good, bad, score, squeeze, raw, ret, mkt: {}, exc: {}, stopD, stop });
     }
   }
   // excess = coin's move minus the average of every coin over the same days (removes the market's move)
@@ -217,6 +253,14 @@ export function stats(rows, h = 1) {
     const dm = dailyMeans(g, r => r.exc[h]);
     out.components[k] = g.length ? { n: g.length, avgRet: mean(g.map(r => r.ret[h])), avgExc: mean(dm), t: tStat(dm) / adj, upRate: up(g), beatRate: beat(g) } : { n: 0 };
   }
+
+  // Recommended stops: how often were they crossed within h days, and was getting out the right call?
+  const st = rows.filter(r => r.stop?.[h]);
+  const side = k => {
+    const hits = st.filter(r => r.stop[h][k + 'Hit']), judged = hits.filter(r => r.stop[h][k + 'Good'] != null);
+    return { hitRate: st.length ? hits.length / st.length : null, goodRate: judged.length ? judged.filter(r => r.stop[h][k + 'Good']).length / judged.length : null, hits: hits.length };
+  };
+  out.stops = { n: st.length, avgDist: mean(st.map(r => r.stopD)), long: side('long'), short: side('short') };
 
   // ⚡ squeeze: are the following moves really bigger than usual?
   const sq = rows.filter(r => r.squeeze);

@@ -233,6 +233,20 @@ h1 .tld { color: var(--ink-2); font-weight: 600; }
 .tag.os { background: color-mix(in oklab, var(--blue) 20%, transparent); }
 .tag.ob { background: color-mix(in oklab, var(--orange) 24%, transparent); }
 .tag.sq { background: color-mix(in oklab, var(--amber) 32%, transparent); }
+.tag.stop-x { background: #b8413f; color: #fff; }
+.row .sl { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.row .sl.near { color: var(--ink); background: color-mix(in oklab, var(--amber) 30%, transparent); border-radius: 4px; padding: 0 3px; }
+.tile.stop-crossed { box-shadow: inset 0 0 0 2px #b8413f; }
+.d-stops { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.d-stop { border: 1px solid var(--grid); border-radius: 10px; padding: 8px 10px; }
+.d-stop.near { border-color: var(--amber); }
+.d-stop.crossed { border-color: #b8413f; background: color-mix(in oklab, #b8413f 10%, transparent); }
+.d-st { font-size: 11px; color: var(--muted); }
+.d-st b { color: var(--ink); text-transform: uppercase; letter-spacing: .03em; }
+.d-sv { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.d-sv span { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.d-sn { font-size: 11.5px; color: var(--ink-2); margin-top: 2px; }
+.sc-stops ul { margin: 4px 0 0; padding-left: 18px; font-size: 13px; }
 .gauge { position: relative; flex: 1; min-width: 28px; height: 6px; border-radius: 3px;
   background: linear-gradient(90deg,
     color-mix(in oklab, var(--blue) 45%, transparent) 0 var(--rsi-lo, 30%),
@@ -335,6 +349,7 @@ footer details summary { cursor: pointer; }
         <button class="chip" data-f="down" aria-pressed="false">Downtrend <span class="n"></span></button>
         <button class="chip" data-f="sq" aria-pressed="false">Squeeze <span class="n"></span></button>
         <button class="chip" data-f="cross" aria-pressed="false">Recent cross <span class="n"></span></button>
+        <button class="chip" data-f="stop" aria-pressed="false">🛑 Stop crossed <span class="n"></span></button>
       </div>
     </div>
     <div class="spacer"></div>
@@ -362,7 +377,7 @@ footer details summary { cursor: pointer; }
       <b>BB width</b>: (upper − lower) / middle band, ranked against the last 180 days. Bottom 25% is a <i>squeeze</i> (volatility is compressed, and a big move often follows, in either direction). Top 20% is <i>expanded</i>. The very tightest bands get a ⚡ next to the name: a big move is likely, but not its direction, so ⚡ never counts as a 🚀 or 😢.</div>
     <div id="srcinfo"></div>
     <details id="excluded"><summary>Excluded tokens</summary><div></div></details>
-    <div>Data is collected every 10 minutes from CoinGecko (CoinLore as backup) for prices and rankings, and from Binance, Gate.io, OKX, MEXC, KuCoin and CoinGecko for daily candles. Prices are not real-time. Today's candle is still forming, so indicators move during the day. Not financial advice.</div>
+    <div>Data is collected every 10 minutes from CoinGecko (CoinLore as backup) for prices and rankings, and from Binance, Gate.io, OKX, MEXC, KuCoin and CoinGecko for daily candles. Prices are not real-time. Today's candle is still forming, so indicators move during the day. <b>Recommended stop-losses</b> are suggested levels only: this page is not real-time and cannot exit a position for you, so set stops on your exchange. Not financial advice.</div>
   </footer>
 </div>
 
@@ -518,6 +533,20 @@ function compute(ser) {
   }
   // 🚀 / 😢: exactly what the daily scorecard measures
   r.sig = SIG.scoreOf(SIG.componentsAt(s, n - 1, p), p);
+
+  // Recommended stops: set once a day from the last completed close, so they don't move with every refresh.
+  // Today's candle is still forming, so anchor on the one before it.
+  const anchor = Math.floor(t[n - 1] / DAY) >= Math.floor(Date.now() / DAY) ? n - 2 : n - 1;
+  const lv = anchor > 0 ? SIG.stopLevels(c, anchor, p) : null;
+  if (lv) {
+    const room = (a, b) => (a - b) / (lv.anchor * lv.dist);         // share of the stop distance still left
+    r.stop = {
+      ...lv, anchorIdx: anchor,
+      longPct: (lv.long / last - 1) * 100, shortPct: (lv.short / last - 1) * 100,
+      longState: last <= lv.long ? 'crossed' : room(last, lv.long) < 0.25 ? 'near' : 'ok',
+      shortState: last >= lv.short ? 'crossed' : room(lv.short, last) < 0.25 ? 'near' : 'ok',
+    };
+  }
   return r;
 }
 
@@ -531,6 +560,7 @@ const match = (ind, f) => {
     case 'down': return ind.trend === 'down';
     case 'sq': return ind.bbState === 'tight' || ind.bbState === 'squeeze';
     case 'cross': return !!ind.cross;
+    case 'stop': return ind.stop?.longState === 'crossed' || ind.stop?.shortState === 'crossed';
   }
   return true;
 };
@@ -569,6 +599,15 @@ function indHTML(ind) {
     const label = sq ? `<span class="tag sq">${BB_LABEL[ind.bbState]}</span>` : `<span class="v">${BB_LABEL[ind.bbState]}</span>`;
     rows.push(`<div class="row"><span class="k">BBW</span>${icon}${label}<span class="s">${ind.bbw.toFixed(1)}%<span class="pp"> · p${ind.bbPct.toFixed(0)}</span></span></div>`);
   } else rows.push('<div class="row"><span class="k">BBW</span><span class="s">n/a</span></div>');
+  // Recommended stop-loss for long and short positions
+  const st = ind.stop;
+  if (st) {
+    const cell = (side, pct, state) => state === 'crossed'
+      ? `<span class="tag stop-x" title="Recommended ${side} stop crossed: exit ${side} positions">🛑 ${side} stop crossed</span>`
+      : `<span class="sl ${state === 'near' ? 'near' : ''}" title="Recommended stop for ${side} positions${state === 'near' ? ': price is close to it' : ''}">${state === 'near' ? '⚠️ ' : ''}${side === 'long' ? 'L' : 'S'} ${fmtPct(pct, 1)}</span>`;
+    const crossed = st.longState === 'crossed' ? cell('long', st.longPct, 'crossed') : st.shortState === 'crossed' ? cell('short', st.shortPct, 'crossed') : '';
+    rows.push(`<div class="row"><span class="k">STOP</span>${crossed || `${cell('long', st.longPct, st.longState)}<span class="s">·</span>${cell('short', st.shortPct, st.shortState)}`}</div>`);
+  } else rows.push('<div class="row"><span class="k">STOP</span><span class="s">n/a</span></div>');
   return rows.join('');
 }
 
@@ -609,7 +648,8 @@ function tileHTML(c) {
   const dim = S.filter !== 'all' && !match(ind, S.filter);
   const sg = signals(ind);
   const label = `${c.name}, ${fmtPrice(c.current_price)}, ${S.colorBy} ${fmtPct(ch)}, ${sg.good.length} rockets, ${sg.bad.length} cry faces${S.ind[c.id]?.sig?.squeeze ? ", squeeze: big move likely" : ""}`;
-  return `<button class="tile ${heatClass(ch, S.colorBy)}${dim ? ' dim' : ''}" data-id="${esc(c.id)}" aria-label="${esc(label)}">
+  const stopX = ind?.stop && (ind.stop.longState === 'crossed' || ind.stop.shortState === 'crossed');
+  return `<button class="tile ${heatClass(ch, S.colorBy)}${dim ? ' dim' : ''}${stopX ? ' stop-crossed' : ''}" data-id="${esc(c.id)}" aria-label="${esc(label)}">
     <div class="top">
       <div class="sym">${logo(c, 18)}<span>${esc(c.symbol.toUpperCase())}</span><span class="rk">#${c.market_cap_rank}</span></div>
       <div class="chg">${fmtPct(ch, ch != null && Math.abs(ch) >= 10 ? 1 : 2)}</div>
@@ -632,6 +672,7 @@ function renderLegend() {
     <span class="leg-item"><span class="gauge" style="width:60px;flex:none"><i style="left:50%"></i></span> RSI 0–100 (under ${P().rsiLow} oversold · over ${P().rsiHigh} overbought)</span>
     <span class="leg-item"><span class="up-t" style="display:inline-flex">${ICON.up}</span>/<span class="dn-t" style="display:inline-flex">${ICON.down}</span> ${P().maFast}MA vs ${P().maSlow}MA</span>
     <span class="leg-item">⚡ BB width in bottom ${P().bbTightPct}%: big move likely, direction unknown</span>
+    <span class="leg-item"><b>STOP</b> = recommended stop-loss: <b>L</b> for long positions, <b>S</b> for short, ${P().stopMult}× the coin's average daily move from yesterday's close · 🛑 crossed = get out</span>
     ${['🚀', '😢'].map(e => {
       const ks = Object.keys(SIG.COMPONENTS).filter(k => roleOf(k) === e);
       return ks.length ? `<span class="leg-item">${e} each: ${ks.map(legendName).join(' · ')}</span>` : '';
@@ -666,6 +707,14 @@ function renderCounts() {
   }
 }
 
+// "−3.1% ($82,190)" for a recommended stop, or "🛑 crossed" once price is past it
+function stopCell(st, side) {
+  if (!st) return '—';
+  const state = st[side + 'State'], pct = st[side + 'Pct'], price = st[side];
+  if (state === 'crossed') return `<b class="sc-warn">🛑 crossed</b> <span style="color:var(--ink-2)">${fmtPrice(price)}</span>`;
+  return `${state === 'near' ? '⚠️ ' : ''}${fmtPct(pct, 1)} <span style="color:var(--ink-2)">${fmtPrice(price)}</span>`;
+}
+
 const COLS = [
   ['rank', '#', c => c.market_cap_rank],
   ['name', 'Coin', c => c.name.toLowerCase()],
@@ -681,6 +730,8 @@ const COLS = [
   ['dS', 'vs slow MA', c => { const i = S.ind[c.id]; return i?.mS ? (i.last / i.mS - 1) * 100 : null; }],
   ['bbw', 'BBW %', c => S.ind[c.id]?.bbw],
   ['bbp', 'BBW pctl', c => S.ind[c.id]?.bbPct],
+  ['stopL', 'Recommended stop (long)', c => S.ind[c.id]?.stop?.longPct],
+  ['stopS', 'Recommended stop (short)', c => S.ind[c.id]?.stop?.shortPct],
 ];
 function renderTable() {
   const col = COLS.find(x => x[0] === S.sort.key) || COLS[0];
@@ -700,7 +751,8 @@ function renderTable() {
     return `<tr class="${dim ? 'dim' : ''}" data-id="${esc(c.id)}"><td>${c.market_cap_rank}</td><td><b>${esc(c.symbol.toUpperCase())}</b> <span style="color:var(--ink-2)">${esc(c.name)}</span></td><td style="text-align:left">${emojiHTML(S.ind[c.id]) || ''}</td>
       <td>${fmtPrice(c.current_price)}</td><td>${heat('24h')}</td><td>${heat('7d')}</td><td>${heat('30d')}</td><td>${fmtBig(c.market_cap)}</td>
       <td>${rsi}</td><td>${trend}</td><td>${fmtPct(i.mF ? (i.last / i.mF - 1) * 100 : null, 1)}</td><td>${fmtPct(i.mS ? (i.last / i.mS - 1) * 100 : null, 1)}</td>
-      <td>${i.bbw != null ? i.bbw.toFixed(1) + '%' : '—'}</td><td>${bbp}</td></tr>`;
+      <td>${i.bbw != null ? i.bbw.toFixed(1) + '%' : '—'}</td><td>${bbp}</td>
+      <td>${stopCell(i.stop, 'long')}</td><td>${stopCell(i.stop, 'short')}</td></tr>`;
   }).join('');
   $('#tablewrap').innerHTML = `<table><caption class="sr">Top ${TOP_N} coins with indicators</caption><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
 }
@@ -809,6 +861,15 @@ function wireChart() {
   svg.addEventListener('pointerleave', hide);
 }
 
+// Recommended stops: how often they were crossed, and whether getting out was the right call
+function stopsHTML(stp, h, hw) {
+  if (!stp?.n) return '';
+  const side = (s, name, dir) => !s.hits ? `<b>${name}</b>: never crossed.`
+    : `<b>${name}</b>: crossed within ${hw} ${pc(s.hitRate)} of the time. After getting out, price kept ${dir} for ${hw} (a good exit) <b>${pc(s.goodRate)}</b> of the time, and came back (you'd have been shaken out) ${s.goodRate == null ? '—' : pc(1 - s.goodRate)}.`;
+  return `<div class="sc-stops"><p><b>🛑 Recommended stops, judged over ${hw}</b> <span class="sc-muted">(average distance ${pc(stp.avgDist)} from the close, crossed on a daily close)</span></p>
+    <ul><li>${side(stp.long, 'Long stops', 'falling')}</li><li>${side(stp.short, 'Short stops', 'rising')}</li></ul></div>`;
+}
+
 function renderScorecard() {
   const box = $('#scorewrap'), sc = S.scorecard;
   if (!sc) {
@@ -877,6 +938,7 @@ function renderScorecard() {
       </div>
       <p class="sc-verdict">Verdict: <b>${icVerdict(w.ic)}</b>. <span class="sc-muted">(Daily rank correlation between score and the move over ${hw}: ${w.ic.mean?.toFixed(3) ?? '—'}, t = ${w.ic.t?.toFixed(1) ?? '—'}. Around 0 means no link; t above 2 means it's unlikely to be luck.${h > 1 ? ' Multi-day moves overlap, so t is scaled down to stay honest.' : ''})</span></p>
       <p><b>⚡ Did a squeeze lead to bigger moves?</b> ${sqLine}${sq?.n ? ` <span class="sc-muted">${sq.n.toLocaleString()} squeezes.</span>` : ''}</p>
+      ${stopsHTML(w.stops, h, hw)}
       <h3>More 🚀 → bigger move?</h3>
       <div class="tablewrap"><table class="sc-table"><thead><tr><th>Signals</th><th>Coin-days</th><th>Up</th><th>Avg move</th><th>vs market</th></tr></thead><tbody>${scoreRows}</tbody></table></div>
       <h3>Each signal on its own</h3>
@@ -906,7 +968,8 @@ function detailChart(ind) {
   const W = 332, H = 130, PAD_L = 0, PAD_R = 44;
   const sl = a => a.slice(s);
   const c = sl(ind.c), m50 = sl(ind.maF), m200 = sl(ind.maS), up = sl(ind.bb.up), lo = sl(ind.bb.lo), rsi = sl(ind.rsi);
-  const all = [...c, ...m50, ...m200, ...up, ...lo].filter(v => v != null);
+  const stp = ind.stop;
+  const all = [...c, ...m50, ...m200, ...up, ...lo, ...(stp ? [stp.long, stp.short] : [])].filter(v => v != null);
   let min = Math.min(...all), max = Math.max(...all);
   const pad = (max - min) * 0.06 || max * 0.01; min -= pad; max += pad;
   const x = i => PAD_L + i / (N - 1) * (W - PAD_L - PAD_R);
@@ -922,6 +985,7 @@ function detailChart(ind) {
     <path d="${linePath(m200, x, y)}" fill="none" stroke="var(--s-ma200)" stroke-width="2" stroke-linejoin="round"/>
     <path d="${linePath(m50, x, y)}" fill="none" stroke="var(--s-ma50)" stroke-width="2" stroke-linejoin="round"/>
     <path d="${linePath(c, x, y)}" fill="none" stroke="var(--s-price)" stroke-width="1.5" stroke-linejoin="round"/>
+    ${stp ? [['long', stp.long, '#b8413f'], ['short', stp.short, '#0077be']].map(([k, v, col]) => `<line x1="${x(Math.max(0, N - 30))}" x2="${W - PAD_R}" y1="${y(v)}" y2="${y(v)}" stroke="${col}" stroke-width="1.5"/><text x="${W - PAD_R + 6}" y="${y(v) + 3.5}" font-size="10" font-weight="700" fill="${col}">${k === 'long' ? 'L stop' : 'S stop'}</text>`).join('') : ''}
     <circle cx="${x(N - 1)}" cy="${y(c[N - 1])}" r="3.5" fill="var(--s-price)" stroke="var(--surface)" stroke-width="2"/>
   </svg>`;
   const RH = 46, ry = v => RH - v / 100 * RH;
@@ -932,7 +996,7 @@ function detailChart(ind) {
     <path d="${linePath(rsi, x, ry)}" fill="none" stroke="var(--s-price)" stroke-width="1.5" stroke-linejoin="round"/>
     ${rsi[N - 1] != null ? `<circle cx="${x(N - 1)}" cy="${ry(rsi[N - 1])}" r="3" fill="var(--s-price)" stroke="var(--surface)" stroke-width="2"/>` : ''}
   </svg>`;
-  return `<div class="d-legend"><span><i style="background:var(--s-price)"></i>Price</span><span><i style="background:var(--s-ma50)"></i>${P().maFast}-day MA</span><span><i style="background:var(--s-ma200)"></i>${P().maSlow}-day MA</span><span><i class="band"></i>Bollinger (${P().bbPeriod}, ${P().bbK})</span></div>
+  return `<div class="d-legend"><span><i style="background:var(--s-price)"></i>Price</span><span><i style="background:var(--s-ma50)"></i>${P().maFast}-day MA</span><span><i style="background:var(--s-ma200)"></i>${P().maSlow}-day MA</span><span><i class="band"></i>Bollinger (${P().bbPeriod}, ${P().bbK})</span>${ind.stop ? '<span><i style="background:#b8413f"></i>Stop (long)</span><span><i style="background:#0077be"></i>Stop (short)</span>' : ''}</div>
     <div class="d-chart">${priceSvg}<p class="ttl">RSI (14)</p>${rsiSvg}</div>`;
 }
 
@@ -955,6 +1019,11 @@ function showDetail(id, anchor, keepPos) {
       ${ind.cross ? `<dt>MA cross</dt><dd>✦ ${ind.cross.type === 'golden' ? 'Golden' : 'Death'} cross ${ind.cross.ago === 0 ? 'today' : ind.cross.ago + ' day' + (ind.cross.ago > 1 ? 's' : '') + ' ago'}</dd>` : ''}
       <dt>BB width</dt><dd>${ind.bbw != null ? `${ind.bbw.toFixed(2)}% · ${ordinal(Math.round(ind.bbPct))} pctl · ${BB_LABEL[ind.bbState]}` : '—'}</dd>
     </dl>
+    ${ind.stop ? `<div class="d-stops">
+      <div class="d-stop ${ind.stop.longState}"><div class="d-st">Recommended stop · <b>long</b> positions</div><div class="d-sv">${fmtPrice(ind.stop.long)} <span>${fmtPct(ind.stop.longPct, 1)}</span></div><div class="d-sn">${ind.stop.longState === 'crossed' ? '🛑 <b>Crossed: exit long positions.</b>' : ind.stop.longState === 'near' ? '⚠️ Price is close to the stop.' : 'Exit a long if price falls below this.'}</div></div>
+      <div class="d-stop ${ind.stop.shortState}"><div class="d-st">Recommended stop · <b>short</b> positions</div><div class="d-sv">${fmtPrice(ind.stop.short)} <span>${fmtPct(ind.stop.shortPct, 1)}</span></div><div class="d-sn">${ind.stop.shortState === 'crossed' ? '🛑 <b>Crossed: exit short positions.</b>' : ind.stop.shortState === 'near' ? '⚠️ Price is close to the stop.' : 'Exit a short if price rises above this.'}</div></div>
+    </div>
+    <div class="d-src">Stops = ${P().stopMult}× the average daily move (${(ind.stop.dist / P().stopMult * 100).toFixed(1)}%) from the ${new Date(ind.t[ind.stop.anchorIdx ?? ind.n - 2] ?? Date.now()).toISOString().slice(0, 10)} close. Suggested levels, not advice: set them on your exchange, as this page isn't real-time.</div>` : ''}
     <div class="d-src">${h ? `${h.src} ${h.pair} · ${ind.n} daily candles` : ''}${ind.bbShort ? ' · BBW percentile uses under 90 days' : ''}</div>`;
   } else body += `<div class="d-src">${ind?.error ? 'No daily history found on Binance, Gate.io, OKX or CoinGecko.' : 'Loading candles…'}</div>`;
   box.querySelector('.body').innerHTML = body;

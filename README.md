@@ -18,6 +18,11 @@ A crypto heatmap of the top 50 coins by market cap. Every tile combines the pric
   - ⚡ for a very tight band (bottom 10%): a big move is likely, but not its direction, so ⚡ never counts as a 🚀 or 😢
 
   The weekly tuner can change the thresholds, flip a signal from 🚀 to 😢, or switch it off. The legend always shows the current rules.
+- **Recommended stop-loss** for **long** and **short** positions (the STOP row):
+  - distance = **2× the coin's average daily move** over the last 20 days: about 3% for BTC, about 7% for a typical coin
+  - set once a day from the last daily close: exit a long below it, or a short above it
+  - ⚠️ when price is within a quarter of the distance, and 🛑 **crossed: get out** with a red tile border once price is past it
+  - shown in the tile, the table, and the detail chart (as lines). These are suggested levels only: the page isn't real-time, so set stops on your exchange.
 
 Hover a tile (tap on a phone) to see a 120-day chart with price, both moving averages, the Bollinger band and RSI. The **Table** view sorts by any column. The **Scorecard** view shows how the signals have actually performed.
 
@@ -32,12 +37,13 @@ Every day at **00:20 UTC** a GitHub job scores the previous day:
   - how each signal did on its own, flagged "⚠ pointing the wrong way" when the data disagrees with its role
   - a verdict based on the daily rank correlation between score and the move (for 3 and 7 days, where moves overlap from day to day, t-values are divided by √days so they aren't overstated)
   - whether a ⚡ squeeze was really followed by bigger moves than usual
+  - for the recommended stops: how often they were crossed, and whether, after getting out, price kept going the wrong way (a good exit) or came back (shaken out)
 
 **Self-tuning, every Sunday.** The tuner tries other RSI periods and levels, moving-average pairs (20/50, 20/100, 50/200) and wide-band thresholds. For each signal it decides whether it should count as a 🚀, a 😢, or be switched off, judging it over the next 1, 3 and 7 days. The newest half of history is cut into **three check periods**. For each one, settings are chosen using only the days before it, then compared with the current settings on that period. New settings are written to `params.json` **only if they win at least 2 of the 3 periods and do better on average**. Because many variants get tried, a signal needs t ≥ 2.5 (not the usual 2) to be switched on. The site picks new settings up automatically, and every change is logged on the Scorecard.
 
 Statistics cap moves at ±30% a day (wider for 3 and 7 days), so a bad price print can't dominate the averages. The Scorecard still shows each coin's real move. A signal needs at least 20 firings before it gets a verdict.
 
-*Honest baseline (first runs, Sept 2026):* the default signals showed **no reliable next-day edge**. The daily rank correlation was about 0, and 🚀 coins went up 48% of the time, the same as all coins. Two signals pointed the wrong way: overbought and wide-band coins tended to *keep* outperforming (momentum). So far the tuner has kept the defaults, because the momentum settings didn't hold up on the most recent months. And ⚡ squeezes (bottom 10% of band width) were followed by *smaller* moves than usual (about 0.85×), not bigger ones.
+*Honest baseline (first runs, Sept 2026):* the default signals showed **no reliable next-day edge**. The daily rank correlation was about 0, and 🚀 coins went up 48% of the time, the same as all coins. Two signals pointed the wrong way: overbought and wide-band coins tended to *keep* outperforming (momentum). So far the tuner has kept the defaults, because the momentum settings didn't hold up on the most recent months. And ⚡ squeezes (bottom 10% of band width) were followed by *smaller* moves than usual (about 0.85×), not bigger ones. The recommended stops were crossed about 22% of the time within 3 days, and after an exit the next move was roughly a coin flip. That's typical: a stop doesn't predict direction, it caps how much you can lose.
 
 ## How it works
 
