@@ -976,7 +976,7 @@ function renderScorecard() {
 
   const t = sc.tuning || {}, last = t.last;
   const foldsHTML = last?.folds ? `<ul>${last.folds.map(f => `<li>${f.from} → ${f.to}: current ${f.before?.toFixed(3) ?? '—'} vs candidate ${f.after?.toFixed(3) ?? '—'} ${f.won ? '✅' : '❌'}</li>`).join('')}</ul>` : '';
-  const tuneHTML = !t.lastRun ? '<p class="sc-muted">The tuner hasn\'t run yet. It runs every Sunday.</p>' : `
+  const tuneHTML = !t.lastRun || !last ? '<p class="sc-muted">The tuner hasn\'t run yet. It runs every Sunday.</p>' : `
     <p><b>Last run ${new Date(t.lastRun).toLocaleDateString()}</b>: ${last.adopted ? '✅ <b>adopted new settings</b>: they beat the current ones on periods they weren\'t tuned on.' : 'kept the current settings. The alternative didn\'t clearly beat them on periods it wasn\'t tuned on.'}
       ${last.folds ? `Won <b>${last.wins} of ${last.folds.length}</b> check periods · average score (rank correlation over 1/3/7 days): current <b>${last.testIC.before?.toFixed(3) ?? '—'}</b> vs candidate <b>${last.testIC.after?.toFixed(3) ?? '—'}</b>.` : `Check-period score: current <b>${last.testIC.before?.toFixed(3) ?? '—'}</b> vs candidate <b>${last.testIC.after?.toFixed(3) ?? '—'}</b>.`}</p>
     ${last.stop ? `<p><b>Stop distance</b>: tested ${last.stop.table.map(s => `${s.m}× (exits ${s.avg >= 0 ? 'saved' : 'cost'} ${pc(Math.abs(s.avg), 2)} over 3 days)`).join(', ')}. ${last.stop.adopt ? `✅ <b>Switched from ${last.stop.from}× to ${last.stop.to}×</b>: it did better in ${last.stop.wins} of 3 check periods.` : `Kept <b>${last.stop.from}×</b>: no other distance did clearly better.`}</p>` : ''}
@@ -1164,8 +1164,9 @@ $('#detail').addEventListener('click', e => {
   $('#detail').classList.add('pinned');
   $('#scrim').classList.add('show');
 });
-$('#grid').addEventListener('focusin', e => { const t = e.target.closest('.tile'); if (t && !S.pinned) showDetail(t.dataset.id, t); });
-$('#grid').addEventListener('focusout', () => hideDetail());
+// Keyboard users get the preview on Tab focus; a tap or click also focuses the tile, but that's handled by 'click'
+$('#grid').addEventListener('focusin', e => { const t = e.target.closest('.tile'); if (t && !S.pinned && t.matches(':focus-visible')) showDetail(t.dataset.id, t); });
+$('#grid').addEventListener('focusout', () => { if (!overDetail) hideDetail(); });
 $('#grid').addEventListener('click', e => {
   const t = e.target.closest('.tile');
   if (!t) return;
