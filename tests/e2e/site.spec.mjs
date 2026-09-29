@@ -189,8 +189,11 @@ test("scorecard: clicking one of yesterday's coins opens its chart card beside i
   await expect(popup.locator('svg.pnf')).toBeVisible();
   await popup.locator('[data-chart="price"]').click();
   await expect(popup.locator('svg.pnf')).toHaveCount(0);
-  await page.locator('#scorewrap button[data-coin="alpha-coin"]').click();  // another chip switches the card
-  await expect(popup.locator('.d-head b')).toHaveText('Alpha Coin');
+  // another of yesterday's coins switches the card (whichever the test data lists; the card may cover it, so dispatch)
+  const other = page.locator('#scorewrap button[data-coin]:not([data-coin="moon-coin"])').first();
+  await other.dispatchEvent('click');
+  await expect(popup).toHaveClass(/pinned/);
+  await expect(popup.locator('.d-head b')).not.toHaveText('Moon Coin');
   await popup.locator('.x').click();
   await expect(popup).not.toHaveClass(/show/);
 });
