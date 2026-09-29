@@ -313,6 +313,43 @@
    "KuCoin": "ARB",
    "Gate.io": "ARB",
    "MEXC": "ARB"
+  },
+  "just": {
+   "Binance": "JST",
+   "Gate.io": "JST",
+   "MEXC": "JST",
+   "KuCoin": "JST"
+  },
+  "kaspa": {
+   "Gate.io": "KAS",
+   "MEXC": "KAS",
+   "KuCoin": "KAS"
+  },
+  "algorand": {
+   "Binance": "ALGO",
+   "OKX": "ALGO",
+   "KuCoin": "ALGO",
+   "Gate.io": "ALGO",
+   "MEXC": "ALGO"
+  },
+  "render-token": {
+   "Binance": "RENDER",
+   "OKX": "RENDER",
+   "KuCoin": "RENDER",
+   "Gate.io": "RENDER",
+   "MEXC": "RENDER"
+  },
+  "pancakeswap-token": {
+   "Binance": "CAKE",
+   "MEXC": "CAKE",
+   "KuCoin": "CAKE",
+   "Gate.io": "CAKE"
+  },
+  "vechain": {
+   "Binance": "VET",
+   "KuCoin": "VET",
+   "Gate.io": "VET",
+   "MEXC": "VET"
   }
  }
 }
