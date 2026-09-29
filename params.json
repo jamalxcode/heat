@@ -18,7 +18,7 @@
     "trendDown": -1,
     "overbought": 0,
     "bbWide": 0,
-    "momUp": 0,
-    "momDown": 0
+    "momUp": 1,
+    "momDown": -1
   }
 }

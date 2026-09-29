@@ -10,12 +10,13 @@ export const DEFAULT_PARAMS = {
   // Momentum: the coin's move over the last 30 days is above +momPct% (momUp) or below −momPct% (momDown)
   momPct: 20,
   // +1 = counts as a 🚀, -1 = counts as a 😢, 0 = switched off. The tuner may flip or disable a signal.
-  // Only the moving-average trend is scored (it's the only 🚀/😢 shown next to the name). RSI, Bollinger width and
-  // momentum stay in the tiles as information: the tuner still measures them and logs what it would do, but keeps them off.
-  weights: { trendUp: 1, oversold: 0, trendDown: -1, overbought: 0, bbWide: 0, momUp: 0, momDown: 0 },
+  // Only what's shown next to the name is scored: the moving-average trend (🚀 / 😢) and 30-day momentum (🔥 / 🧊).
+  // RSI and Bollinger width stay in the tiles as information: the tuner still measures them and logs what it would
+  // do, but keeps them off.
+  weights: { trendUp: 1, oversold: 0, trendDown: -1, overbought: 0, bbWide: 0, momUp: 1, momDown: -1 },
 };
-// The signals that may count as a 🚀 / 😢 (the tuner can flip or disable them, but never switch on the others)
-export const SCORED = ['trendUp', 'trendDown'];
+// The signals that may count as a 🚀 / 😢 call (the tuner can flip or disable them, but never switch on the others)
+export const SCORED = ['trendUp', 'trendDown', 'momUp', 'momDown'];
 
 // Directional signals: each one adds a 🚀 or a 😢 (or nothing while its weight is 0)
 export const COMPONENTS = {
@@ -410,7 +411,7 @@ function selectParams(cur, rowsFor, until, minT) {
   const wide = best([75, 80, 85, 90, 95].map(bbWidePct => ({ bbWidePct })), 'bbWide');
   if (wide) { next.bbWidePct = wide.v.bbWidePct; setSign('bbWide', wide.e); }
 
-  // Momentum (on trial): which 30-day threshold, and whether strong/weak momentum should be a 🚀, a 😢 or off
+  // Momentum (🔥 / 🧊 on the tiles): which 30-day threshold, and whether strong/weak momentum should be a 🚀, a 😢 or off
   let bestMom = null;
   for (const momPct of [10, 20, 30]) {
     const rows = rowsFor({ ...next, momPct });

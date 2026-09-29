@@ -81,13 +81,14 @@ test('scoreOf: weights decide 🚀 vs 😢 vs off, and the squeeze never counts'
   assert.equal(sc.squeeze, true);
 });
 
-test('momentum: +1%/day for 30 days is strong momentum, and it is off by default', () => {
+test('momentum: +1%/day for 30 days is strong momentum, and it counts as a 🚀 call by default', () => {
   const c = Array.from({ length: 260 }, (_, i) => 100 * 1.01 ** i);   // 30-day move ≈ +34.8%
   const a = S.componentsAt(S.series(c, S.DEFAULT_PARAMS), 259, S.DEFAULT_PARAMS);
   assert.equal(a.momUp, true);
   assert.equal(a.momDown, false);
-  assert.equal(S.scoreOf(a, S.DEFAULT_PARAMS).good.includes('momUp'), false, 'weight 0: no 🚀 until the tuner proves it');
-  assert.equal(S.scoreOf(a, { weights: { momUp: 1 } }).good.includes('momUp'), true);
+  assert.equal(S.scoreOf(a, S.DEFAULT_PARAMS).good.includes('momUp'), true);
+  assert.equal(S.scoreOf(a, { weights: { momUp: 0 } }).good.includes('momUp'), false, 'weight 0: switched off');
+  assert.ok(S.SCORED.includes('momUp') && !S.SCORED.includes('oversold'), 'momentum is scored, RSI is not');
   assert.equal(S.componentsAt(S.series(c, { momPct: 40 }), 259, { momPct: 40 }).momUp, false, 'threshold is a setting');
 });
 
