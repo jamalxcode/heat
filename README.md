@@ -2,7 +2,7 @@
 
 **Live: https://heat.sala.company**
 
-A crypto heatmap of the top 50 coins by market cap. Every tile combines the price move with three technical signals, and a daily scorecard checks whether those signals actually predicted anything.
+A crypto heatmap of the top 100 coins by market cap, with stablecoins, tokenized gold and wrapped/staked copies left out. Every tile combines the price move with technical indicators, and a daily scorecard checks whether the 🚀 / 😢 calls actually predicted anything.
 
 > ⚠️ **Work in progress. Use at your own risk.** Data can be late, wrong or missing, and nothing here is financial advice. Prices are **not real-time**: they refresh every 10 minutes.
 
@@ -12,13 +12,8 @@ A crypto heatmap of the top 50 coins by market cap. Every tile combines the pric
 - **RSI**: a 0–100 gauge, tagged *Oversold* / *Overbought* at the current thresholds (default 30 / 70).
 - **Trend**: fast vs slow moving average (default 50 / 200-day), plus whether price agrees (*strong*) or not (*pullback* / *bounce*). A ✦ marks a golden or death cross in the last 14 days.
 - **Bollinger Band width (20, 2)**: ranked against its last 180 days. The bottom 25% is tagged *Squeeze*: volatility is compressed and a big move often follows, in either direction.
-- **🚀 / 😢 next to the name**: one per active signal. By default:
-  - 🚀 for a strong uptrend or RSI oversold
-  - 😢 for a strong downtrend, RSI overbought, or a wide band (top 20%)
-  - ⚡ for a very tight band (bottom 10%): a big move is likely, but not its direction, so ⚡ never counts as a 🚀 or 😢
-
-  The weekly tuner can change the thresholds, flip a signal from 🚀 to 😢, or switch it off. Two **momentum** signals (30-day move above +20% or below −20%) are on trial: they stay off until the tuner proves they work. The legend always shows the current rules, plus the signals' **90-day track record**. While that shows no proven edge, the 🚀/😢 are **dimmed**, as hints rather than calls.
-- **✖️ / ⭕ after the emoji**: the **point & figure trend**, from the same chart as the popup's P&F view. ✖️ means the latest column is rising (X) and ⭕ means it's falling (O). Hover it for the column's size, when it started, the price for the next box and for a flip, and the latest buy/sell signal. It's shown for information and isn't scored yet.
+- **🚀 / 😢 next to the name**: the **50/200 moving-average trend** only. 🚀 is a strong uptrend (fast MA above slow, price above both), and 😢 is a strong downtrend. RSI and Bollinger width are shown in the tile rows and the chart, not as emoji. These are also the only calls the Scorecard judges, so its track record describes exactly what you see. The weekly tuner can change the MA pair, flip the roles, or switch them off. The legend shows the current rules and the **90-day track record**. While that shows no proven edge, the 🚀/😢 are **dimmed**, as hints rather than calls.
+- **X📈 / O📉 after the emoji**: the **point & figure trend**, from the same chart as the popup's P&F view. X📈 means the latest column is rising, and O📉 means it's falling. Hover it for the column's size, when it started, the price for the next box and for a flip, and the latest buy/sell signal. It's shown for information and isn't scored yet.
 - **Recommended stop-loss** for **long** and **short** positions (the STOP row):
   - distance = **2× the coin's average daily move** over the last 20 days: about 3% for BTC, about 7% for a typical coin. The weekly tuner compares 1.5×, 2× and 2.5× and switches only if another distance's exits saved more in 2 of 3 check periods.
   - set once a day from the last daily close: exit a long below it, or a short above it
@@ -53,16 +48,16 @@ The **Table** view sorts by any column, including the recommended stops. The **S
 
 Every day at **00:20 UTC** a GitHub job scores the previous day:
 
-- **Yesterday's calls**: for coins with more 🚀, how many went up; for coins with more 😢, how many went down. Each is measured in absolute terms and against the average of all 50 coins.
+- **Yesterday's calls**: for coins with more 🚀, how many went up; for coins with more 😢, how many went down. Each is measured in absolute terms and against the average of all 100 coins.
 - **Last 60 days chart**: what holding each day's 🚀 coins, 😢 coins or all coins for one day would have compounded to, with a hover tooltip per day.
 - **Track record** over the last 30 days, 90 days and all history (about 2.7 years), judged over the **next day, 3 days or 7 days**:
   - whether more 🚀 meant bigger moves
   - how each signal did on its own, flagged "⚠ pointing the wrong way" when the data disagrees with its role
   - a verdict based on the daily rank correlation between score and the move (for 3 and 7 days, where moves overlap from day to day, t-values are divided by √days so they aren't overstated)
-  - whether a ⚡ squeeze was really followed by bigger moves than usual
+  - whether a squeeze (bottom 10% band width) was really followed by bigger moves than usual
   - for the recommended stops: how often they were crossed, and whether, after getting out, price kept going the wrong way (a good exit) or came back (shaken out)
 
-**Self-tuning, every Sunday.** The tuner tries other RSI periods and levels, moving-average pairs (20/50, 20/100, 50/200) and wide-band thresholds. For each signal it decides whether it should count as a 🚀, a 😢, or be switched off, judging it over the next 1, 3 and 7 days. The newest half of history is cut into **three check periods**. For each one, settings are chosen using only the days before it, then compared with the current settings on that period. New settings are written to `params.json` **only if they win at least 2 of the 3 periods and do better on average**. Because many variants get tried, a signal needs t ≥ 2.5 (not the usual 2) to be switched on. The site picks new settings up automatically, and every change is logged on the Scorecard.
+**Self-tuning, every Sunday.** The tuner tries moving-average pairs (20/50, 20/100, 50/200) and decides whether each trend signal should count as a 🚀, a 😢, or be switched off, judging it over the next 1, 3 and 7 days. It still measures RSI, wide-band and momentum variants and logs what it *would* do with them, but it keeps them off: only the MA trend is scored (since Sept 2026; before that, RSI and Bollinger signals counted too). The newest half of history is cut into **three check periods**. For each one, settings are chosen using only the days before it, then compared with the current settings on that period. New settings are written to `params.json` **only if they win at least 2 of the 3 periods and do better on average**. Because many variants get tried, a signal needs t ≥ 2.5 (not the usual 2) to be switched on. The site picks new settings up automatically, and every change is logged on the Scorecard.
 
 Statistics cap moves at ±30% a day (wider for 3 and 7 days), so a bad price print can't dominate the averages. The Scorecard still shows each coin's real move. A signal needs at least 20 firings before it gets a verdict.
 
@@ -88,11 +83,11 @@ GitHub Actions: daily 00:20 UTC (via cron-job.org)
 | `index.html` | The whole site (HTML, CSS and JS in one page) |
 | `signals.mjs` | The shared signal engine: indicators, 🚀/😢/⚡ rules, scoring stats, tuner. Used by the page, the scorer and the tuner, so they always agree. |
 | `tests/signals.test.mjs` | Unit tests: RSI against the StockCharts worked example, Bollinger/SMA against hand-computed values, scoring and tuning sanity checks |
-| `scripts/build-data.mjs` | Builds `data.json`: top-100 rankings plus 260 daily closes per coin, with fallbacks across six data sources |
+| `scripts/build-data.mjs` | Builds `data.json`: top-250 rankings plus 260 daily closes for the top 150 (enough for 100 after exclusions), with fallbacks across six data sources |
 | `scripts/score.mjs` | Daily scorecard and weekly tuning (about 1,000 days of candles per coin) |
 | `params.json` | Signal settings chosen by the tuner. Missing means the defaults in `signals.mjs` are used. |
 | `data/scorecard.json` | Latest scorecard, committed daily by the bot |
-| `data/pairs.json` | Each coin's exact USDT pair on Binance, Gate.io, OKX, MEXC and KuCoin, from CoinGecko's per-coin tickers. Refreshed weekly by the scorer (and for coins new to the top 50), so a ticker shared by two coins, or a renamed coin (Toncoin now trades as GRAM), can't pull in the wrong price history. |
+| `data/pairs.json` | Each coin's exact USDT pair on Binance, Gate.io, OKX, MEXC and KuCoin, from CoinGecko's per-coin tickers. Refreshed weekly by the scorer (and for coins new to the top 100), so a ticker shared by two coins, or a renamed coin (Toncoin now trades as GRAM), can't pull in the wrong price history. |
 | `.github/workflows/update-data.yml` | Builds `data.json` and deploys the site to GitHub Pages every 10 minutes and on every push to `main` |
 | `.github/workflows/score-signals.yml` | Daily scoring (plus Sunday tuning). It commits the results, which also keeps the schedules from being paused for inactivity. |
 | `.github/workflows/test.yml` | Runs the unit tests on every push |

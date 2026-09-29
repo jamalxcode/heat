@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>heat.sala.company</title>
-<meta name="description" content="heat.sala.company: crypto heatmap of the top 50 coins by market cap, with RSI, 50/200-day MA trend and Bollinger Band squeeze signals in every tile. Refreshed every 10 minutes.">
+<meta name="description" content="heat.sala.company: crypto heatmap of the top 100 coins by market cap (stablecoins excluded), with RSI, 50/200-day MA trend, Bollinger Band width and point & figure trend in every tile. Refreshed every 10 minutes.">
 <meta property="og:title" content="heat.sala.company">
 <meta name="theme-color" content="#b3161b">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='88'%3E%F0%9F%94%A5%3C/text%3E%3C/svg%3E">
@@ -226,7 +226,8 @@ h1 .tld { color: var(--ink-2); font-weight: 600; }
 .tile .name { font-size: 12px; display: flex; align-items: center; gap: 4px; min-width: 0; white-space: nowrap; }
 .tile .name .nm { opacity: .85; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .tile .emo { flex: none; font-size: 13px; letter-spacing: -1px; line-height: 1; }
-.pnf-mark { flex: none; font-size: 11px; line-height: 1; margin-left: 3px; }
+.pnf-mark { flex: none; font-size: 11px; line-height: 1; margin-left: 3px; white-space: nowrap; }
+.pnf-mark b { font-weight: 800; margin-right: 1px; }
 /* no proven edge yet: signals shown as quiet hints, not loud calls */
 body.signals-unproven .tile .emo { opacity: .55; filter: grayscale(.35); }
 .leg-item.edge { flex-basis: 100%; }
@@ -346,7 +347,7 @@ footer details summary { cursor: pointer; }
       <span class="logo" aria-hidden="true"><span>🔥</span></span>
       <div>
         <h1><span class="heat">heat</span><span class="tld">.sala.company</span></h1>
-        <p class="sub">Crypto heatmap of the top 50 by market cap · RSI(14), 50/200-day MA trend and Bollinger Band width in every tile</p>
+        <p class="sub">Crypto heatmap of the top 100 by market cap, stablecoins excluded · RSI(14), 50/200-day MA trend and Bollinger Band width in every tile</p>
       </div>
     </div>
     <div class="status">
@@ -401,7 +402,7 @@ footer details summary { cursor: pointer; }
   <footer>
     <div><b>How to read a tile.</b> <b>RSI</b>: below the lower line is <i>oversold</i> and above the upper line is <i>overbought</i> (the exact levels are in the legend and can be retuned). The marker shows where RSI sits on 0–100.
       <b>Trend</b>: the fast moving average above the slow one (50/200-day by default) is an uptrend, below is a downtrend. The note says whether price agrees ("strong") or not ("pullback" / "bounce"). ✦ marks a golden or death cross in the last 14 days.
-      <b>BB width</b>: (upper − lower) / middle band, ranked against the last 180 days. Bottom 25% is a <i>squeeze</i> (volatility is compressed, and a big move often follows, in either direction). Top 20% is <i>expanded</i>. The very tightest bands get a ⚡ next to the name: a big move is likely, but not its direction, so ⚡ never counts as a 🚀 or 😢.</div>
+      <b>BB width</b>: (upper − lower) / middle band, ranked against the last 180 days. Bottom 25% is a <i>squeeze</i> (volatility is compressed, and a big move often follows, in either direction). Top 20% is <i>expanded</i>.</div>
     <div id="srcinfo"></div>
     <details id="excluded"><summary>Excluded tokens</summary><div></div></details>
     <div class="cg-foot">Market data <a href="https://www.coingecko.com/" target="_blank" rel="noopener"><b>Powered by CoinGecko</b></a>.</div>
@@ -425,7 +426,7 @@ import * as SIG from './signals.mjs';
 (() => {
 
 /* ================= config ================= */
-const TOP_N = 50;
+const TOP_N = 100;
 const REFRESH_MIN = 10;              // data.json is rebuilt by GitHub Actions every 10 minutes
 const MARKETS_TTL = REFRESH_MIN * 60e3;
 const SNAPSHOT_GRACE = 2 * 60e3;     // Actions runs start late and Pages takes a minute to publish
@@ -673,16 +674,19 @@ function applyParams(p) {
   if (changed) for (const c of S.coins) if (S.hist[c.id]) S.ind[c.id] = compute(withLive(S.hist[c.id].closes, c.current_price));
   return changed;
 }
+// Next to the name: only the 50/200 MA trend (🚀 / 😢) and the point & figure trend. RSI and Bollinger width
+// stay in the tile rows and the chart, not as emoji.
+const NAME_SIGNALS = SIG.SCORED;
 function emojiHTML(ind) {
-  const { good, bad } = signals(ind);
-  const sq = !!ind?.sig?.squeeze;
-  const title = [good.length && '🚀 ' + good.join(', '), bad.length && '😢 ' + bad.join(', '), sq && '⚡ ' + SIG.SQUEEZE_LABEL].filter(Boolean).join(' · ');
-  const emo = good.length || bad.length || sq
-    ? `<span class="emo" title="${esc(title)}" aria-label="${esc(title)}">${'🚀'.repeat(good.length)}${'😢'.repeat(bad.length)}${sq ? '⚡' : ''}</span>` : '';
+  const pick = ks => (ks || []).filter(k => NAME_SIGNALS.includes(k)).map(k => SIG.COMPONENTS[k]);
+  const good = pick(ind?.sig?.good), bad = pick(ind?.sig?.bad);
+  const title = [good.length && '🚀 ' + good.join(', '), bad.length && '😢 ' + bad.join(', ')].filter(Boolean).join(' · ');
+  const emo = good.length || bad.length
+    ? `<span class="emo" title="${esc(title)}" aria-label="${esc(title)}">${'🚀'.repeat(good.length)}${'😢'.repeat(bad.length)}</span>` : '';
   return emo + pnfMark(ind);
 }
-// ✖️ / ⭕: the latest point & figure column is rising (X) or falling (O). Shown for information; not scored.
-const PNF_EMO = { X: '✖️', O: '⭕' };
+// X📈 / O📉: the latest point & figure column is rising (X) or falling (O). Shown for information; not scored.
+const PNF_EMO = { X: '<b>X</b>📈', O: '<b>O</b>📉' };
 function pnfMark(ind) {
   const f = ind?.pnf;
   if (!f) return '';
@@ -748,12 +752,11 @@ function renderLegend() {
     <span class="scale">${cells.map(([k, l]) => `<span class="${k}">${l}</span>`).join('')}</span>
     <span class="leg-item"><span class="gauge" style="width:60px;flex:none"><i style="left:50%"></i></span> RSI 0–100 (under ${P().rsiLow} oversold · over ${P().rsiHigh} overbought)</span>
     <span class="leg-item"><span class="up-t" style="display:inline-flex">${ICON.up}</span>/<span class="dn-t" style="display:inline-flex">${ICON.down}</span> ${P().maFast}MA vs ${P().maSlow}MA</span>
-    <span class="leg-item">⚡ BB width in bottom ${P().bbTightPct}%: big move likely, direction unknown</span>
-    <span class="leg-item">✖️ / ⭕ point & figure trend: the latest column is rising (X) or falling (O)</span>
+    <span class="leg-item"><b>X</b>📈 / <b>O</b>📉 point & figure trend: the latest column is rising (X) or falling (O)</span>
     <span class="leg-item"><b>STOP</b> = recommended stop-loss: <b>L</b> for long positions, <b>S</b> for short, ${P().stopMult}× the coin's average daily move from the last daily close (00:00 UTC) · ⚠ past it intraday = watch · 🛑 a daily close past it = suggested exit</span>
     ${edgeLegend()}
     ${['🚀', '😢'].map(e => {
-      const ks = Object.keys(SIG.COMPONENTS).filter(k => roleOf(k) === e);
+      const ks = NAME_SIGNALS.filter(k => roleOf(k) === e);
       return ks.length ? `<span class="leg-item">${e} each: ${ks.map(legendName).join(' · ')}</span>` : '';
     }).join('')}`;
 }
@@ -931,7 +934,7 @@ function basketChart(daily) {
       </svg>
       <div class="sc-tip" hidden></div>
     </div>
-    <p class="sc-muted">Each day: the average next-day move of that day's 🚀 coins, 😢 coins and all coins, compounded over the last ${pts.length} days. It's a scorekeeping line, not a trading result: there are no fees or slippage, and the coins are today's top 50, several of which made the list <i>because</i> they rose, so all three lines look better than reality. Compare the lines with each other, not with zero.</p>`;
+    <p class="sc-muted">Each day: the average next-day move of that day's 🚀 coins, 😢 coins and all coins, compounded over the last ${pts.length} days. It's a scorekeeping line, not a trading result: there are no fees or slippage, and the coins are today's top 100, several of which made the list <i>because</i> they rose, so all three lines look better than reality. Compare the lines with each other, not with zero.</p>`;
 }
 function wireChart() {
   const box = $('#scorewrap .sc-chart');

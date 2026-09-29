@@ -1,6 +1,6 @@
 // Daily scorecard for heat.sala.company's 🚀 / 😢 signals, plus the weekly self-tuning.
 // Runs in GitHub Actions at 00:20 UTC (.github/workflows/score-signals.yml), right after the daily candle closes.
-//   node scripts/score.mjs [--tune]    env SITE_URL = the live site (for today's top-50 list)
+//   node scripts/score.mjs [--tune]    env SITE_URL = the live site (for today's top-100 list)
 // Writes data/scorecard.json, and params.json when the tuner finds settings that do better on unseen data.
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
@@ -17,11 +17,11 @@ const today = Math.floor(Date.now() / DAY);
 const params = SIG.withDefaults(await readJSON('params.json', null));
 const prev = await readJSON('data/scorecard.json', null);
 
-// 1. Today's universe: the same top 50 the site shows
+// 1. Today's universe: the same top 100 the site shows
 const snap = await getJSON(`${SITE}/data.json?b=${Date.now()}`);
-const universe = SIG.pickUniverse(snap.markets, snap.cats, 50);
+const universe = SIG.pickUniverse(snap.markets, snap.cats, 100);
 
-// 2. Exact trading pairs by CoinGecko ID: refreshed weekly (and for coins new to the top 50), saved to data/pairs.json
+// 2. Exact trading pairs by CoinGecko ID: refreshed weekly (and for coins new to the top 100), saved to data/pairs.json
 const tuneNow = process.argv.includes('--tune') || new Date().getUTCDay() === 0;
 let pairsFile = await readJSON('data/pairs.json', { t: 0, pairs: {} });
 const stalePairs = tuneNow || Date.now() - pairsFile.t > 7 * DAY;

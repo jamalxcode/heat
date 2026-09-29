@@ -10,9 +10,12 @@ export const DEFAULT_PARAMS = {
   // Momentum: the coin's move over the last 30 days is above +momPct% (momUp) or below −momPct% (momDown)
   momPct: 20,
   // +1 = counts as a 🚀, -1 = counts as a 😢, 0 = switched off. The tuner may flip or disable a signal.
-  // Momentum starts off: it's on trial, and the tuner switches it on only if it proves itself on unseen data.
-  weights: { trendUp: 1, oversold: 1, trendDown: -1, overbought: -1, bbWide: -1, momUp: 0, momDown: 0 },
+  // Only the moving-average trend is scored (it's the only 🚀/😢 shown next to the name). RSI, Bollinger width and
+  // momentum stay in the tiles as information: the tuner still measures them and logs what it would do, but keeps them off.
+  weights: { trendUp: 1, oversold: 0, trendDown: -1, overbought: 0, bbWide: 0, momUp: 0, momDown: 0 },
 };
+// The signals that may count as a 🚀 / 😢 (the tuner can flip or disable them, but never switch on the others)
+export const SCORED = ['trendUp', 'trendDown'];
 
 // Directional signals: each one adds a 🚀 or a 😢 (or nothing while its weight is 0)
 export const COMPONENTS = {
@@ -365,8 +368,10 @@ function selectParams(cur, rowsFor, until, minT) {
     return { t: tSum / HORIZONS.length, avg: avgSum / HORIZONS.length, n };
   };
   const setSign = (k, e) => {
-    next.weights[k] = Math.abs(e.t) >= minT ? Math.sign(e.avg) : 0;
-    notes.push(`${COMPONENTS[k]}: ${next.weights[k] > 0 ? '🚀' : next.weights[k] < 0 ? '😢' : 'off'} (t=${e.t.toFixed(2)}, ${(e.avg * 100).toFixed(2)}% vs market, avg over 1/3/7 days)`);
+    const w = Math.abs(e.t) >= minT ? Math.sign(e.avg) : 0, scored = SCORED.includes(k);
+    next.weights[k] = scored ? w : 0;
+    const role = w > 0 ? '🚀' : w < 0 ? '😢' : 'off';
+    notes.push(`${COMPONENTS[k]}: ${scored ? role : `not scored${w ? ` (would be ${role})` : ''}`} (t=${e.t.toFixed(2)}, ${(e.avg * 100).toFixed(2)}% vs market, avg over 1/3/7 days)`);
   };
   const best = (variants, k) => {
     let b = null;
@@ -429,9 +434,9 @@ function objective(rows, from, to) {
 // all history) are adopted only if that procedure beat the current settings in most folds and on average.
 export function tune(coins, current, { folds = 3, minT = 2.5, margin = 0.003 } = {}) {
   const cur = withDefaults(current);
-  // Rows for a given setting (~40k rows for 50 coins × 2.7 years). Keep only the 12 most recently used: caching every
+  // Rows for a given setting (~80k rows for 100 coins × 2.7 years). Keep only the 8 most recently used: caching every
   // variant tried across all folds ran GitHub's runner out of memory (4 GB) once momentum and stop variants were added.
-  const cache = new Map(), CACHE_MAX = 12;
+  const cache = new Map(), CACHE_MAX = 8;
   const rowsFor = p => {
     const k = JSON.stringify(withDefaults(p));
     let rows = cache.get(k);
@@ -551,4 +556,4 @@ export function isPegged(c, cats) {
   const a = Math.abs(c.price_change_percentage_24h_in_currency ?? 9), b = Math.abs(c.price_change_percentage_7d_in_currency ?? 9), d = Math.abs(c.price_change_percentage_30d_in_currency ?? 0);
   return a < 0.6 && b < 1.5 && d < 3 && c.current_price > 0.85 && c.current_price < 1.35;
 }
-export const pickUniverse = (markets, cats, n = 50) => markets.filter(c => !isPegged(c, cats)).slice(0, n);
+export const pickUniverse = (markets, cats, n = 100) => markets.filter(c => !isPegged(c, cats)).slice(0, n);

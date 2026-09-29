@@ -14,10 +14,10 @@
   "momPct": 20,
   "weights": {
     "trendUp": 1,
-    "oversold": 1,
+    "oversold": 0,
     "trendDown": -1,
-    "overbought": -1,
-    "bbWide": -1,
+    "overbought": 0,
+    "bbWide": 0,
     "momUp": 0,
     "momDown": 0
   }

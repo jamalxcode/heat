@@ -138,11 +138,13 @@ test('hover: moving off toward another coin closes the popup, then opens that co
   await expect(popup.locator('.d-head b')).not.toHaveText('Alpha Coin');
 });
 
-test('every tile shows its point & figure trend (✖️ / ⭕), matching the popup chart', async ({ page }) => {
+test('names show only the MA 🚀/😢 and the point & figure trend (X📈 / O📉), matching the popup chart', async ({ page }) => {
   await expect(page.locator('#grid .tile .pnf-mark')).toHaveCount(N);
   const mark = tile(page, 'moon-coin').locator('.pnf-mark');
   const dir = (await mark.getAttribute('class')).includes('pnf-X') ? 'X' : 'O';
-  await expect(mark).toHaveText(dir === 'X' ? '✖️' : '⭕');
+  await expect(mark).toHaveText(dir === 'X' ? 'X📈' : 'O📉');
+  await expect(page.locator('#grid .tile .name', { hasText: '⚡' })).toHaveCount(0);   // no BB emoji
+  for (const t of await page.locator('#grid .tile .emo').all()) expect(await t.getAttribute('title')).toMatch(/^(🚀 strong uptrend|😢 strong downtrend)$/);
   await tile(page, 'moon-coin').click();
   await page.locator('#detail [data-chart="pnf"]').click();
   await expect(page.locator('#detail')).toContainText(dir === 'X' ? 'rising (X)' : 'falling (O)');

@@ -4,7 +4,7 @@
 // The build() function has no Node dependencies, so it can also be run in a browser for testing.
 
 const CANDLES = 260;
-const RAW_TOP = 80;                    // candles for the top 80 raw coins covers the top 50 after exclusions
+const RAW_TOP = 150;                   // candles for the top 150 raw coins covers the top 100 after exclusions (stablecoins, wrapped, gold)
 const HIST_REUSE = 60 * 60e3;          // exchange candles: refetch hourly (the page patches today's close with the live price)
 const HIST_REUSE_CG = 6 * 60 * 60e3;   // CoinGecko candles: its free quota is scarce
 const CG = 'https://api.coingecko.com/api/v3';
@@ -46,11 +46,13 @@ const trim = c => ({
 
 async function loadMarkets(prev, log) {
   try {
-    const rows = await getJSON(`${CG}/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&price_change_percentage=24h,7d,30d`);
+    const rows = await getJSON(`${CG}/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1&price_change_percentage=24h,7d,30d`);
     return { src: 'CoinGecko', markets: rows.map(trim) };
   } catch (e) { log('CoinGecko markets failed: ' + e.message); }
   try {
-    const d = await getJSON('https://api.coinlore.net/api/tickers/?start=0&limit=100');
+    // CoinLore returns at most 100 per call: two pages cover the top 150 we need
+    const d = { data: [] };
+    for (const start of [0, 100]) d.data.push(...((await getJSON(`https://api.coinlore.net/api/tickers/?start=${start}&limit=100`)).data || []));
     // CoinLore has no CoinGecko ids or logos: borrow them by symbol from the remembered list (see `known` in build())
     const known = { ...(prev?.known || {}) };
     for (const c of prev?.markets || []) if (!c.id.startsWith('cl-')) known[c.symbol.toLowerCase()] ??= { id: c.id, image: c.image };
