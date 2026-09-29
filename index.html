@@ -1199,7 +1199,7 @@ function pinDetail(id, anchor) {
 /* ================= events ================= */
 const finePointer = matchMedia('(hover: hover) and (pointer: fine)');
 // Hover rules:
-// - a popup opens only once the mouse RESTS on a coin (~0.4 s), so gliding across tiles opens nothing
+// - a popup opens only once the mouse RESTS on a coin (~1 s), so gliding across tiles opens nothing
 // - it opens on the side the mouse came from (see showDetail), out of the way of where it's heading
 // - it's solid, so the mouse can rest on it; heading TOWARD it keeps it open
 // - moving off it toward another coin closes it quickly; that coin opens once the mouse rests there
@@ -1232,7 +1232,7 @@ function headingInto(rect) {
   return true;
 }
 let openTimer = 0, hideTimer = 0, overDetail = false, pendingId = null;
-const HOVER_OPEN_MS = 400, HOVER_HIDE_MS = 250, HOVER_AWAY_MS = 120;
+const HOVER_OPEN_MS = 1000, HOVER_HIDE_MS = 250, HOVER_AWAY_MS = 120;
 const cancelHide = () => { clearTimeout(hideTimer); hideTimer = 0; };
 const cancelOpen = () => { clearTimeout(openTimer); pendingId = null; };
 const hideSoon = ms => { if (!hideTimer) hideTimer = setTimeout(() => { hideTimer = 0; if (!overDetail) hideDetail(); }, ms); };

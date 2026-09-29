@@ -37,7 +37,7 @@ A crypto heatmap of the top 50 coins by market cap. Every tile combines the pric
 - **Right:** the key numbers, the long and short stop cards, and where the price history comes from (✓ or ?).
 
 Hovering is built so the popup never gets in the way of the coin you're reaching for:
-- it opens only once the mouse **rests** on a coin for about 0.4 seconds, so gliding across tiles opens nothing
+- it opens only once the mouse **rests** on a coin for about 1 second, so gliding across tiles opens nothing
 - it opens on the **side the mouse came from** (to the left or above when you move right or down), leaving the tiles ahead of the mouse visible
 - moving toward the popup keeps it open, even across other tiles, so you can reach it
 - moving away toward another coin closes it quickly, and that coin opens once the mouse rests on it
