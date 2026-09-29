@@ -38,6 +38,7 @@ jobs:
       - name: Fetch market data
         env:
           PREV_URL: ${{ steps.pages.outputs.base_url }}/data.json
+          COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}   # CoinGecko blocks GitHub's IPs without a key
         run: |
           mkdir -p _site
           mkdir -p _site/scripts

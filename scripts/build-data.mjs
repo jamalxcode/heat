@@ -14,13 +14,18 @@ const ALIASES = { 'the-open-network': ['TON'], 'polygon-ecosystem-token': ['POL'
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const DAY = 864e5;
 
+// CoinGecko Demo API key (a GitHub Actions secret). Server-side only: the browser fallback never sees it.
+// CoinGecko blocks unauthenticated requests from data-centre IPs such as GitHub's runners (HTTP 403).
+const cgKey = () => (IS_NODE && process.env.COINGECKO_API_KEY) || null;
+
 export async function getJSON(url, { tries = 3, timeout = 20000 } = {}) {
+  const headers = IS_NODE ? { 'user-agent': 'heat.sala.company data job', accept: 'application/json', ...(url.startsWith(CG) && cgKey() ? { 'x-cg-demo-api-key': cgKey() } : {}) } : undefined;
   for (let i = 0; ; i++) {
     let status = 0;
     try {
       const ctl = new AbortController();
       const t = setTimeout(() => ctl.abort(), timeout);
-      const r = await fetch(url, { signal: ctl.signal, headers: IS_NODE ? { 'user-agent': 'heat.sala.company data job', accept: 'application/json' } : undefined });
+      const r = await fetch(url, { signal: ctl.signal, headers });
       clearTimeout(t);
       status = r.status;
       if (r.ok) return await r.json();
@@ -46,8 +51,9 @@ async function loadMarkets(prev, log) {
   } catch (e) { log('CoinGecko markets failed: ' + e.message); }
   try {
     const d = await getJSON('https://api.coinlore.net/api/tickers/?start=0&limit=100');
-    const known = {};
-    for (const c of prev?.markets || []) known[c.symbol.toLowerCase()] ??= c;
+    // CoinLore has no CoinGecko ids or logos: borrow them by symbol from the remembered list (see `known` in build())
+    const known = { ...(prev?.known || {}) };
+    for (const c of prev?.markets || []) if (!c.id.startsWith('cl-')) known[c.symbol.toLowerCase()] ??= { id: c.id, image: c.image };
     const markets = (d.data || []).map(r => {
       const sym = String(r.symbol).toLowerCase(), k = known[sym];
       return {
@@ -207,6 +213,9 @@ export async function build({ prev = null, log = console.log, params = null, cgC
   }
 
   const inMarkets = new Set(markets.map(c => c.id));
+  // Remember every coin's CoinGecko id and logo by symbol, so a CoinLore fallback keeps both (it has neither)
+  const known = { ...(prev?.known || {}) };
+  for (const c of markets) if (!c.id.startsWith('cl-') && c.image) known[c.symbol.toLowerCase()] = { id: c.id, image: c.image };
   const count = {};
   for (const h of Object.values(hist)) count[h.src] = (count[h.src] || 0) + 1;
   log(`Rankings: ${src}${stale ? ' (previous copy)' : ''} · candles for ${Object.keys(hist).length}/${targets.length} (${reused} reused) · ${JSON.stringify(count)} · ${((Date.now() - started) / 1000).toFixed(1)}s`);
@@ -220,6 +229,7 @@ export async function build({ prev = null, log = console.log, params = null, cgC
     markets,
     cats: { t: cats.t, stable: cats.stable.filter(id => inMarkets.has(id)), gold: cats.gold.filter(id => inMarkets.has(id)) },
     hist,
+    known,
   };
 }
 
