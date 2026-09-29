@@ -177,6 +177,24 @@ test('scorecard view renders its chart and horizon switch', async ({ page }) => 
   await expect(page.locator('#scorewrap')).toContainText('judged over the next 7 days');
 });
 
+test("scorecard: clicking one of yesterday's coins opens its chart card beside it; × closes it", async ({ page }) => {
+  await page.locator('#view button[data-v="score"]').click();
+  await page.locator('#scorewrap button[data-coin="moon-coin"]').click();
+  const popup = page.locator('#detail');
+  await expect(popup).toHaveClass(/pinned/);
+  await expect(popup.locator('.d-head b')).toHaveText('Moon Coin');
+  const pb = await popup.boundingBox(), vp = page.viewportSize();
+  expect(pb.y + pb.height).toBeLessThanOrEqual(vp.height);
+  await popup.locator('[data-chart="pnf"]').click();                        // same Price / P&F switch as the grid
+  await expect(popup.locator('svg.pnf')).toBeVisible();
+  await popup.locator('[data-chart="price"]').click();
+  await expect(popup.locator('svg.pnf')).toHaveCount(0);
+  await page.locator('#scorewrap button[data-coin="alpha-coin"]').click();  // another chip switches the card
+  await expect(popup.locator('.d-head b')).toHaveText('Alpha Coin');
+  await popup.locator('.x').click();
+  await expect(popup).not.toHaveClass(/show/);
+});
+
 test.describe('phone', () => {
   test.use({ viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true });
 

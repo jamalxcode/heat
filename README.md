@@ -50,7 +50,7 @@ The **Table** view sorts by any column, including the recommended stops. The **S
 
 Every day at **00:20 UTC** a GitHub job scores the previous day:
 
-- **Yesterday's calls**: for coins with more 🚀, how many went up; for coins with more 😢, how many went down. Each is measured in absolute terms and against the average of all 100 coins.
+- **Yesterday's calls**: for coins with more 🚀, how many went up; for coins with more 😢, how many went down. Each is measured in absolute terms and against the average of all 100 coins. **Click a coin** in the list to open its chart card beside it (the same card as a grid click, with the Price / P&F switch); click it again or × to close.
 - **Last 60 days chart**: what holding each day's 🚀 coins, 😢 coins or all coins for one day would have compounded to, with a hover tooltip per day.
 - **Track record** over the last 30 days, 90 days and all history (about 2.7 years), judged over the **next day, 3 days or 7 days**:
   - whether more 🚀 meant bigger moves

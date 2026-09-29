@@ -143,6 +143,8 @@ h1 .tld { color: var(--ink-2); font-weight: 600; }
 .sc-l { font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 .sc-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 .sc-chip { font-size: 12px; padding: 3px 8px; border-radius: 999px; background: var(--tint); color: var(--tint-ink); box-shadow: inset 0 0 0 1px var(--border); white-space: nowrap; }
+button.sc-chip { border: 0; font: inherit; font-size: 12px; cursor: pointer; }
+button.sc-chip:hover, button.sc-chip[aria-expanded="true"] { box-shadow: inset 0 0 0 2px var(--ink); }
 .sc-verdict { font-size: 13.5px !important; margin-top: 12px !important; }
 .sc-table td, .sc-table th { text-align: right; }
 .sc-table td:first-child, .sc-table th:first-child { text-align: left; }
@@ -1029,7 +1031,15 @@ function renderScorecard() {
         ${tile('😢 coins', ys.sad.n ? `${Math.round(ys.sad.downRate * ys.sad.n)} of ${ys.sad.n} went down` : 'none', ys.sad.n ? [`average ${spc(ys.sad.avgRet)}`, `vs market ${spc(ys.sad.avgExc)}`] : [])}
         ${tile('Whole market', spc(y.market), [`average of all ${sc.coins} coins`])}
       </div>
-      ${moved.length ? `<div class="sc-chips">${moved.map(c => `<span class="sc-chip ${heatClass(c.ret * 100, '24h')}" title="${esc(c.sym)}: ${c.good.map(k => '🚀 ' + SIG.COMPONENTS[k]).concat(c.bad.map(k => '😢 ' + SIG.COMPONENTS[k])).concat(c.squeeze ? ['⚡ squeeze'] : []).join(', ')}">${esc(c.sym)} ${c.score ? emo(c.score) : ''}${c.squeeze ? '⚡' : ''} ${spc(c.ret, 1)}</span>`).join('')}</div>` : ''}
+      ${moved.length ? `<div class="sc-chips">${moved.map(c => {
+        // a coin still on the page opens its chart card (P&F first) beside the chip; click again or × to close
+        const open = S.coins.some(x => x.id === c.id);
+        const tip = `${c.sym}: ${c.good.map(k => '🚀 ' + SIG.COMPONENTS[k]).concat(c.bad.map(k => '😢 ' + SIG.COMPONENTS[k])).join(', ')}${open ? ' · click for its chart' : ''}`;
+        const inner = `${esc(c.sym)} ${c.score ? emo(c.score) : ''} ${spc(c.ret, 1)}`;
+        return open
+          ? `<button type="button" class="sc-chip ${heatClass(c.ret * 100, '24h')}" data-coin="${esc(c.id)}" title="${esc(tip)}">${inner}</button>`
+          : `<span class="sc-chip ${heatClass(c.ret * 100, '24h')}" title="${esc(tip)}">${inner}</span>`;
+      }).join('')}</div>` : ''}
     </div>
 
     ${sc.daily?.length ? `<div class="sc-card"><h2>Last ${sc.daily.length} days <span class="sc-muted">holding each day's 🚀 coins vs 😢 coins for one day</span></h2>${basketChart(sc.daily)}</div>` : ''}
@@ -1214,6 +1224,7 @@ function hideDetail(force) {
   if (S.pinned && !force) return;
   S.pinned = null;
   S.hoverId = null; overDetail = false;
+  $$('#scorewrap [aria-expanded="true"]').forEach(x => x.setAttribute('aria-expanded', 'false'));
   $('#detail').classList.remove('show', 'pinned');
   $('#scrim').classList.remove('show');
 }
@@ -1326,7 +1337,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') hideDetail(t
 // Close a pinned popup on a click elsewhere. Uses the click's original path, because a redraw can detach e.target.
 document.addEventListener('click', e => {
   if (!S.pinned) return;
-  const inside = e.composedPath().some(n => n.id === 'detail' || n.classList?.contains('tile') || (n.tagName === 'TR' && n.dataset?.id));
+  const inside = e.composedPath().some(n => n.id === 'detail' || n.classList?.contains('tile') || n.dataset?.coin || (n.tagName === 'TR' && n.dataset?.id));
   if (!inside) hideDetail(true);
 });
 addEventListener('scroll', () => { if (!S.pinned) hideDetail(); }, { passive: true });
@@ -1346,7 +1357,14 @@ $('#scorewrap').addEventListener('click', e => {
   const b = e.target.closest('[data-w]');
   if (b) { S.scoreWin = b.dataset.w; renderScorecard(); return; }
   const hb = e.target.closest('[data-h]');
-  if (hb) { S.scoreH = +hb.dataset.h; renderScorecard(); }
+  if (hb) { S.scoreH = +hb.dataset.h; renderScorecard(); return; }
+  // Yesterday's coins: open the coin's chart card beside the chip, the same card as a grid click (Price / P&F
+  // switch included); the same chip again, ×, Escape or a click elsewhere closes it
+  const chip = e.target.closest('[data-coin]');
+  if (!chip) return;
+  if (S.pinned === chip.dataset.coin) { hideDetail(true); return; }
+  pinDetail(chip.dataset.coin, chip);
+  $$('#scorewrap [data-coin]').forEach(x => x.setAttribute('aria-expanded', x === chip));
 });
 function setFilter(f) {
   S.filter = f;
