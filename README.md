@@ -36,7 +36,13 @@ A crypto heatmap of the top 50 coins by market cap. Every tile combines the pric
   - a status line gives the price for the next X or O and for a flip in direction, and hovering a column shows its range and dates
 - **Right:** the key numbers, the long and short stop cards, and where the price history comes from (✓ or ?).
 
-The popup stays on the coin you opened while the mouse is on it. Crossing other tiles only switches it if you stop on one for about 0.2 seconds. Click the popup (or the tile) to pin it open, and click outside it to close it. On phones, tapping a tile opens the same details as a bottom sheet.
+Hovering is built so the popup never gets in the way of the coin you're reaching for:
+- it opens only once the mouse **rests** on a coin for about 0.4 seconds, so gliding across tiles opens nothing
+- it opens on the **side the mouse came from** (to the left or above when you move right or down), leaving the tiles ahead of the mouse visible
+- moving toward the popup keeps it open, even across other tiles, so you can reach it
+- moving away toward another coin closes it quickly, and that coin opens once the mouse rests on it
+
+Click the popup (or the tile) to pin it open, and click outside it to close it. On phones, tapping a tile opens the same details as a bottom sheet.
 
 **Filters.** The Highlight buttons (Oversold, Overbought, Uptrend, Downtrend, Squeeze, Recent cross, 🛑 Stop crossed) show only the matching coins, in both grid and table. Each button shows its count. **All coins** (or clicking the active button again) brings everything back.
 
@@ -89,7 +95,7 @@ GitHub Actions: daily 00:20 UTC (via cron-job.org)
 | `.github/workflows/update-data.yml` | Builds `data.json` and deploys the site to GitHub Pages every 10 minutes and on every push to `main` |
 | `.github/workflows/score-signals.yml` | Daily scoring (plus Sunday tuning). It commits the results, which also keeps the schedules from being paused for inactivity. |
 | `.github/workflows/test.yml` | Runs the unit tests on every push |
-| `.github/workflows/e2e.yml` | **Browser tests** (Playwright, headless Chrome) on every push: no outside API calls, filters, both stop states, the popup (fits a 13-inch screen, stays put under a real mouse, pins and closes), the phone bottom sheet, and the Scorecard view |
+| `.github/workflows/e2e.yml` | **Browser tests** (Playwright, headless Chrome) on every push: no outside API calls, filters, both stop states, the popup (fits a 13-inch screen, opens only on a resting mouse, closes when moving away, stays put when moving onto it, pins and closes), the phone bottom sheet, and the Scorecard view |
 | `tests/e2e/` | The browser tests, deterministic test data (`fixtures.mjs`) and a local server (`serve.mjs`, also `npm run dev`) |
 
 **How the data stays safe and fresh:**

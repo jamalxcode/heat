@@ -1161,12 +1161,20 @@ function showDetail(id, anchor, keepPos) {
     return;
   }
   if (anchor) {
-    // beside the tile if it fits; otherwise centered below (or above) it; always clamped inside the window
+    // Place it behind the mouse: on the side it came from, so the tiles it's heading for stay visible.
+    // Beside the tile if there's room, otherwise above/below; always clamped inside the window.
     const r = anchor.getBoundingClientRect(), bw = box.offsetWidth, bh = box.offsetHeight, vw = innerWidth, vh = innerHeight, gap = 10, m = 12;
+    const tv = ptr.travel;                                 // last clear direction of mouse travel (unit vector)
+    const fitsR = r.right + gap + bw <= vw - m, fitsL = r.left - gap - bw >= m;
+    const side = (tv.x > 0.2 ? ['left', 'right'] : ['right', 'left']).find(s => s === 'right' ? fitsR : fitsL);
     let left, top;
-    if (r.right + gap + bw <= vw - m) { left = r.right + gap; top = r.top; }
-    else if (r.left - gap - bw >= m) { left = r.left - gap - bw; top = r.top; }
-    else { left = (vw - bw) / 2; top = r.bottom + gap + bh <= vh - m ? r.bottom + gap : r.top - gap - bh; }
+    if (side) { left = side === 'right' ? r.right + gap : r.left - gap - bw; top = r.top; }
+    else {
+      const fitsB = r.bottom + gap + bh <= vh - m, fitsA = r.top - gap - bh >= m;
+      const above = tv.y > 0.2 ? fitsA || !fitsB : tv.y < -0.2 ? !fitsB && fitsA : !fitsB && fitsA;
+      top = above ? r.top - gap - bh : r.bottom + gap;
+      left = tv.x > 0.2 ? r.right - bw : tv.x < -0.2 ? r.left : r.left + r.width / 2 - bw / 2;   // lean away from where it's heading
+    }
     left = Math.min(Math.max(m, left), Math.max(m, vw - bw - m));
     top = Math.min(Math.max(m, top), Math.max(m, vh - bh - m));
     box.style.left = left + 'px'; box.style.top = top + 'px';
@@ -1190,23 +1198,67 @@ function pinDetail(id, anchor) {
 
 /* ================= events ================= */
 const finePointer = matchMedia('(hover: hover) and (pointer: fine)');
-// Hover: the popup is solid (the mouse can rest on it without reaching the tiles underneath), and switching to
-// another coin waits ~0.2 s, so crossing other tiles on the way to the popup doesn't change it.
-let hoverTimer = 0, hideTimer = 0, overDetail = false;
-const HOVER_SWITCH_MS = 180, HOVER_HIDE_MS = 250;
-$('#grid').addEventListener('mouseover', e => {
-  const t = e.target.closest('.tile');
-  if (!t || S.pinned || !finePointer.matches) return;
-  clearTimeout(hideTimer); clearTimeout(hoverTimer);
-  if (!$('#detail').classList.contains('show')) showDetail(t.dataset.id, t);
-  else if (S.hoverId !== t.dataset.id) hoverTimer = setTimeout(() => { if (!overDetail) showDetail(t.dataset.id, t); }, HOVER_SWITCH_MS);
-});
-$('#grid').addEventListener('mouseleave', () => {
-  clearTimeout(hoverTimer);
-  hideTimer = setTimeout(() => { if (!overDetail) hideDetail(); }, HOVER_HIDE_MS);
-});
-$('#detail').addEventListener('mouseenter', () => { overDetail = true; clearTimeout(hideTimer); clearTimeout(hoverTimer); });
-$('#detail').addEventListener('mouseleave', () => { overDetail = false; hideTimer = setTimeout(() => hideDetail(), HOVER_HIDE_MS); });
+// Hover rules:
+// - a popup opens only once the mouse RESTS on a coin (~0.4 s), so gliding across tiles opens nothing
+// - it opens on the side the mouse came from (see showDetail), out of the way of where it's heading
+// - it's solid, so the mouse can rest on it; heading TOWARD it keeps it open
+// - moving off it toward another coin closes it quickly; that coin opens once the mouse rests there
+const ptr = { pts: [], travel: { x: 0, y: 0 } };
+document.addEventListener('mousemove', e => {
+  const now = performance.now();
+  ptr.pts.push({ x: e.clientX, y: e.clientY, t: now });
+  while (ptr.pts.length > 2 && now - ptr.pts[0].t > 120) ptr.pts.shift();
+  const a = ptr.pts[0], dx = e.clientX - a.x, dy = e.clientY - a.y, d = Math.hypot(dx, dy);
+  if (d > 24) ptr.travel = { x: dx / d, y: dy / d };      // remember the last clear direction of travel
+}, { passive: true });
+const ptrSpeed = () => {                                   // px per ms over the last ~120 ms
+  const p = ptr.pts; if (p.length < 2) return 0;
+  const a = p[0], b = p[p.length - 1];
+  return performance.now() - b.t > 80 ? 0 : Math.hypot(b.x - a.x, b.y - a.y) / Math.max(1, b.t - a.t);
+};
+// Is the mouse moving toward this rectangle? (ray from the mouse along its motion, against the rect grown by 16px)
+function headingInto(rect) {
+  const p = ptr.pts; if (p.length < 2) return false;
+  const a = p[0], b = p[p.length - 1], dx = b.x - a.x, dy = b.y - a.y;
+  if (Math.hypot(dx, dy) < 4) return false;
+  let tmin = 0, tmax = Infinity;
+  for (const [o, d, lo, hi] of [[b.x, dx, rect.left - 16, rect.right + 16], [b.y, dy, rect.top - 16, rect.bottom + 16]]) {
+    if (Math.abs(d) < 1e-6) { if (o < lo || o > hi) return false; continue; }
+    let t1 = (lo - o) / d, t2 = (hi - o) / d;
+    if (t1 > t2) [t1, t2] = [t2, t1];
+    tmin = Math.max(tmin, t1); tmax = Math.min(tmax, t2);
+    if (tmin > tmax) return false;
+  }
+  return true;
+}
+let openTimer = 0, hideTimer = 0, overDetail = false, pendingId = null;
+const HOVER_OPEN_MS = 400, HOVER_HIDE_MS = 250, HOVER_AWAY_MS = 120;
+const cancelHide = () => { clearTimeout(hideTimer); hideTimer = 0; };
+const cancelOpen = () => { clearTimeout(openTimer); pendingId = null; };
+const hideSoon = ms => { if (!hideTimer) hideTimer = setTimeout(() => { hideTimer = 0; if (!overDetail) hideDetail(); }, ms); };
+function armOpen(t) {
+  if (pendingId === t.dataset.id) return;                // already waiting on this coin
+  clearTimeout(openTimer); pendingId = t.dataset.id;
+  const tryOpen = () => {
+    if (S.pinned || overDetail || pendingId !== t.dataset.id || !t.isConnected) return;
+    if (ptrSpeed() > 0.25) { openTimer = setTimeout(tryOpen, 120); return; }   // still moving: wait for it to rest
+    pendingId = null; cancelHide();
+    showDetail(t.dataset.id, t);
+  };
+  openTimer = setTimeout(tryOpen, HOVER_OPEN_MS);
+}
+$('#grid').addEventListener('mousemove', e => {
+  if (S.pinned || !finePointer.matches) return;
+  const t = e.target.closest('.tile'), box = $('#detail'), shown = box.classList.contains('show');
+  if (!t) { cancelOpen(); return; }
+  if (shown && S.hoverId === t.dataset.id) { cancelHide(); cancelOpen(); return; }   // still on the open coin
+  if (shown && headingInto(box.getBoundingClientRect())) { cancelHide(); cancelOpen(); return; }   // on the way to the popup
+  if (shown) hideSoon(HOVER_AWAY_MS);                      // moving away toward another coin
+  armOpen(t);
+}, { passive: true });
+$('#grid').addEventListener('mouseleave', () => { cancelOpen(); if (!overDetail) hideSoon(HOVER_HIDE_MS); });
+$('#detail').addEventListener('mouseenter', () => { overDetail = true; cancelHide(); cancelOpen(); });
+$('#detail').addEventListener('mouseleave', () => { overDetail = false; hideSoon(HOVER_HIDE_MS); });
 // clicking the hover popup pins it open, like clicking the tile
 $('#detail').addEventListener('click', e => {
   const sw = e.target.closest('[data-chart]');

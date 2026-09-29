@@ -99,6 +99,45 @@ test('popup fits a 13-inch screen, stays put under the mouse, pins and closes', 
   await expect(popup).not.toHaveClass(/show/);
 });
 
+const center = b => [b.x + b.width / 2, b.y + b.height / 2];
+
+test('hover: gliding across tiles opens nothing; a popup opens only after resting on a coin', async ({ page }) => {
+  const ids = await tiles(page).evaluateAll(els => els.map(e => e.dataset.id));
+  const first = await tile(page, ids[0]).boundingBox(), last = await tile(page, ids[ids.length - 1]).boundingBox();
+  await page.mouse.move(...center(first));
+  await page.mouse.move(...center(last), { steps: 20 });       // a quick pass over the grid
+  const popup = page.locator('#detail');
+  await page.waitForTimeout(150);
+  await expect(popup).not.toHaveClass(/show/);
+  await page.waitForTimeout(500);                              // now resting on the last tile
+  await expect(popup).toHaveClass(/show/);
+  const want = ids[ids.length - 1].replace(/-coin$/, '').replace(/^./, s => s.toUpperCase()) + ' Coin';
+  await expect(popup.locator('.d-head b')).toHaveText(new RegExp(want, 'i'));   // the coin it rests on, not one it crossed
+});
+
+test('hover: moving off toward another coin closes the popup, then opens that coin', async ({ page }) => {
+  const a = await tile(page, 'alpha-coin').boundingBox();
+  await page.mouse.move(...center(a));
+  const popup = page.locator('#detail');
+  await expect(popup.locator('.d-head b')).toHaveText('Alpha Coin');
+  const pb = await popup.boundingBox();
+  // pick a tile that lies away from the popup (the popup's center is on the other side)
+  const away = await tiles(page).evaluateAll((els, p) => {
+    const pc = p.x + p.width / 2;
+    const cand = els.map(e => ({ id: e.dataset.id, r: e.getBoundingClientRect() }))
+      .filter(t => t.id !== 'alpha-coin' && (t.r.right < p.x || t.r.left > p.x + p.width || t.r.bottom < p.y || t.r.top > p.y + p.height));
+    cand.sort((x, y) => Math.abs(y.r.left - pc) - Math.abs(x.r.left - pc));
+    return cand[0]?.id;
+  }, pb);
+  expect(away).toBeTruthy();
+  const tb = await tile(page, away).boundingBox();
+  await page.mouse.move(...center(tb), { steps: 8 });
+  await page.waitForTimeout(250);
+  await expect(popup).not.toHaveClass(/show/);                 // closed quickly on the way
+  await expect(popup).toHaveClass(/show/);                     // then the resting coin opens
+  await expect(popup.locator('.d-head b')).not.toHaveText('Alpha Coin');
+});
+
 test('popup switches to a point & figure chart that fits, and remembers it', async ({ page }) => {
   await tile(page, 'moon-coin').click();                      // pin it open
   const popup = page.locator('#detail');
