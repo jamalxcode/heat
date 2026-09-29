@@ -39,10 +39,10 @@ const coins = [], missing = [];
 let verified = 0;
 await pool(universe, 5, async c => {
   let h = await fromExchanges(c, snap.hist?.[c.id]?.src, HISTORY, pairsFile.pairs);
-  if (h?.verified) verified++;
   if (!h) { try { h = await fromCoinGecko(c, HISTORY); } catch { h = null; } }
   const closes = (h?.closes || []).filter(([t]) => Math.floor(t / DAY) < today);
   if (closes.length < 260) { missing.push(c.symbol.toUpperCase()); return; }
+  if (h.verified) verified++;
   const byDay = new Map(closes.map(([t, v]) => [Math.floor(t / DAY), v]));
   const days = [...byDay.keys()].sort((a, b) => a - b), filled = [];
   let last = byDay.get(days[0]);
