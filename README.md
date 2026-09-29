@@ -18,6 +18,7 @@ A crypto heatmap of the top 50 coins by market cap. Every tile combines the pric
   - ⚡ for a very tight band (bottom 10%): a big move is likely, but not its direction, so ⚡ never counts as a 🚀 or 😢
 
   The weekly tuner can change the thresholds, flip a signal from 🚀 to 😢, or switch it off. Two **momentum** signals (30-day move above +20% or below −20%) are on trial: they stay off until the tuner proves they work. The legend always shows the current rules, plus the signals' **90-day track record**. While that shows no proven edge, the 🚀/😢 are **dimmed**, as hints rather than calls.
+- **✖️ / ⭕ after the emoji**: the **point & figure trend**, from the same chart as the popup's P&F view. ✖️ means the latest column is rising (X) and ⭕ means it's falling (O). Hover it for the column's size, when it started, the price for the next box and for a flip, and the latest buy/sell signal. It's shown for information and isn't scored yet.
 - **Recommended stop-loss** for **long** and **short** positions (the STOP row):
   - distance = **2× the coin's average daily move** over the last 20 days: about 3% for BTC, about 7% for a typical coin. The weekly tuner compares 1.5×, 2× and 2.5× and switches only if another distance's exits saved more in 2 of 3 check periods.
   - set once a day from the last daily close: exit a long below it, or a short above it

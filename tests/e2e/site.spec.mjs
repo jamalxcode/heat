@@ -138,6 +138,16 @@ test('hover: moving off toward another coin closes the popup, then opens that co
   await expect(popup.locator('.d-head b')).not.toHaveText('Alpha Coin');
 });
 
+test('every tile shows its point & figure trend (✖️ / ⭕), matching the popup chart', async ({ page }) => {
+  await expect(page.locator('#grid .tile .pnf-mark')).toHaveCount(N);
+  const mark = tile(page, 'moon-coin').locator('.pnf-mark');
+  const dir = (await mark.getAttribute('class')).includes('pnf-X') ? 'X' : 'O';
+  await expect(mark).toHaveText(dir === 'X' ? '✖️' : '⭕');
+  await tile(page, 'moon-coin').click();
+  await page.locator('#detail [data-chart="pnf"]').click();
+  await expect(page.locator('#detail')).toContainText(dir === 'X' ? 'rising (X)' : 'falling (O)');
+});
+
 test('popup switches to a point & figure chart that fits, and remembers it', async ({ page }) => {
   await tile(page, 'moon-coin').click();                      // pin it open
   const popup = page.locator('#detail');

@@ -226,6 +226,7 @@ h1 .tld { color: var(--ink-2); font-weight: 600; }
 .tile .name { font-size: 12px; display: flex; align-items: center; gap: 4px; min-width: 0; white-space: nowrap; }
 .tile .name .nm { opacity: .85; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .tile .emo { flex: none; font-size: 13px; letter-spacing: -1px; line-height: 1; }
+.pnf-mark { flex: none; font-size: 11px; line-height: 1; margin-left: 3px; }
 /* no proven edge yet: signals shown as quiet hints, not loud calls */
 body.signals-unproven .tile .emo { opacity: .55; filter: grayscale(.35); }
 .leg-item.edge { flex-basis: 100%; }
@@ -537,6 +538,9 @@ function compute(ser) {
 
   r.rsiNow = s.rsi[n - 1];
   r.rsiState = r.rsiNow == null ? null : r.rsiNow < p.rsiLow ? 'os' : r.rsiNow > p.rsiHigh ? 'ob' : 'mid';
+  // point & figure trend: the direction of the latest column (same chart as the popup's P&F view)
+  const pf = SIG.pointFigure(c), pfLast = pf.cols[pf.cols.length - 1];
+  r.pnf = pfLast ? { ...pf.now, since: pfLast.start, boxes: pfLast.hi - pfLast.lo + 1, signal: pf.lastSignal } : null;
 
   const mF = s.maF[n - 1], mS = s.maS[n - 1];
   r.mF = mF; r.mS = mS;
@@ -672,9 +676,21 @@ function applyParams(p) {
 function emojiHTML(ind) {
   const { good, bad } = signals(ind);
   const sq = !!ind?.sig?.squeeze;
-  if (!good.length && !bad.length && !sq) return '';
   const title = [good.length && '🚀 ' + good.join(', '), bad.length && '😢 ' + bad.join(', '), sq && '⚡ ' + SIG.SQUEEZE_LABEL].filter(Boolean).join(' · ');
-  return `<span class="emo" title="${esc(title)}" aria-label="${esc(title)}">${'🚀'.repeat(good.length)}${'😢'.repeat(bad.length)}${sq ? '⚡' : ''}</span>`;
+  const emo = good.length || bad.length || sq
+    ? `<span class="emo" title="${esc(title)}" aria-label="${esc(title)}">${'🚀'.repeat(good.length)}${'😢'.repeat(bad.length)}${sq ? '⚡' : ''}</span>` : '';
+  return emo + pnfMark(ind);
+}
+// ✖️ / ⭕: the latest point & figure column is rising (X) or falling (O). Shown for information; not scored.
+const PNF_EMO = { X: '✖️', O: '⭕' };
+function pnfMark(ind) {
+  const f = ind?.pnf;
+  if (!f) return '';
+  const s = f.signal;
+  const title = `Point & figure: ${f.dir === 'X' ? 'rising (X)' : 'falling (O)'} column, ${f.boxes} boxes since ${new Date(ind.t[f.since]).toISOString().slice(0, 10)}. `
+    + `Next ${f.dir} at a close ${f.dir === 'X' ? 'above' : 'below'} ${fmtPrice(f.next)}; flips to ${f.dir === 'X' ? 'O below' : 'X above'} ${fmtPrice(f.reverse)}.`
+    + (s ? ` Latest signal: ${s.type === 'buy' ? 'double-top buy' : 'double-bottom sell'}.` : '');
+  return `<span class="pnf-mark pnf-${f.dir}" title="${esc(title)}" aria-label="${esc(title)}">${PNF_EMO[f.dir]}</span>`;
 }
 
 // ✓ = price history comes from a trading pair confirmed by the coin's CoinGecko ID; ? = matched by ticker only
@@ -733,6 +749,7 @@ function renderLegend() {
     <span class="leg-item"><span class="gauge" style="width:60px;flex:none"><i style="left:50%"></i></span> RSI 0–100 (under ${P().rsiLow} oversold · over ${P().rsiHigh} overbought)</span>
     <span class="leg-item"><span class="up-t" style="display:inline-flex">${ICON.up}</span>/<span class="dn-t" style="display:inline-flex">${ICON.down}</span> ${P().maFast}MA vs ${P().maSlow}MA</span>
     <span class="leg-item">⚡ BB width in bottom ${P().bbTightPct}%: big move likely, direction unknown</span>
+    <span class="leg-item">✖️ / ⭕ point & figure trend: the latest column is rising (X) or falling (O)</span>
     <span class="leg-item"><b>STOP</b> = recommended stop-loss: <b>L</b> for long positions, <b>S</b> for short, ${P().stopMult}× the coin's average daily move from the last daily close (00:00 UTC) · ⚠ past it intraday = watch · 🛑 a daily close past it = suggested exit</span>
     ${edgeLegend()}
     ${['🚀', '😢'].map(e => {
