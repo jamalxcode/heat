@@ -350,6 +350,248 @@
    "KuCoin": "VET",
    "Gate.io": "VET",
    "MEXC": "VET"
+  },
+  "polygon-ecosystem-token": {
+   "Binance": "POL",
+   "OKX": "POL",
+   "KuCoin": "POL",
+   "MEXC": "POL",
+   "Gate.io": "POL"
+  },
+  "gatechain-token": {
+   "Gate.io": "GT"
+  },
+  "lighter": {
+   "OKX": "LIT",
+   "MEXC": "LIT",
+   "Gate.io": "LIT",
+   "KuCoin": "LIT"
+  },
+  "jupiter-exchange-solana": {
+   "Binance": "JUP",
+   "OKX": "JUP",
+   "KuCoin": "JUP",
+   "Gate.io": "JUP",
+   "MEXC": "JUP"
+  },
+  "kucoin-shares": {
+   "KuCoin": "KCS",
+   "MEXC": "KCS"
+  },
+  "pi-network": {
+   "OKX": "PI",
+   "Gate.io": "PI",
+   "MEXC": "PI"
+  },
+  "blockchain-capital": {},
+  "cosmos": {
+   "Binance": "ATOM",
+   "MEXC": "ATOM",
+   "OKX": "ATOM",
+   "KuCoin": "ATOM",
+   "Gate.io": "ATOM"
+  },
+  "filecoin": {
+   "Binance": "FIL",
+   "OKX": "FIL",
+   "MEXC": "FIL",
+   "Gate.io": "FIL",
+   "KuCoin": "FIL"
+  },
+  "nexo": {
+   "Binance": "NEXO",
+   "MEXC": "NEXO",
+   "Gate.io": "NEXO"
+  },
+  "aerodrome-finance": {
+   "Binance": "AERO",
+   "MEXC": "AERO",
+   "Gate.io": "AERO",
+   "KuCoin": "AERO"
+  },
+  "dash": {
+   "Binance": "DASH",
+   "OKX": "DASH",
+   "MEXC": "DASH",
+   "KuCoin": "DASH",
+   "Gate.io": "DASH"
+  },
+  "stable-2": {
+   "MEXC": "STABLE",
+   "Gate.io": "STABLE",
+   "KuCoin": "STABLE"
+  },
+  "injective-protocol": {
+   "Binance": "INJ",
+   "MEXC": "INJ",
+   "Gate.io": "INJ",
+   "OKX": "INJ",
+   "KuCoin": "INJ"
+  },
+  "ether-fi": {
+   "Binance": "ETHFI",
+   "MEXC": "ETHFI",
+   "OKX": "ETHFI",
+   "Gate.io": "ETHFI",
+   "KuCoin": "ETHFI"
+  },
+  "aptos": {
+   "Binance": "APT",
+   "OKX": "APT",
+   "Gate.io": "APT",
+   "KuCoin": "APT",
+   "MEXC": "APT"
+  },
+  "xdce-crowd-sale": {
+   "KuCoin": "XDC",
+   "Gate.io": "XDC",
+   "MEXC": "XDC"
+  },
+  "akedo": {
+   "Gate.io": "AKE",
+   "KuCoin": "AKE",
+   "MEXC": "AKE"
+  },
+  "flare-networks": {
+   "OKX": "FLR",
+   "KuCoin": "FLR",
+   "Gate.io": "FLR",
+   "MEXC": "FLR"
+  },
+  "pudgy-penguins": {
+   "Binance": "PENGU",
+   "OKX": "PENGU",
+   "Gate.io": "PENGU",
+   "KuCoin": "PENGU",
+   "MEXC": "PENGU"
+  },
+  "curve-dao-token": {
+   "Binance": "CRV",
+   "OKX": "CRV",
+   "MEXC": "CRV",
+   "KuCoin": "CRV",
+   "Gate.io": "CRV"
+  },
+  "pyth-network": {
+   "Binance": "PYTH",
+   "OKX": "PYTH",
+   "MEXC": "PYTH",
+   "KuCoin": "PYTH",
+   "Gate.io": "PYTH"
+  },
+  "blockstack": {
+   "Binance": "STX",
+   "OKX": "STX",
+   "KuCoin": "STX",
+   "Gate.io": "STX",
+   "MEXC": "STX"
+  },
+  "beldex": {
+   "KuCoin": "BDX",
+   "MEXC": "BDX"
+  },
+  "official-trump": {
+   "Binance": "TRUMP",
+   "OKX": "TRUMP",
+   "KuCoin": "TRUMP",
+   "Gate.io": "TRUMP",
+   "MEXC": "TRUMP"
+  },
+  "layerzero": {
+   "Binance": "ZRO",
+   "KuCoin": "ZRO",
+   "OKX": "ZRO",
+   "MEXC": "ZRO",
+   "Gate.io": "ZRO"
+  },
+  "virtual-protocol": {
+   "Binance": "VIRTUAL",
+   "OKX": "VIRTUAL",
+   "Gate.io": "VIRTUAL",
+   "KuCoin": "VIRTUAL",
+   "MEXC": "VIRTUAL"
+  },
+  "fetch-ai": {
+   "Binance": "FET",
+   "OKX": "FET",
+   "Gate.io": "FET",
+   "KuCoin": "FET",
+   "MEXC": "FET"
+  },
+  "raydium": {
+   "Binance": "RAY",
+   "OKX": "RAY",
+   "KuCoin": "RAY",
+   "Gate.io": "RAY",
+   "MEXC": "RAY"
+  },
+  "midnight-3": {
+   "Binance": "NIGHT",
+   "OKX": "NIGHT",
+   "KuCoin": "NIGHT",
+   "Gate.io": "NIGHT",
+   "MEXC": "NIGHT"
+  },
+  "sei-network": {
+   "KuCoin": "SEI",
+   "Binance": "SEI",
+   "OKX": "SEI",
+   "Gate.io": "SEI",
+   "MEXC": "SEI"
+  },
+  "bianrensheng": {},
+  "grass": {
+   "OKX": "GRASS",
+   "Gate.io": "GRASS",
+   "KuCoin": "GRASS",
+   "MEXC": "GRASS"
+  },
+  "a7a5": {},
+  "plasma": {
+   "Binance": "XPL",
+   "OKX": "XPL",
+   "Gate.io": "XPL",
+   "KuCoin": "XPL",
+   "MEXC": "XPL"
+  },
+  "celestia": {
+   "Binance": "TIA",
+   "OKX": "TIA",
+   "MEXC": "TIA",
+   "KuCoin": "TIA",
+   "Gate.io": "TIA"
+  },
+  "pearl-2": {},
+  "bitcoin-cash-sv": {
+   "Gate.io": "BSV",
+   "MEXC": "BSV"
+  },
+  "pendle": {
+   "Binance": "PENDLE",
+   "MEXC": "PENDLE",
+   "OKX": "PENDLE",
+   "KuCoin": "PENDLE",
+   "Gate.io": "PENDLE"
+  },
+  "hash-2": {},
+  "pieverse": {
+   "Gate.io": "PIEVERSE",
+   "MEXC": "PIEVERSE"
+  },
+  "derive": {
+   "Gate.io": "DRV"
+  },
+  "lido-dao": {
+   "Binance": "LDO",
+   "OKX": "LDO",
+   "KuCoin": "LDO",
+   "MEXC": "LDO",
+   "Gate.io": "LDO"
+  },
+  "spx6900": {
+   "KuCoin": "SPX",
+   "Gate.io": "SPX",
+   "MEXC": "SPX"
   }
  }
 }
