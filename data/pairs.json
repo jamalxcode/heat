@@ -306,6 +306,13 @@
    "Gate.io": "CRO",
    "KuCoin": "CRO",
    "MEXC": "CRO"
+  },
+  "arbitrum": {
+   "Binance": "ARB",
+   "OKX": "ARB",
+   "KuCoin": "ARB",
+   "Gate.io": "ARB",
+   "MEXC": "ARB"
   }
  }
 }
