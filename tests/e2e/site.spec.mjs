@@ -14,7 +14,9 @@ test.beforeEach(async ({ page }) => {
   });
   await page.addInitScript(() => {
     localStorage.setItem('hm.wip', String(Date.now()));                       // skip the work-in-progress popup
-    localStorage.setItem('hm.prefs', JSON.stringify({ view: 'grid', colorBy: '24h' }));
+    // start on the grid, but keep anything a test saved before a reload (e.g. the chart type)
+    const saved = JSON.parse(localStorage.getItem('hm.prefs') || '{}');
+    localStorage.setItem('hm.prefs', JSON.stringify({ ...saved, view: 'grid', colorBy: '24h' }));
   });
   await page.goto('/');
   await expect(page.locator('#status')).toContainText(`${N}/${N} coins with indicators`);
@@ -95,6 +97,24 @@ test('popup fits a 13-inch screen, stays put under the mouse, pins and closes', 
   await expect(popup).toHaveClass(/pinned/);
   await page.locator('h1').click();
   await expect(popup).not.toHaveClass(/show/);
+});
+
+test('popup switches to a point & figure chart that fits, and remembers it', async ({ page }) => {
+  await tile(page, 'moon-coin').click();                      // pin it open
+  const popup = page.locator('#detail');
+  await expect(popup).toHaveClass(/pinned/);
+  await popup.locator('[data-chart="pnf"]').click();
+  const svg = popup.locator('svg.pnf');
+  await expect(svg).toBeVisible();
+  expect(await svg.locator('path, ellipse').count()).toBeGreaterThan(10);  // X and O marks drawn
+  await expect(popup).toContainText('reversal');
+  const pb = await popup.boundingBox(), vp = page.viewportSize();
+  expect(pb.y + pb.height).toBeLessThanOrEqual(vp.height);
+  await page.reload();
+  await tile(page, 'alpha-coin').click();
+  await expect(page.locator('#detail svg.pnf')).toBeVisible();          // choice kept after reload
+  await page.locator('#detail [data-chart="price"]').click();
+  await expect(page.locator('#detail svg.pnf')).toHaveCount(0);
 });
 
 test('scorecard view renders its chart and horizon switch', async ({ page }) => {

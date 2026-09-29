@@ -29,7 +29,11 @@ A crypto heatmap of the top 50 coins by market cap. Every tile combines the pric
 - **✓ / ? next to the ticker**: ✓ means the coin's price history comes from an exchange pair confirmed by its CoinGecko ID. ? means it was matched by ticker only (a best guess, checked against the price). Hover the mark to see the exchange and pair.
 
 **Coin details.** Hover a tile to open its details. On laptops they appear in a two-column popup, sized to fit a 13-inch screen:
-- **Left:** a 120-day chart of price, both moving averages, the Bollinger band and the recommended stop lines, plus RSI below it.
+- **Left:** a 120-day chart of price, both moving averages, the Bollinger band and the recommended stop lines, plus RSI below it. A **Price / P&F** switch (remembered) swaps in a **point & figure** chart:
+  - X columns rise and O columns fall, built from daily closes on a log scale
+  - the box size is set per coin from its volatility (about 1.5% for BTC, 2–3% for a typical coin), with a 3-box reversal
+  - **B** marks a double-top buy (an X column tops the previous X column) and **S** a double-bottom sell
+  - a status line gives the price for the next X or O and for a flip in direction, and hovering a column shows its range and dates
 - **Right:** the key numbers, the long and short stop cards, and where the price history comes from (✓ or ?).
 
 The popup stays on the coin you opened while the mouse is on it. Crossing other tiles only switches it if you stop on one for about 0.2 seconds. Click the popup (or the tile) to pin it open, and click outside it to close it. On phones, tapping a tile opens the same details as a bottom sheet.

@@ -295,6 +295,9 @@ td .cell-heat { display: inline-block; padding: 1px 6px; border-radius: 4px; bac
 /* two columns on laptops: charts left, numbers and stops right, so the popup is wide rather than tall */
 .d-cols { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 4px 18px; align-items: start; }
 .d-right .kv { margin-top: 0; padding-top: 0; border-top: 0; }
+.d-switch { margin: 2px 0 6px; }
+.d-switch button { font-size: 12px; padding: 2px 10px; }
+.d-chart svg.pnf { display: block; width: 100%; height: auto; }
 @media (max-width: 760px) {
   #detail { width: 400px; }
   .d-cols { grid-template-columns: 1fr; }
@@ -476,11 +479,11 @@ const S = {
   colorBy: '24h', filter: 'all', view: 'grid', pegged: false,
   sort: { key: 'rank', dir: 1 }, pinned: null, busy: false,
   updated: null, marketSrc: '', stale: false, nextAuto: 0,
-  params: SIG.withDefaults(null), scorecard: null, scoreWin: 'd30', scoreH: 1,
+  params: SIG.withDefaults(null), scorecard: null, scoreWin: 'd30', scoreH: 1, chart: 'price',
 };
 const prefs = store.get('hm.prefs') || {};
-Object.assign(S, { colorBy: prefs.colorBy || '24h', view: prefs.view || 'grid', pegged: !!prefs.pegged });
-const savePrefs = () => store.set('hm.prefs', { colorBy: S.colorBy, view: S.view, pegged: S.pegged, theme: document.documentElement.dataset.theme || '' });
+Object.assign(S, { colorBy: prefs.colorBy || '24h', view: prefs.view || 'grid', pegged: !!prefs.pegged, chart: prefs.chart === 'pnf' ? 'pnf' : 'price' });
+const savePrefs = () => store.set('hm.prefs', { colorBy: S.colorBy, view: S.view, pegged: S.pegged, chart: S.chart, theme: document.documentElement.dataset.theme || '' });
 
 function setStatus(text, kind = '') { $('#status').innerHTML = `<span class="dot ${kind}"></span>${esc(text)}`; }
 
@@ -1040,6 +1043,45 @@ function linePath(vals, x, y) {
   });
   return d;
 }
+// [ Price | P&F ] switch above the popup chart (remembered)
+const chartSwitch = () => `<div class="seg d-switch" role="group" aria-label="Chart type">${[['price', 'Price'], ['pnf', 'P&F']].map(([v, l]) => `<button data-chart="${v}" aria-pressed="${S.chart === v}">${l}</button>`).join('')}</div>`;
+
+// Point & figure: X = rising column, O = falling column, each box a fixed % move, 3-box reversal (signals.mjs)
+function pnfChart(ind) {
+  const pf = SIG.pointFigure(ind.c);
+  if (pf.cols.length < 2) return '<p class="d-src">Not enough movement yet for a point & figure chart.</p>';
+  // show the most recent columns, as many as fit in about 40 rows of boxes
+  let cols = pf.cols.slice(-36);
+  while (cols.length > 12 && Math.max(...cols.map(c => c.hi)) - Math.min(...cols.map(c => c.lo)) + 1 > 40) cols = cols.slice(1);
+  const lo = Math.min(...cols.map(c => c.lo)), hi = Math.max(...cols.map(c => c.hi)), rows = hi - lo + 1;
+  // Boxes stretch to fill the chart (capped at 14px) instead of staying square: square boxes squeezed a
+  // 25-column × 40-row chart into a narrow strip of tiny marks.
+  const W = 332, PAD_R = 50, PAD_T = 12, H = 212;
+  const cw = Math.min(14, (W - PAD_R) / cols.length), ch = Math.min(14, (H - PAD_T) / rows);
+  const x0 = W - PAD_R - cw * cols.length;                    // right-align: the latest column sits next to the price labels
+  const xc = i => x0 + (i + 0.5) * cw, yc = j => H - (j - lo + 0.5) * ch;
+  const day = i => new Date(ind.t[i]).toISOString().slice(5, 10);
+  const rx = cw * 0.34, ry = ch * 0.34, sw = Math.max(1.1, Math.min(cw, ch) * 0.14);
+  const marks = cols.map((c, i) => {
+    const boxes = [];
+    for (let j = c.lo; j <= c.hi; j++) boxes.push(c.dir === 'X'
+      ? `<path d="M${xc(i) - rx} ${yc(j) - ry}L${xc(i) + rx} ${yc(j) + ry}M${xc(i) + rx} ${yc(j) - ry}L${xc(i) - rx} ${yc(j) + ry}"/>`
+      : `<ellipse cx="${xc(i)}" cy="${yc(j)}" rx="${rx}" ry="${ry}"/>`);
+    const tip = `${c.dir === 'X' ? 'Rising (X)' : 'Falling (O)'}: ${fmtPrice(pf.price(c.lo))} → ${fmtPrice(pf.price(c.hi + 1))} · ${day(c.start)} to ${day(c.end)}${c.signal ? ` · ${c.signal.type === 'buy' ? 'double-top buy' : 'double-bottom sell'} at ${fmtPrice(pf.price(c.signal.box))}` : ''}`;
+    const band = `<rect x="${x0 + i * cw}" y="${yc(c.hi) - ch / 2}" width="${cw}" height="${(c.hi - c.lo + 1) * ch}" fill="${i === cols.length - 1 ? 'var(--band)' : 'transparent'}"><title>${esc(tip)}</title></rect>`;
+    const fs = Math.max(8, Math.min(11, cw * 0.9));
+    const sig = c.signal ? `<text x="${xc(i)}" y="${c.signal.type === 'buy' ? yc(c.hi) - ch / 2 - 2 : yc(c.lo) + ch / 2 + fs}" text-anchor="middle" font-size="${fs}" font-weight="700" fill="${c.signal.type === 'buy' ? '#0077be' : '#b8413f'}" pointer-events="none">${c.signal.type === 'buy' ? 'B' : 'S'}</text>` : '';
+    return `${band}<g stroke="${c.dir === 'X' ? '#0077be' : '#b8413f'}" stroke-width="${sw}" fill="none" stroke-linecap="round" pointer-events="none">${boxes.join('')}</g>${sig}`;
+  }).join('');
+  const every = Math.max(1, Math.ceil(rows / 7));
+  const grid = [];
+  for (let j = lo; j <= hi + 1; j += every) grid.push(`<line x1="${x0}" x2="${W - PAD_R}" y1="${yc(j) + ch / 2}" y2="${yc(j) + ch / 2}" stroke="var(--grid)"/><text x="${W - PAD_R + 6}" y="${yc(j) + ch / 2 + 3.5}" font-size="10" fill="var(--muted)">${fmtPrice(pf.price(j)).replace('$', '')}</text>`);
+  const now = pf.now, s = pf.lastSignal;
+  return `<div class="d-legend"><span><b style="color:#0077be">X</b> rising</span><span><b style="color:#b8413f">O</b> falling</span><span>box ${pf.boxPct}% · ${pf.reversal}-box reversal</span><span><b style="color:#0077be">B</b>/<b style="color:#b8413f">S</b> double-top buy / double-bottom sell</span></div>
+    <div class="d-chart"><svg class="pnf" viewBox="0 0 ${W} ${H}" role="img" aria-label="Point and figure chart, last ${cols.length} columns">${grid.join('')}${marks}</svg></div>
+    <p class="d-src">Now in ${now.dir === 'X' ? 'a <b>rising (X)</b>' : 'a <b>falling (O)</b>'} column: the next ${now.dir} at a close ${now.dir === 'X' ? 'above' : 'below'} <b>${fmtPrice(now.next)}</b>; it flips to ${now.dir === 'X' ? 'O below' : 'X above'} <b>${fmtPrice(now.reverse)}</b>.${s ? ` Latest signal: <b>${s.type === 'buy' ? 'double-top buy' : 'double-bottom sell'}</b> at ${fmtPrice(pf.price(s.box))} (${day(s.day)}).` : ''} Built from daily closes; hover a column for details.</p>`;
+}
+
 function detailChart(ind) {
   const N = Math.min(120, ind.n), s = ind.n - N;
   const W = 332, H = 130, PAD_L = 0, PAD_R = 44;
@@ -1087,7 +1129,7 @@ function showDetail(id, anchor, keepPos) {
     <div class="d-price">${fmtPrice(c.current_price)}</div>
     <div class="d-chg"><span>24h ${fmtPct(chgOf(c, '24h'))}</span><span>7d ${fmtPct(chgOf(c, '7d'))}</span><span>30d ${fmtPct(chgOf(c, '30d'))}</span><span>Cap ${fmtBig(c.market_cap)}</span></div>`;
   if (ind && !ind.error) {
-    body += `<div class="d-cols"><div class="d-left">${detailChart(ind)}</div><div class="d-right">`;
+    body += `<div class="d-cols"><div class="d-left">${chartSwitch()}${S.chart === 'pnf' ? pnfChart(ind) : detailChart(ind)}</div><div class="d-right">`;
     const trendTxt = ind.trend ? `${ind.trend === 'up' ? '▲ Uptrend' : '▼ Downtrend'} (${ind.strong ? 'price agrees' : ind.trend === 'up' ? `price below ${P().maFast}MA` : `price above ${P().maFast}MA`})` : `${P().maSlow}-day history not available yet`;
     body += `<dl class="kv">
       <dt>RSI (14)</dt><dd>${ind.rsiNow != null ? ind.rsiNow.toFixed(1) + (ind.rsiState === 'os' ? ' · Oversold' : ind.rsiState === 'ob' ? ' · Overbought' : ' · Neutral') : '—'}</dd>
@@ -1113,7 +1155,11 @@ function showDetail(id, anchor, keepPos) {
   } else body += `<div class="d-src">${ind?.error ? 'No daily history found on Binance, Gate.io, OKX or CoinGecko.' : 'Loading candles…'}</div>`;
   box.querySelector('.body').innerHTML = body;
   box.classList.add('show');
-  if (keepPos) return;
+  if (keepPos) {                              // redrawn in place (e.g. chart switch): stay inside the window
+    const b = box.getBoundingClientRect();
+    if (b.bottom > innerHeight - 12) box.style.top = Math.max(12, innerHeight - b.height - 12) + 'px';
+    return;
+  }
   if (anchor) {
     // beside the tile if it fits; otherwise centered below (or above) it; always clamped inside the window
     const r = anchor.getBoundingClientRect(), bw = box.offsetWidth, bh = box.offsetHeight, vw = innerWidth, vh = innerHeight, gap = 10, m = 12;
@@ -1163,6 +1209,12 @@ $('#detail').addEventListener('mouseenter', () => { overDetail = true; clearTime
 $('#detail').addEventListener('mouseleave', () => { overDetail = false; hideTimer = setTimeout(() => hideDetail(), HOVER_HIDE_MS); });
 // clicking the hover popup pins it open, like clicking the tile
 $('#detail').addEventListener('click', e => {
+  const sw = e.target.closest('[data-chart]');
+  if (sw) {                                   // Price / P&F switch: redraw in place, remember the choice
+    S.chart = sw.dataset.chart; savePrefs();
+    showDetail(S.pinned || S.hoverId, null, true);
+    return;
+  }
   if (S.pinned || !S.hoverId || e.target.closest('.x')) return;
   // pin in place: no redraw, no move
   S.pinned = S.hoverId;

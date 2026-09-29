@@ -91,6 +91,38 @@ test('momentum: +1%/day for 30 days is strong momentum, and it is off by default
   assert.equal(S.componentsAt(S.series(c, { momPct: 40 }), 259, { momPct: 40 }).momUp, false, 'threshold is a setting');
 });
 
+test('pointFigure: columns, 3-box reversals and a double-top buy on a known path', () => {
+  const r = 1.01, at = k => 100 * r ** k;                 // prices exactly k boxes of 1% from 100
+  const path = [0, 1, 2, 3, 4, 5, 4, 3, 2, 1, 2, 3, 4, 5, 6, 7].map(at);
+  const pf = S.pointFigure(path, { boxPct: 1, reversal: 3 });
+  const b0 = Math.floor(Math.log(100) / Math.log(r));
+  const shape = pf.cols.map(c => [c.dir, c.lo - b0, c.hi - b0]);
+  // up 5 boxes (X), down 4 (reversal at 3 boxes → O from one below the top), up 6 (X from one above the bottom)
+  assert.deepEqual(shape, [['X', 0, 5], ['O', 1, 4], ['X', 2, 7]]);
+  assert.equal(pf.cols[2].signal.type, 'buy', 'the second X column topped the first: double-top buy');
+  assert.equal(pf.cols[2].signal.box - b0, 6);
+  assert.equal(pf.cols[1].signal, undefined, 'the O column did not break the (non-existent) previous O');
+  assert.equal(pf.lastSignal.type, 'buy');
+  near(pf.now.next, 1.01 ** (b0 + 8), 1e-6, 'next X needs the top of box 7');
+  near(pf.now.reverse, 1.01 ** (b0 + 5), 1e-6, 'a 3-box reversal means closing below box 5');
+});
+
+test('pointFigure: a smaller move than the reversal just waits, and a new low is a double-bottom sell', () => {
+  const at = k => 100 * 1.01 ** k;
+  const small = S.pointFigure([0, 3, 2, 1].map(at), { boxPct: 1, reversal: 3 });
+  assert.equal(small.cols.length, 1, 'a 2-box pullback does not start an O column');
+  const sell = S.pointFigure([0, -3, 0, -5].map(at), { boxPct: 1, reversal: 3 });
+  assert.deepEqual(sell.cols.map(c => c.dir), ['O', 'X', 'O']);
+  assert.equal(sell.cols[2].signal.type, 'sell');
+});
+
+test('autoBoxPct: snaps the average daily move to a clean box size', () => {
+  const steady = Array.from({ length: 80 }, (_, i) => 100 * (i % 2 ? 1.02 : 1));   // alternating ±2% moves
+  assert.equal(S.autoBoxPct(steady), 2);
+  const calm = Array.from({ length: 80 }, (_, i) => 100 * (i % 2 ? 1.004 : 1));
+  assert.equal(S.autoBoxPct(calm), 0.5);
+});
+
 test('withDefaults: ignores unknown weights and fills missing ones', () => {
   const p = S.withDefaults({ rsiLow: 25, weights: { bbTight: 1, overbought: 1 } });
   assert.equal(p.rsiLow, 25);

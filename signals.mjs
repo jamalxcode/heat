@@ -153,6 +153,59 @@ export function stopLevels(closes, i, p) {
   return { dist: d, anchor: c, long: c * (1 - d), short: c * (1 + d) };
 }
 
+/* ---------- point & figure ---------- */
+// Box size from the coin's own volatility: its average daily move over the last 60 closes, snapped to a clean step.
+// About 1-1.5% for BTC and 2-3% for a typical coin, so every chart has a readable number of columns.
+const PNF_STEPS = [0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
+export function autoBoxPct(closes, lookback = 60) {
+  const n = closes.length, from = Math.max(1, n - lookback);
+  let s = 0, k = 0;
+  for (let i = from; i < n; i++) { s += Math.abs(closes[i] / closes[i - 1] - 1); k++; }
+  const avg = k ? s / k * 100 : 2;
+  return PNF_STEPS.reduce((best, v) => Math.abs(v - avg) < Math.abs(best - avg) ? v : best, PNF_STEPS[0]);
+}
+
+// Close-only point & figure on a log scale: box j spans prices [r^j, r^(j+1)) with r = 1 + boxPct/100, so boxes are
+// equal percentage moves. X columns rise, O columns fall; a new column needs a move of `reversal` boxes the other way.
+// Columns: { dir: 'X'|'O', lo, hi (box indices, inclusive), start, end (candle indices), signal? }.
+// signal = double-top buy (an X column tops the previous X column) or double-bottom sell (an O column breaks the previous O).
+export function pointFigure(closes, { boxPct = autoBoxPct(closes), reversal = 3 } = {}) {
+  const lr = Math.log(1 + boxPct / 100);
+  const box = p => Math.floor(Math.log(p) / lr + 1e-9);
+  const cols = [];
+  let col = null;
+  const b0 = box(closes[0]);
+  const breakout = (c, i) => {
+    const prev = cols[cols.length - 3];                 // columns alternate X/O, so the previous same-direction one is 2 back
+    if (!prev || c.signal) return;
+    if (c.dir === 'X' && c.hi > prev.hi) c.signal = { type: 'buy', day: i, box: prev.hi + 1 };
+    if (c.dir === 'O' && c.lo < prev.lo) c.signal = { type: 'sell', day: i, box: prev.lo - 1 };
+  };
+  for (let i = 1; i < closes.length; i++) {
+    const b = box(closes[i]);
+    if (!col) {
+      if (b > b0) col = { dir: 'X', lo: b0, hi: b, start: i, end: i };
+      else if (b < b0) col = { dir: 'O', lo: b, hi: b0, start: i, end: i };
+      if (col) cols.push(col);
+      continue;
+    }
+    if (col.dir === 'X') {
+      if (b > col.hi) { col.hi = b; col.end = i; breakout(col, i); }
+      else if (b <= col.hi - reversal) { col = { dir: 'O', lo: b, hi: col.hi - 1, start: i, end: i }; cols.push(col); breakout(col, i); }
+    } else {
+      if (b < col.lo) { col.lo = b; col.end = i; breakout(col, i); }
+      else if (b >= col.lo + reversal) { col = { dir: 'X', lo: col.lo + 1, hi: b, start: i, end: i }; cols.push(col); breakout(col, i); }
+    }
+  }
+  const price = j => Math.pow(1 + boxPct / 100, j);   // lower edge of box j
+  const last = cols[cols.length - 1];
+  const now = !last ? null : last.dir === 'X'
+    ? { dir: 'X', next: price(last.hi + 1), reverse: price(last.hi - reversal + 1) }   // add an X above / flip to O below
+    : { dir: 'O', next: price(last.lo), reverse: price(last.lo + reversal) };          // add an O below / flip to X above
+  const lastSignal = [...cols].reverse().find(c => c.signal)?.signal || null;
+  return { boxPct, reversal, cols, price, now, lastSignal };
+}
+
 /* ---------- evaluation ---------- */
 const DAY = 864e5;
 const cap = h => 0.3 * Math.sqrt(h);   // ±30% a day, wider for longer horizons: stops one bad print swamping averages
