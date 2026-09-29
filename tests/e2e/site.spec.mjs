@@ -30,6 +30,14 @@ test('loads everything from data.json, with no outside API calls', async ({ page
   expect(external).toEqual([]);
 });
 
+test('CoinGecko attribution is shown (required for the free API key)', async ({ page }) => {
+  for (const where of ['#fresh', 'footer']) {
+    const link = page.locator(`${where} a[href^="https://www.coingecko.com"]`);
+    await expect(link).toBeVisible();
+    await expect(link).toContainText('Powered by CoinGecko');
+  }
+});
+
 test('✓ / ? marks show how each coin was matched', async ({ page }) => {
   await expect(tile(page, 'alpha-coin').locator('.vf.ok')).toHaveCount(1);
   await expect(tile(page, 'beta-coin').locator('.vf.guess')).toHaveCount(1);

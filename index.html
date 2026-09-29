@@ -107,6 +107,10 @@ h1 .heat { font-weight: 800; background: linear-gradient(90deg, #ff9a1a, #e0301e
 h1 .tld { color: var(--ink-2); font-weight: 600; }
 .fresh { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid #0077be; border-radius: 10px; padding: 8px 12px; margin: 0 0 12px; font-size: 13px; color: var(--ink-2); }
 .fresh b { color: var(--ink); }
+.fresh .cg-attr { margin-left: auto; flex: none; white-space: nowrap; font-size: 12px; color: var(--ink-2); text-decoration: none; border-bottom: 1px solid var(--axis); }
+.fresh .cg-attr:hover { color: var(--ink); }
+.cg-foot a { color: inherit; }
+@media (max-width: 640px) { .fresh { flex-wrap: wrap; } .fresh .cg-attr { margin-left: 26px; } }
 .fresh .f-ic { font-size: 16px; }
 .fresh.late { border-left-color: var(--amber); }
 /* work-in-progress notice: floating card, never blocks the page */
@@ -396,6 +400,7 @@ footer details summary { cursor: pointer; }
       <b>BB width</b>: (upper − lower) / middle band, ranked against the last 180 days. Bottom 25% is a <i>squeeze</i> (volatility is compressed, and a big move often follows, in either direction). Top 20% is <i>expanded</i>. The very tightest bands get a ⚡ next to the name: a big move is likely, but not its direction, so ⚡ never counts as a 🚀 or 😢.</div>
     <div id="srcinfo"></div>
     <details id="excluded"><summary>Excluded tokens</summary><div></div></details>
+    <div class="cg-foot">Market data <a href="https://www.coingecko.com/en/api" target="_blank" rel="noopener"><b>Powered by CoinGecko</b></a>.</div>
     <div>Data is collected every 10 minutes from CoinGecko (CoinLore as backup) for prices and rankings, and from Binance, Gate.io, OKX, MEXC, KuCoin and CoinGecko for daily candles. Prices are not real-time. Today's candle is still forming, so indicators move during the day. <b>Recommended stop-losses</b> are suggested levels only: this page is not real-time and cannot exit a position for you, so set stops on your exchange. Not financial advice.</div>
   </footer>
 </div>
@@ -1286,7 +1291,8 @@ function renderFresh(now) {
   el.classList.toggle('late', late);
   const html = `<span class="f-ic" aria-hidden="true">🕒</span><span><b>Last refreshed ${tm}</b> (${ago}) · ${next}. `
     + (late ? '<b>This update is running late, so you are seeing the last good data.</b> ' : '')
-    + `Prices are <b>not real-time</b>: they refresh every ${REFRESH_MIN} minutes.</span>`;
+    + `Prices are <b>not real-time</b>: they refresh every ${REFRESH_MIN} minutes.</span>`
+    + `<a class="cg-attr" href="https://www.coingecko.com/en/api" target="_blank" rel="noopener">Powered by CoinGecko</a>`;   // attribution required for the free CoinGecko API key
   if (el.innerHTML !== html) el.innerHTML = html;
 }
 
