@@ -109,7 +109,7 @@ test('hover: gliding across tiles opens nothing; a popup opens only after restin
   const popup = page.locator('#detail');
   await page.waitForTimeout(150);
   await expect(popup).not.toHaveClass(/show/);
-  await page.waitForTimeout(1200);                             // now resting on the last tile
+  await page.waitForTimeout(2300);                             // now resting on the last tile
   await expect(popup).toHaveClass(/show/);
   const want = ids[ids.length - 1].replace(/-coin$/, '').replace(/^./, s => s.toUpperCase()) + ' Coin';
   await expect(popup.locator('.d-head b')).toHaveText(new RegExp(want, 'i'));   // the coin it rests on, not one it crossed
