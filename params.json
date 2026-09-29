@@ -19,6 +19,8 @@
     "overbought": 0,
     "bbWide": 0,
     "momUp": 1,
-    "momDown": -1
+    "momDown": -1,
+    "pnfUp": 1,
+    "pnfDown": -1
   }
 }

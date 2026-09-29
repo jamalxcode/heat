@@ -230,7 +230,7 @@ h1 .tld { color: var(--ink-2); font-weight: 600; }
 .pnf-mark { flex: none; font-size: 11px; line-height: 1; margin-left: 3px; white-space: nowrap; }
 .pnf-mark b { font-weight: 800; margin-right: 1px; }
 /* no proven edge yet: signals shown as quiet hints, not loud calls */
-body.signals-unproven .tile .emo { opacity: .55; filter: grayscale(.35); }
+body.signals-unproven .tile .emo, body.signals-unproven .tile .pnf-mark { opacity: .55; filter: grayscale(.35); }
 .leg-item.edge { flex-basis: 100%; }
 .leg-item.edge.weak { color: var(--ink-2); }
 .leg-item.edge a { color: inherit; }
@@ -541,8 +541,8 @@ function compute(ser) {
   r.rsiNow = s.rsi[n - 1];
   r.rsiState = r.rsiNow == null ? null : r.rsiNow < p.rsiLow ? 'os' : r.rsiNow > p.rsiHigh ? 'ob' : 'mid';
   // point & figure trend: the direction of the latest column (same chart as the popup's P&F view)
-  const pf = SIG.pointFigure(c), pfLast = pf.cols[pf.cols.length - 1];
-  r.pnf = pfLast ? { ...pf.now, since: pfLast.start, boxes: pfLast.hi - pfLast.lo + 1, signal: pf.lastSignal } : null;
+  const pfOff = Math.max(0, n - SIG.PNF_WINDOW), pf = SIG.pointFigure(c.slice(pfOff)), pfLast = pf.cols[pf.cols.length - 1];   // same window the scorer uses
+  r.pnf = pfLast ? { ...pf.now, since: pfOff + pfLast.start, boxes: pfLast.hi - pfLast.lo + 1, signal: pf.lastSignal } : null;
 
   const mF = s.maF[n - 1], mS = s.maS[n - 1];
   r.mF = mF; r.mS = mS;
@@ -663,6 +663,7 @@ function legendName(k) {
     oversold: `RSI(${p.rsiPeriod}) under ${p.rsiLow}`, overbought: `RSI(${p.rsiPeriod}) over ${p.rsiHigh}`,
     bbTight: `BB width in bottom ${p.bbTightPct}%`, bbWide: `BB width in top ${100 - p.bbWidePct}%`,
     momUp: `30-day move above +${p.momPct}%`, momDown: `30-day move below −${p.momPct}%`,
+    pnfUp: `point & figure rising (X column)`, pnfDown: `point & figure falling (O column)`,
   }[k];
 }
 // Apply signal settings everywhere they show (RSI gauge zones, labels) and recompute every tile
@@ -676,14 +677,15 @@ function applyParams(p) {
   return changed;
 }
 // Next to the name: the 50/200 MA trend (🚀 / 😢), the point & figure trend (X📈 / O📉) and 30-day momentum (🔥 / 🧊).
-// RSI and Bollinger width stay in the tile rows and the chart, not as emoji. Trend and momentum are what the
-// Scorecard judges (🔥 / 🧊 count as 🚀 / 😢 calls in their current role); P&F is shown for information.
+// RSI and Bollinger width stay in the tile rows and the chart, not as emoji. All three are what the Scorecard judges:
+// X📈 / O📉 and 🔥 / 🧊 count as 🚀 / 😢 calls in their current role, and disappear if the tuner switches them off.
 const NAME_SIGNALS = SIG.SCORED;
 const MOM_EMO = { momUp: '🔥', momDown: '🧊' };
+const LEGEND_EMO = { ...MOM_EMO, pnfUp: '<b>X</b>📈', pnfDown: '<b>O</b>📉' };
+const call = k => roleOf(k) === '🚀' ? '🚀 call' : '😢 call';
 function emojiHTML(ind) {
   const fired = [...(ind?.sig?.good || []), ...(ind?.sig?.bad || [])].filter(k => NAME_SIGNALS.includes(k));
-  const call = k => roleOf(k) === '🚀' ? '🚀 call' : '😢 call';
-  const trend = fired.filter(k => !MOM_EMO[k]), mom = fired.filter(k => MOM_EMO[k]);
+  const trend = fired.filter(k => k.startsWith('trend')), mom = fired.filter(k => MOM_EMO[k]);
   const trendTitle = trend.map(k => `${roleOf(k)} ${SIG.COMPONENTS[k]}`).join(' · ');
   const trendHTML = trend.length ? `<span class="emo" title="${esc(trendTitle)}" aria-label="${esc(trendTitle)}">${trend.map(roleOf).join('')}</span>` : '';
   const m30 = ind?.chg?.['30d'];
@@ -693,13 +695,13 @@ function emojiHTML(ind) {
   }).join('');
   return trendHTML + pnfMark(ind) + momHTML;
 }
-// X📈 / O📉: the latest point & figure column is rising (X) or falling (O). Shown for information; not scored.
+// X📈 / O📉: the latest point & figure column is rising (X) or falling (O). Scored like the others (see above).
 const PNF_EMO = { X: '<b>X</b>📈', O: '<b>O</b>📉' };
 function pnfMark(ind) {
-  const f = ind?.pnf;
-  if (!f) return '';
+  const f = ind?.pnf, k = f?.dir === 'X' ? 'pnfUp' : 'pnfDown';
+  if (!f || roleOf(k) === 'off') return '';
   const s = f.signal;
-  const title = `Point & figure: ${f.dir === 'X' ? 'rising (X)' : 'falling (O)'} column, ${f.boxes} boxes since ${new Date(ind.t[f.since]).toISOString().slice(0, 10)}. `
+  const title = `Point & figure: ${f.dir === 'X' ? 'rising (X)' : 'falling (O)'} column, ${f.boxes} boxes since ${new Date(ind.t[f.since]).toISOString().slice(0, 10)}: counts as a ${call(k)}. `
     + `Next ${f.dir} at a close ${f.dir === 'X' ? 'above' : 'below'} ${fmtPrice(f.next)}; flips to ${f.dir === 'X' ? 'O below' : 'X above'} ${fmtPrice(f.reverse)}.`
     + (s ? ` Latest signal: ${s.type === 'buy' ? 'double-top buy' : 'double-bottom sell'}.` : '');
   return `<span class="pnf-mark pnf-${f.dir}" title="${esc(title)}" aria-label="${esc(title)}">${PNF_EMO[f.dir]}</span>`;
@@ -760,12 +762,11 @@ function renderLegend() {
     <span class="scale">${cells.map(([k, l]) => `<span class="${k}">${l}</span>`).join('')}</span>
     <span class="leg-item"><span class="gauge" style="width:60px;flex:none"><i style="left:50%"></i></span> RSI 0–100 (under ${P().rsiLow} oversold · over ${P().rsiHigh} overbought)</span>
     <span class="leg-item"><span class="up-t" style="display:inline-flex">${ICON.up}</span>/<span class="dn-t" style="display:inline-flex">${ICON.down}</span> ${P().maFast}MA vs ${P().maSlow}MA</span>
-    <span class="leg-item"><b>X</b>📈 / <b>O</b>📉 point & figure trend: the latest column is rising (X) or falling (O)</span>
     <span class="leg-item"><b>STOP</b> = recommended stop-loss: <b>L</b> for long positions, <b>S</b> for short, ${P().stopMult}× the coin's average daily move from the last daily close (00:00 UTC) · ⚠ past it intraday = watch · 🛑 a daily close past it = suggested exit</span>
     ${edgeLegend()}
     ${['🚀', '😢'].map(e => {
       const ks = NAME_SIGNALS.filter(k => roleOf(k) === e);
-      return ks.length ? `<span class="leg-item">${e} calls: ${ks.map(k => `${MOM_EMO[k] || e} ${legendName(k)}`).join(' · ')}</span>` : '';
+      return ks.length ? `<span class="leg-item">${e} calls: ${ks.map(k => `${LEGEND_EMO[k] || e} ${legendName(k)}`).join(' · ')}</span>` : '';
     }).join('')}`;
 }
 
@@ -1076,7 +1077,7 @@ const chartSwitch = () => `<div class="seg d-switch" role="group" aria-label="Ch
 
 // Point & figure: X = rising column, O = falling column, each box a fixed % move, 3-box reversal (signals.mjs)
 function pnfChart(ind) {
-  const pf = SIG.pointFigure(ind.c);
+  const pfOff = Math.max(0, ind.c.length - SIG.PNF_WINDOW), pf = SIG.pointFigure(ind.c.slice(pfOff));
   if (pf.cols.length < 2) return '<p class="d-src">Not enough movement yet for a point & figure chart.</p>';
   // show the most recent columns, as many as fit in about 40 rows of boxes
   let cols = pf.cols.slice(-36);
@@ -1088,7 +1089,7 @@ function pnfChart(ind) {
   const cw = Math.min(14, (W - PAD_R) / cols.length), ch = Math.min(14, (H - PAD_T) / rows);
   const x0 = W - PAD_R - cw * cols.length;                    // right-align: the latest column sits next to the price labels
   const xc = i => x0 + (i + 0.5) * cw, yc = j => H - (j - lo + 0.5) * ch;
-  const day = i => new Date(ind.t[i]).toISOString().slice(5, 10);
+  const day = i => new Date(ind.t[pfOff + i]).toISOString().slice(5, 10);
   const rx = cw * 0.34, ry = ch * 0.34, sw = Math.max(1.1, Math.min(cw, ch) * 0.14);
   const marks = cols.map((c, i) => {
     const boxes = [];

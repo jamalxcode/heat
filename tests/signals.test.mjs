@@ -81,6 +81,20 @@ test('scoreOf: weights decide 🚀 vs 😢 vs off, and the squeeze never counts'
   assert.equal(sc.squeeze, true);
 });
 
+test('point & figure: scored per day from past closes only, the same way the chart is drawn', () => {
+  const up = Array.from({ length: 300 }, (_, i) => 100 * 1.01 ** i);
+  const a = S.componentsAt(S.series(up, S.DEFAULT_PARAMS), 299, S.DEFAULT_PARAMS);
+  assert.equal(a.pnfUp, true);
+  assert.equal(a.pnfDown, false);
+  assert.ok(S.scoreOf(a, S.DEFAULT_PARAMS).good.includes('pnfUp'), 'a rising column counts as a 🚀 call by default');
+  // no look-ahead: the direction on day 199 ignores the fall that comes after it
+  const zig = [...up.slice(0, 200), ...Array.from({ length: 100 }, (_, i) => up[199] * 0.99 ** (i + 1))];
+  assert.equal(S.pnfDirAt(zig, 199), 'X');
+  assert.equal(S.pnfDirAt(zig, 299), 'O');
+  const cols = S.pointFigure(zig.slice(-S.PNF_WINDOW)).cols;   // what the page's chart shows
+  assert.equal(S.pnfDirAt(zig, 299), cols[cols.length - 1].dir);
+});
+
 test('momentum: +1%/day for 30 days is strong momentum, and it counts as a 🚀 call by default', () => {
   const c = Array.from({ length: 260 }, (_, i) => 100 * 1.01 ** i);   // 30-day move ≈ +34.8%
   const a = S.componentsAt(S.series(c, S.DEFAULT_PARAMS), 259, S.DEFAULT_PARAMS);

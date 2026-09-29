@@ -10,13 +10,13 @@ export const DEFAULT_PARAMS = {
   // Momentum: the coin's move over the last 30 days is above +momPct% (momUp) or below −momPct% (momDown)
   momPct: 20,
   // +1 = counts as a 🚀, -1 = counts as a 😢, 0 = switched off. The tuner may flip or disable a signal.
-  // Only what's shown next to the name is scored: the moving-average trend (🚀 / 😢) and 30-day momentum (🔥 / 🧊).
-  // RSI and Bollinger width stay in the tiles as information: the tuner still measures them and logs what it would
-  // do, but keeps them off.
-  weights: { trendUp: 1, oversold: 0, trendDown: -1, overbought: 0, bbWide: 0, momUp: 1, momDown: -1 },
+  // Only what's shown next to the name is scored: the moving-average trend (🚀 / 😢), the point & figure trend
+  // (X📈 / O📉) and 30-day momentum (🔥 / 🧊). RSI and Bollinger width stay in the tiles as information: the tuner
+  // still measures them and logs what it would do, but keeps them off.
+  weights: { trendUp: 1, oversold: 0, trendDown: -1, overbought: 0, bbWide: 0, momUp: 1, momDown: -1, pnfUp: 1, pnfDown: -1 },
 };
 // The signals that may count as a 🚀 / 😢 call (the tuner can flip or disable them, but never switch on the others)
-export const SCORED = ['trendUp', 'trendDown', 'momUp', 'momDown'];
+export const SCORED = ['trendUp', 'trendDown', 'momUp', 'momDown', 'pnfUp', 'pnfDown'];
 
 // Directional signals: each one adds a 🚀 or a 😢 (or nothing while its weight is 0)
 export const COMPONENTS = {
@@ -27,6 +27,8 @@ export const COMPONENTS = {
   bbWide:     'wide Bollinger band',
   momUp:      'strong 30-day momentum',
   momDown:    'weak 30-day momentum',
+  pnfUp:      'point & figure rising (X column)',
+  pnfDown:    'point & figure falling (O column)',
 };
 
 // Stop distances the tuner compares (× the average daily move)
@@ -116,7 +118,10 @@ export function componentsAt(s, i, p) {
   const c = s.c[i], r = s.rsi[i], f = s.maF[i], sl = s.maS[i], q = s.bbPct[i];
   const trend = f != null && sl != null;
   const m30 = i >= 30 ? (c / s.c[i - 30] - 1) * 100 : null;
+  const pf = pnfDirAt(s.c, i);
   return {
+    pnfUp:      pf ? pf === 'X' : null,
+    pnfDown:    pf ? pf === 'O' : null,
     momUp:      m30 != null ? m30 >= P.momPct : null,
     momDown:    m30 != null ? m30 <= -P.momPct : null,
     trendUp:    trend ? f > sl && c > f : null,
@@ -158,6 +163,20 @@ export function stopLevels(closes, i, p) {
 }
 
 /* ---------- point & figure ---------- */
+// The page draws P&F from the last PNF_WINDOW daily closes. To score it without looking ahead, the direction on each
+// past day is worked out the same way: from the PNF_WINDOW closes up to that day, with the box size from that
+// window's own last 60 days. It doesn't depend on any tuned setting, so it's cached per price series.
+export const PNF_WINDOW = 260;
+const PNF_CACHE = new WeakMap();
+export function pnfDirAt(closes, i) {
+  let m = PNF_CACHE.get(closes);
+  if (!m) PNF_CACHE.set(closes, m = new Map());
+  if (!m.has(i)) {
+    const cols = pointFigure(closes.slice(Math.max(0, i - PNF_WINDOW + 1), i + 1)).cols;
+    m.set(i, cols.length ? cols[cols.length - 1].dir : null);
+  }
+  return m.get(i);
+}
 // Box size from the coin's own volatility: its average daily move over the last 60 closes, snapped to a clean step.
 // About 1-1.5% for BTC and 2-3% for a typical coin, so every chart has a readable number of columns.
 const PNF_STEPS = [0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
@@ -420,6 +439,11 @@ function selectParams(cur, rowsFor, until, minT) {
     if (u.n >= 20 && d.n >= 20 && (!bestMom || t > bestMom.t)) bestMom = { momPct, u, d, t };
   }
   if (bestMom) { next.momPct = bestMom.momPct; setSign('momUp', bestMom.u); setSign('momDown', bestMom.d); }
+
+  // Point & figure trend (X📈 / O📉): nothing to tune, only whether a rising / falling column is a 🚀, a 😢 or off
+  const pfRows = rowsFor(next), pu = effect(pfRows, 'pnfUp'), pd = effect(pfRows, 'pnfDown');
+  if (pu.n >= 20) setSign('pnfUp', pu);
+  if (pd.n >= 20) setSign('pnfDown', pd);
   return { params: next, notes };
 }
 
