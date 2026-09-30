@@ -42,7 +42,9 @@ jobs:
         run: |
           mkdir -p _site
           mkdir -p _site/scripts
-          cp index.html signals.mjs _site/
+          cp index.html signals.mjs robots.txt og-image.png _site/
+          # sitemap for search engines: one page, whose data changes every day
+          printf '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>https://heat.sala.company/</loc><lastmod>%s</lastmod><changefreq>hourly</changefreq></url>\n</urlset>\n' "$(date -u +%F)" > _site/sitemap.xml
           cp scripts/build-data.mjs _site/scripts/   # the page runs it itself if data.json ever goes stale
           [ -f data/scorecard.json ] && cp data/scorecard.json _site/ || true
           [ -f data/pairs.json ] && cp data/pairs.json _site/ || true

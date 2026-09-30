@@ -3,9 +3,60 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>heat.sala.company</title>
-<meta name="description" content="heat.sala.company: crypto heatmap of the top 100 coins by market cap (stablecoins excluded), with RSI, 50/200-day MA trend, Bollinger Band width and point & figure trend in every tile. Refreshed every 10 minutes.">
-<meta property="og:title" content="heat.sala.company">
+<title>Crypto Heatmap: Top 100 Coins, RSI &amp; Trend | heat.sala.company</title>
+<meta name="description" content="Free crypto heatmap of the top 100 coins: price moves, RSI, 50/200-day trend, point &amp; figure and suggested stop-losses. Updated every 10 minutes.">
+<link rel="canonical" href="https://heat.sala.company/">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="author" content="sala.company">
+<!-- link previews (Open Graph / X) -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="heat.sala.company">
+<meta property="og:url" content="https://heat.sala.company/">
+<meta property="og:title" content="Crypto Heatmap: Top 100 Coins with RSI, Trend &amp; Stop-Losses">
+<meta property="og:description" content="The top 100 coins by market cap at a glance: price heat, RSI, 50/200-day trend, Bollinger width, point &amp; figure and suggested stop-losses. Refreshed every 10 minutes.">
+<meta property="og:image" content="https://heat.sala.company/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The heat.sala.company crypto heatmap: tiles for Bitcoin, Ethereum and other top coins, colored by 24-hour change">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Crypto Heatmap: Top 100 Coins with RSI, Trend &amp; Stop-Losses">
+<meta name="twitter:description" content="Price heat, RSI, 50/200-day trend, Bollinger width, point &amp; figure and suggested stop-losses for the top 100 coins. Refreshed every 10 minutes.">
+<meta name="twitter:image" content="https://heat.sala.company/og-image.png">
+<!-- structured data: what this page is, plus the FAQ shown in the footer -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebApplication",
+      "name": "heat.sala.company crypto heatmap",
+      "url": "https://heat.sala.company/",
+      "image": "https://heat.sala.company/og-image.png",
+      "applicationCategory": "FinanceApplication",
+      "operatingSystem": "Any (web browser)",
+      "isAccessibleForFree": true,
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "description": "A crypto heatmap of the top 100 coins by market cap, stablecoins excluded. Each tile shows the price move, RSI, the 50/200-day moving-average trend, Bollinger Band width, point & figure trend, 30-day momentum and suggested stop-losses. Data refreshes every 10 minutes, and a daily scorecard checks how the signals did.",
+      "publisher": { "@type": "Organization", "name": "sala.company", "url": "https://sala.company/" }
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        { "@type": "Question", "name": "What does the crypto heatmap show?",
+          "acceptedAnswer": { "@type": "Answer", "text": "The top 100 coins by market cap, stablecoins excluded. Each tile is colored by its 24-hour, 7-day or 30-day price change and shows RSI, the 50/200-day moving-average trend, Bollinger Band width, the point & figure trend, 30-day momentum and suggested long and short stop-losses." } },
+        { "@type": "Question", "name": "How often is the data updated?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Every 10 minutes. Prices are not real-time. Market data is powered by CoinGecko, with daily candles from Binance, Gate.io, OKX, MEXC and KuCoin." } },
+        { "@type": "Question", "name": "What do the rocket and sad-face emoji mean?",
+          "acceptedAnswer": { "@type": "Answer", "text": "A rocket marks a strong 50/200-day uptrend and a sad face a strong downtrend. X and O show the point & figure trend, and fire and ice show strong or weak 30-day momentum. A daily scorecard checks whether these calls predicted the next moves; so far they show no reliable edge, so treat them as hints, not advice." } },
+        { "@type": "Question", "name": "How are the recommended stop-losses set?",
+          "acceptedAnswer": { "@type": "Answer", "text": "From the last daily close (00:00 UTC), a multiple of the coin's average daily move over the last 20 days: below the close for long positions and above it for short positions. They are suggested levels only; set real stops on your exchange." } },
+        { "@type": "Question", "name": "Is this financial advice?",
+          "acceptedAnswer": { "@type": "Answer", "text": "No. It is an experimental, work-in-progress tool. Data can be late, wrong or missing." } }
+      ]
+    }
+  ]
+}
+</script>
 <meta name="theme-color" content="#b3161b">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='88'%3E%F0%9F%94%A5%3C/text%3E%3C/svg%3E">
 <style>
@@ -357,6 +408,10 @@ td .cell-heat { display: inline-block; padding: 1px 6px; border-radius: 4px; bac
 }
 footer { margin-top: 28px; color: var(--muted); font-size: 12px; display: grid; gap: 6px; }
 footer details summary { cursor: pointer; }
+footer .about { max-width: 820px; margin: 8px 0; color: var(--ink-2); font-size: 13px; line-height: 1.5; }
+footer .about h2 { font-size: 16px; margin: 0 0 6px; color: var(--ink); }
+footer .about h3 { font-size: 13.5px; margin: 12px 0 2px; color: var(--ink); }
+footer .about p { margin: 0; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
@@ -418,10 +473,24 @@ footer details summary { cursor: pointer; }
   </main>
 
   <footer>
-    <div><b>heat.sala.company</b>: a crypto heatmap of the top 100 coins by market cap, stablecoins excluded, with RSI(14), the 50/200-day MA trend, Bollinger Band width, point &amp; figure trend and 30-day momentum in every tile.</div>
     <div><b>How to read a tile.</b> <b>RSI</b>: below the lower line is <i>oversold</i> and above the upper line is <i>overbought</i> (the exact levels are in the legend and can be retuned). The marker shows where RSI sits on 0–100.
       <b>Trend</b>: the fast moving average above the slow one (50/200-day by default) is an uptrend, below is a downtrend. The note says whether price agrees ("strong") or not ("pullback" / "bounce"). ✦ marks a golden or death cross in the last 14 days.
       <b>BB width</b>: (upper − lower) / middle band, ranked against the last 180 days. Bottom 25% is a <i>squeeze</i> (volatility is compressed, and a big move often follows, in either direction). Top 20% is <i>expanded</i>.</div>
+    <!-- About + FAQ: plain text for readers and search engines (the same questions as the FAQ structured data above) -->
+    <section class="about" aria-labelledby="about-h">
+      <h2 id="about-h">About this crypto heatmap</h2>
+      <p>heat.sala.company is a free crypto heatmap of the top 100 cryptocurrencies by market cap, including Bitcoin (BTC), Ethereum (ETH), Solana (SOL), XRP, BNB and Cardano (ADA). It combines the price move with technical indicators and suggested stop-losses in one view, and a daily scorecard checks how its signals actually did.</p>
+      <h3>What does the crypto heatmap show?</h3>
+      <p>The top 100 coins by market cap, stablecoins excluded. Each tile is colored by its 24-hour, 7-day or 30-day price change and shows RSI, the 50/200-day moving-average trend, Bollinger Band width, the point &amp; figure trend, 30-day momentum and suggested long and short stop-losses.</p>
+      <h3>How often is the data updated?</h3>
+      <p>Every 10 minutes. Prices are not real-time. Market data is powered by CoinGecko, with daily candles from Binance, Gate.io, OKX, MEXC and KuCoin.</p>
+      <h3>What do the rocket and sad-face emoji mean?</h3>
+      <p>A rocket marks a strong 50/200-day uptrend and a sad face a strong downtrend. X and O show the point &amp; figure trend, and fire and ice show strong or weak 30-day momentum. A daily scorecard checks whether these calls predicted the next moves; so far they show no reliable edge, so treat them as hints, not advice.</p>
+      <h3>How are the recommended stop-losses set?</h3>
+      <p>From the last daily close (00:00 UTC), a multiple of the coin's average daily move over the last 20 days: below the close for long positions and above it for short positions. They are suggested levels only; set real stops on your exchange.</p>
+      <h3>Is this financial advice?</h3>
+      <p>No. It is an experimental, work-in-progress tool. Data can be late, wrong or missing.</p>
+    </section>
     <div id="srcinfo"></div>
     <details id="excluded"><summary>Excluded tokens</summary><div></div></details>
     <div class="cg-foot">Market data <a href="https://www.coingecko.com/" target="_blank" rel="noopener"><b>Powered by CoinGecko</b></a>.</div>

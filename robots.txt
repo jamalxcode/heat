@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://heat.sala.company/sitemap.xml

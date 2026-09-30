@@ -84,7 +84,8 @@ GitHub Actions: daily 00:20 UTC (via cron-job.org)
 
 | File | What it is |
 |---|---|
-| `index.html` | The whole site (HTML, CSS and JS in one page) |
+| `index.html` | The whole site (HTML, CSS and JS in one page), including its search and link-preview tags |
+| `og-image.png`, `robots.txt` | The link-preview image and the robots file, published with the site (the deploy job also writes `sitemap.xml`) |
 | `signals.mjs` | The shared signal engine: indicators, 🚀/😢/⚡ rules, scoring stats, tuner. Used by the page, the scorer and the tuner, so they always agree. |
 | `tests/signals.test.mjs` | Unit tests: RSI against the StockCharts worked example, Bollinger/SMA against hand-computed values, scoring and tuning sanity checks |
 | `scripts/build-data.mjs` | Builds `data.json`: top-250 rankings plus 260 daily closes for the top 150 (enough for 100 after exclusions), with fallbacks across six data sources |
@@ -110,6 +111,15 @@ GitHub Actions: daily 00:20 UTC (via cron-job.org)
 - **Manual runs:** go to **Actions → Update heatmap data → Run workflow**, or **Actions → Score signals → Run workflow**. Tick *"Run the tuner now"* to tune immediately.
 - **Locally:** `node scripts/build-data.mjs data.json`, then serve the folder (for example `npx serve .`). Scoring: `node scripts/score.mjs --tune` (needs the live `data.json`, via `SITE_URL`). Tests: `npm test` (unit) and `npm run test:e2e` (browser). Preview with test data: `npm run dev`.
 - **Timers:** GitHub's own schedules proved unreliable (about 1 run in 15, and no daily runs), so **cron-job.org** starts both workflows through GitHub's API, using a fine-grained token limited to this repo (Actions: read and write). The token expires in September 2027 and must then be renewed in both cron-job.org jobs. GitHub's schedules stay on as a backup, and the page's in-browser fallback covers any gaps.
+
+## Search engines and link previews
+
+- **Title and description** are written for search results: "Crypto Heatmap: Top 100 Coins, RSI & Trend", under Google's length limits.
+- **Canonical URL** `https://heat.sala.company/` and `robots` allowing indexing.
+- **Link previews** (Open Graph and X): `og-image.png`, a 1200×630 screenshot of the heatmap. To refresh it, take a new 1200×630 screenshot of the page and replace the file.
+- **Structured data** (JSON-LD): a `WebApplication` and an `FAQPage`. The FAQ questions are also shown as plain text in the **About this crypto heatmap** section at the bottom of the page, because Google wants FAQ markup to match visible text.
+- **`robots.txt`** (in the repo) and **`sitemap.xml`** (written by the deploy job with today's date) are published with the site.
+- To get it indexed faster, add the site in **Google Search Console** and submit `https://heat.sala.company/sitemap.xml`. The domain is already verified for GitHub, but Search Console needs its own verification (a TXT record at GoDaddy).
 
 ## Hosting setup
 

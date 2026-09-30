@@ -47,6 +47,20 @@ test('compact top: coins start in the top third of a 13-inch screen; the full le
   await expect(page.locator('#legendMore')).toBeHidden();
 });
 
+test('SEO: title, description, canonical, share image, valid structured data matching the visible FAQ, robots.txt', async ({ page, request }) => {
+  await expect(page).toHaveTitle(/Crypto Heatmap/);
+  expect((await page.title()).length).toBeLessThanOrEqual(65);
+  const desc = await page.locator('meta[name="description"]').getAttribute('content');
+  expect(desc.length).toBeLessThanOrEqual(160);
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://heat.sala.company/');
+  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', /og-image\.png$/);
+  const ld = JSON.parse(await page.locator('script[type="application/ld+json"]').textContent());
+  const faq = ld['@graph'].find(x => x['@type'] === 'FAQPage').mainEntity.map(q => q.name);
+  expect(await page.locator('footer .about h3').allTextContents()).toEqual(faq);     // Google wants FAQ markup to be visible text
+  expect((await request.get('/og-image.png')).status()).toBe(200);
+  expect(await (await request.get('/robots.txt')).text()).toContain('Sitemap: https://heat.sala.company/sitemap.xml');
+});
+
 test('CoinGecko attribution is shown (required for the free API key)', async ({ page }) => {
   for (const where of ['#fresh', 'footer']) {
     const link = page.locator(`${where} a[href="https://www.coingecko.com/"]`);
