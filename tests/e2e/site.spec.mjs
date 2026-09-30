@@ -86,6 +86,28 @@ test('filters show only matching coins, and "All coins" restores them', async ({
   await expect(tiles(page)).toHaveCount(N);
 });
 
+test('color scale: clicking a range shows only coins in it; again (or All coins) shows every coin', async ({ page }) => {
+  const ranges = page.locator('#legendScale [data-heat]');
+  await expect(ranges).toHaveCount(9);
+  let total = 0;
+  for (let i = 0; i < 9; i++) {
+    const r = ranges.nth(i), k = await r.getAttribute('data-heat');
+    await r.click();
+    await expect(ranges.nth(i)).toHaveAttribute('aria-pressed', 'true');
+    const n = await tiles(page).count();
+    total += n;
+    if (n) expect(await tiles(page).evaluateAll((els, k) => els.every(t => t.classList.contains(k)), k)).toBe(true);   // every tile is in that band
+    else await expect(page.locator('#grid .empty')).toContainText('change of');
+    await ranges.nth(i).click();                                              // again: back to all
+    await expect(tiles(page)).toHaveCount(N);
+  }
+  expect(total).toBe(N);                                                      // the nine ranges cover every coin once
+  await ranges.nth(4).click();                                                // ±1, then "All coins" clears it
+  await page.locator('#filters .chip[data-f="all"]').click();
+  await expect(tiles(page)).toHaveCount(N);
+  await expect(page.locator('#legendScale [aria-pressed="true"]')).toHaveCount(0);
+});
+
 test('filter counts match the tiles as soon as the page loads', async ({ page }) => {
   const shown = await page.locator('#grid .tile.stop-closed').count();
   await expect(page.locator('#filters .chip[data-f="stop"] .n')).toHaveText(String(shown));

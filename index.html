@@ -248,7 +248,7 @@ button.sc-chip:hover, button.sc-chip[aria-expanded="true"] { box-shadow: inset 0
 .edge-badge.ok { border-color: var(--green); }
 .edge-badge.weak { border-color: var(--amber); }
 .scale { display: inline-flex; flex-wrap: wrap; align-items: stretch; gap: 2px; max-width: 100%; }
-.scale span { min-width: 40px; padding: 3px 4px; text-align: center; border-radius: 4px; color: var(--ink); font-variant-numeric: tabular-nums; font-size: 11px; }
+.scale > * { min-width: 40px; padding: 3px 4px; text-align: center; border-radius: 4px; color: var(--ink); font-variant-numeric: tabular-nums; font-size: 11px; }
 .leg-item { display: inline-flex; align-items: center; gap: 6px; }
 /* phones: filter chips become one swipeable row, and the top bar, controls and scale tighten up */
 @media (max-width: 640px) {
@@ -258,7 +258,7 @@ button.sc-chip:hover, button.sc-chip[aria-expanded="true"] { box-shadow: inset 0
   .chip { flex: none; }
   .status { gap: 6px; }
   .status .btn { padding: 3px 8px; }
-  .scale span { flex: 1 1 0; min-width: 0; padding: 2px 1px; font-size: 9.5px; letter-spacing: -0.02em; }
+  .scale > * { flex: 1 1 0; min-width: 0; padding: 2px 1px; font-size: 9.5px; letter-spacing: -0.02em; }
   #legendScale .scale { flex: 1 1 100%; flex-wrap: nowrap; }
   #legendScale { flex: 1 1 100%; flex-wrap: wrap; gap: 4px; }
 }
@@ -274,8 +274,13 @@ button.sc-chip:hover, button.sc-chip[aria-expanded="true"] { box-shadow: inset 0
 .h2  { --tint: #a9d7f5; --tint-ink: #06182b; }
 .h3  { --tint: #4aa8e8; --tint-ink: #031c30; }
 .h4  { --tint: #0077be; --tint-ink: #ffffff; }
-.scale span, .cell-heat { color: var(--tint-ink); }
-.scale span { background: var(--tint); }
+.scale > *, .cell-heat { color: var(--tint-ink); }
+.scale > * { background: var(--tint); }
+/* each range on the scale is a button: it shows only the coins in that color band (click again for all) */
+.scale > button { border: 0; font-family: inherit; cursor: pointer; line-height: inherit; }
+.scale > button:hover { box-shadow: inset 0 0 0 2px var(--ink); }
+.scale > button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--ink), 0 0 0 1px var(--surface); font-weight: 700; }
+.scale.picking > button[aria-pressed="false"] { opacity: .45; }
 
 /* ---------- grid + tiles ---------- */
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 8px; }
@@ -851,7 +856,8 @@ function renderLegend() {
     ['h-4', `≤ −${t[3]}`], ['h-3', `−${t[2]}…${t[3]}`], ['h-2', `−${t[1]}…${t[2]}`], ['h-1', `−${t[0]}…${t[1]}`], ['h0', `±${t[0]}`],
     ['h1', `${t[0]}…${t[1]}`], ['h2', `${t[1]}…${t[2]}`], ['h3', `${t[2]}…${t[3]}`], ['h4', `≥ +${t[3]}`],
   ];
-  $('#legendScale').innerHTML = `${S.colorBy} change % <span class="scale">${cells.map(([k, l]) => `<span class="${k}">${l}</span>`).join('')}</span>`;
+  $('#legendScale').innerHTML = `${S.colorBy} change % <span class="scale${S.heat ? ' picking' : ''}" role="group" aria-label="Show only coins in this ${S.colorBy} range">${cells.map(([k, l]) =>
+    `<button type="button" class="${k}" data-heat="${k}" aria-pressed="${S.heat === k}" title="Show only coins with a ${S.colorBy} change of ${l}%">${l}</button>`).join('')}</span>`;
   $('#legendEdge').innerHTML = edgeBadge();
   $('#legendMore').innerHTML = `
     <span class="leg-item"><span class="gauge" style="width:60px;flex:none"><i style="left:50%"></i></span> RSI 0–100 (under ${P().rsiLow} oversold · over ${P().rsiHigh} overbought)</span>
@@ -866,8 +872,11 @@ function renderLegend() {
 
 // Highlight buttons filter the coins: non-matching ones are left out entirely ("All coins" brings them back)
 const FILTER_WORDS = { os: 'oversold', ob: 'overbought', up: 'in an uptrend', down: 'in a downtrend', sq: 'in a squeeze', cross: 'showing a recent moving-average cross', stop: 'past a recommended stop' };
-const visibleCoins = () => S.filter === 'all' ? S.coins : S.coins.filter(c => match(S.ind[c.id], S.filter));
-const emptyHTML = () => `<div class="empty">No coins are ${FILTER_WORDS[S.filter] || 'matching'} right now. <button class="btn" data-show-all>Show all coins</button></div>`;
+// A range on the color scale (S.heat, e.g. 'h-3') narrows it further to coins in that color band
+const inHeat = c => !S.heat || heatClass(chgOf(c, S.colorBy), S.colorBy) === S.heat;
+const visibleCoins = () => S.coins.filter(c => (S.filter === 'all' || match(S.ind[c.id], S.filter)) && inHeat(c));
+const heatWords = () => { const b = $(`#legendScale [data-heat="${S.heat}"]`); return b ? `with a ${S.colorBy} change of ${b.textContent}%` : ''; };
+const emptyHTML = () => `<div class="empty">No coins are ${[S.filter !== 'all' && (FILTER_WORDS[S.filter] || 'matching'), S.heat && heatWords()].filter(Boolean).join(' and ') || 'matching'} right now. <button class="btn" data-show-all>Show all coins</button></div>`;
 
 function renderGrid() {
   const list = visibleCoins();
@@ -1464,6 +1473,7 @@ $('#scorewrap').addEventListener('click', e => {
 });
 function setFilter(f) {
   S.filter = f;
+  if (f === 'all') S.heat = null;               // "All coins" / "Show all coins" also clears a color-scale range
   $$('#filters .chip').forEach(x => x.setAttribute('aria-pressed', x.dataset.f === S.filter));
   hideDetail(true);
   renderAll();
@@ -1472,6 +1482,13 @@ function setFilter(f) {
 $('#filters').addEventListener('click', e => {
   const b = e.target.closest('.chip'); if (!b) return;
   setFilter(S.filter === b.dataset.f && b.dataset.f !== 'all' ? 'all' : b.dataset.f);
+});
+// Color scale: click a range to show only coins in it; click it again to show every coin
+$('#legendScale').addEventListener('click', e => {
+  const b = e.target.closest('[data-heat]'); if (!b) return;
+  S.heat = S.heat === b.dataset.heat ? null : b.dataset.heat;
+  hideDetail(true);
+  renderAll();
 });
 document.addEventListener('click', e => {
   if (e.target.closest('[data-show-all]')) setFilter('all');

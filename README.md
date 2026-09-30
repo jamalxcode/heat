@@ -44,7 +44,7 @@ Click the popup (or the tile) to pin it open, and click outside it to close it. 
 
 **Top of the page.** One slim bar: the title, when the data was last refreshed (and that it is **not real-time**), the coin count, the refresh countdown, theme and WIP buttons. Below it, one row of controls: color by 24h / 7d / 30d, Grid / Table / Scorecard, the filter buttons and the Stablecoins checkbox. On phones the filter buttons are one swipeable row.
 
-**Filters.** The filter buttons (Oversold, Overbought, Uptrend, Downtrend, Squeeze, Recent cross, 🛑 Past stop) show only the matching coins, in both grid and table. Each button shows its count. **All coins** (or clicking the active button again) brings everything back.
+**Filters.** The filter buttons (Oversold, Overbought, Uptrend, Downtrend, Squeeze, Recent cross, 🛑 Past stop) show only the matching coins, in both grid and table. Each button shows its count. **All coins** (or clicking the active button again) brings everything back. **Color scale:** click a range on the scale (e.g. "≤ −10" or "±1") to show only the coins in that color band. It combines with the filter buttons; click the range again, or **All coins**, to show everything.
 
 The **Table** view sorts by any column, including the recommended stops. The **Scorecard** view shows how the signals have actually performed.
 
