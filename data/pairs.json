@@ -592,6 +592,12 @@
    "KuCoin": "SPX",
    "Gate.io": "SPX",
    "MEXC": "SPX"
+  },
+  "falcon-finance-ff": {
+   "Binance": "FF",
+   "Gate.io": "FF",
+   "MEXC": "FF",
+   "KuCoin": "FF"
   }
  }
 }
