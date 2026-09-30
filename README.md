@@ -14,14 +14,14 @@ A crypto heatmap of the top 100 coins by market cap, with stablecoins, tokenized
 - **Bollinger Band width (20, 2)**: ranked against its last 180 days. The bottom 25% is tagged *Squeeze*: volatility is compressed and a big move often follows, in either direction.
 - **🚀 / 😢 next to the name**: the **50/200 moving-average trend**. 🚀 is a strong uptrend (fast MA above slow, price above both), and 😢 is a strong downtrend. RSI and Bollinger width are shown in the tile rows and the chart, not as emoji.
 - **🔥 / 🧊 at the end**: **30-day momentum**. 🔥 means the coin is up more than 20% over 30 days, and 🧊 means it's down more than 20%. Hover for the exact move.
-- **What gets scored:** everything next to the name. The Scorecard judges the MA trend, the P&F trend and momentum: X📈 and 🔥 count as 🚀 calls, O📉 and 🧊 as 😢 calls. So its track record describes exactly what you see. For P&F, each past day is judged from the chart as it looked that day (its own 260 closes and box size), so the backtest never peeks ahead. The weekly tuner can change the MA pair and the momentum threshold, flip a role, or switch a signal off (its emoji then disappears). The legend shows the current rules and the **90-day track record**. While that shows no proven edge, the emoji are **dimmed**, as hints rather than calls.
+- **What gets scored:** everything next to the name. The Scorecard judges the MA trend, the P&F trend and momentum: X📈 and 🔥 count as 🚀 calls, O📉 and 🧊 as 😢 calls. So its track record describes exactly what you see. For P&F, each past day is judged from the chart as it looked that day (its own 260 closes and box size), so the backtest never peeks ahead. The weekly tuner can change the MA pair and the momentum threshold, flip a role, or switch a signal off (its emoji then disappears). The legend line shows a track-record badge ("🚀/😢: no proven edge yet", linking to the Scorecard); **ⓘ How to read** opens the full legend with the current rules and the **90-day track record** (it stays open or closed per browser). While that shows no proven edge, the emoji are **dimmed**, as hints rather than calls.
 - **X📈 / O📉 after the emoji**: the **point & figure trend**, from the same chart as the popup's P&F view. X📈 means the latest column is rising, and O📉 means it's falling. Hover it for the column's size, when it started, the price for the next box and for a flip, and the latest buy/sell signal. It counts as a 🚀 (X) or 😢 (O) call.
 - **Recommended stop-loss** for **long** and **short** positions (the STOP row):
   - distance = **2× the coin's average daily move** over the last 20 days: about 3% for BTC, about 7% for a typical coin. The weekly tuner compares 1.5×, 2× and 2.5× and switches only if another distance's exits saved more in 2 of 3 check periods.
   - set once a day from the last daily close: exit a long below it, or a short above it
   - ⚠️ when price is within a quarter of the distance
   - **⚠ past the stop intraday** (amber border): the live price is beyond today's stop, but no daily close has confirmed it. Watch the 00:00 UTC close.
-  - **🛑 closed past the stop** (red border): the last daily close finished beyond the stop that applied that day. This is the suggested exit, and it's what the scorecard measures. The **🛑 Closed past stop** filter lists these coins.
+  - **🛑 closed past the stop** (red border): the last daily close finished beyond the stop that applied that day. This is the suggested exit, and it's what the scorecard measures. The **🛑 Past stop** filter lists these coins.
   - shown in the tile, the table, and the detail chart (as lines). These are suggested levels only: the page isn't real-time, so set stops on your exchange.
 
 - **✓ / ? next to the ticker**: ✓ means the coin's price history comes from an exchange pair confirmed by its CoinGecko ID. ? means it was matched by ticker only (a best guess, checked against the price). Hover the mark to see the exchange and pair.
@@ -42,7 +42,9 @@ Hovering is built so the popup never gets in the way of the coin you're reaching
 
 Click the popup (or the tile) to pin it open, and click outside it to close it. On phones, tapping a tile opens the same details as a bottom sheet.
 
-**Filters.** The Highlight buttons (Oversold, Overbought, Uptrend, Downtrend, Squeeze, Recent cross, 🛑 Stop crossed) show only the matching coins, in both grid and table. Each button shows its count. **All coins** (or clicking the active button again) brings everything back.
+**Top of the page.** One slim bar: the title, when the data was last refreshed (and that it is **not real-time**), the coin count, the refresh countdown, theme and WIP buttons. Below it, one row of controls: color by 24h / 7d / 30d, Grid / Table / Scorecard, the filter buttons and the Stablecoins checkbox. On phones the filter buttons are one swipeable row.
+
+**Filters.** The filter buttons (Oversold, Overbought, Uptrend, Downtrend, Squeeze, Recent cross, 🛑 Past stop) show only the matching coins, in both grid and table. Each button shows its count. **All coins** (or clicking the active button again) brings everything back.
 
 The **Table** view sorts by any column, including the recommended stops. The **Scorecard** view shows how the signals have actually performed.
 

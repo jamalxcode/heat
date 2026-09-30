@@ -93,11 +93,11 @@ button, select, input { font: inherit; color: inherit; }
 .wrap { max-width: 1440px; margin: 0 auto; padding: 20px 16px 48px; }
 
 /* ---------- header ---------- */
-header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; margin-bottom: 16px; }
-h1 { font-size: 26px; line-height: 1.15; margin: 0 0 4px; letter-spacing: -0.02em; }
-.brand { display: flex; align-items: center; gap: 14px; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; margin-bottom: 10px; }
+h1 { font-size: 22px; line-height: 1.15; margin: 0; letter-spacing: -0.02em; white-space: nowrap; }
+.brand { display: flex; align-items: center; gap: 10px; flex: none; }
 .logo {
-  flex: none; width: 50px; height: 50px; border-radius: 15px; display: grid; place-items: center; font-size: 28px;
+  flex: none; width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; font-size: 20px;
   background: radial-gradient(circle at 50% 78%, #ffd36b 0%, #ff7a1a 30%, #d8261c 62%, #3a0a0c 100%);
   box-shadow: 0 0 0 1px rgba(255,122,26,.35), 0 6px 22px rgba(255,90,20,.45), inset 0 1px 0 rgba(255,255,255,.25);
 }
@@ -105,14 +105,13 @@ h1 { font-size: 26px; line-height: 1.15; margin: 0 0 4px; letter-spacing: -0.02e
 @keyframes flicker { 0%, 100% { transform: scale(1) rotate(-3deg); } 35% { transform: scale(1.07) rotate(2deg); } 70% { transform: scale(.97) rotate(-1deg); } }
 h1 .heat { font-weight: 800; background: linear-gradient(90deg, #ff9a1a, #e0301e 55%, #9b1c1c); -webkit-background-clip: text; background-clip: text; color: transparent; }
 h1 .tld { color: var(--ink-2); font-weight: 600; }
-.fresh { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid #0077be; border-radius: 10px; padding: 8px 12px; margin: 0 0 12px; font-size: 13px; color: var(--ink-2); }
+/* when the data was refreshed: a line of text in the top bar (an amber box only when an update is running late) */
+.fresh { flex: 1 1 320px; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; font-size: 12.5px; color: var(--ink-2); }
 .fresh b { color: var(--ink); }
-.fresh .cg-attr { margin-left: auto; flex: none; white-space: nowrap; font-size: 12px; color: var(--ink-2); text-decoration: none; border-bottom: 1px solid var(--axis); }
+.fresh .cg-attr { flex: none; white-space: nowrap; font-size: 12px; color: var(--ink-2); text-decoration: none; border-bottom: 1px solid var(--axis); }
 .fresh .cg-attr:hover { color: var(--ink); }
 .cg-foot a { color: inherit; }
-@media (max-width: 640px) { .fresh { flex-wrap: wrap; } .fresh .cg-attr { margin-left: 26px; } }
-.fresh .f-ic { font-size: 16px; }
-.fresh.late { border-left-color: var(--amber); }
+.fresh.late { background: color-mix(in oklab, var(--amber) 16%, var(--surface)); border: 1px solid var(--amber); border-radius: 8px; padding: 4px 10px; }
 /* work-in-progress notice: floating card, never blocks the page */
 .wip {
   position: fixed; z-index: 30; top: 14px; left: 50%; width: min(560px, calc(100vw - 32px));
@@ -175,21 +174,40 @@ button.sc-chip:hover, button.sc-chip[aria-expanded="true"] { box-shadow: inset 0
 .btn:focus-visible, .chip:focus-visible, .seg button:focus-visible, .tile:focus-visible, th button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 
 /* ---------- controls (one filter row) ---------- */
-.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 12px; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 6px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px; }
 .ctl { display: flex; align-items: center; gap: 8px; }
 .ctl > .lab { color: var(--muted); font-size: 12px; }
 .seg { display: inline-flex; background: var(--neutral); border-radius: 8px; padding: 2px; }
 .seg button { border: 0; background: transparent; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--ink-2); }
 .seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); font-weight: 600; }
-.chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.chip { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 3px 10px; cursor: pointer; font-size: 12.5px; color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chip { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 3px 8px; cursor: pointer; font-size: 12.5px; color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; }
 .chip[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
 .chip .n { font-variant-numeric: tabular-nums; opacity: .7; }
 .check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); cursor: pointer; }
 .spacer { flex: 1; }
 
 /* ---------- legend ---------- */
-.legend { display: flex; flex-wrap: wrap; gap: 10px 28px; align-items: center; margin: 0 2px 14px; font-size: 12px; color: var(--ink-2); }
+.legend { margin: 0 2px 10px; font-size: 12px; color: var(--ink-2); }
+.leg-line { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; }
+.leg-line .leg-toggle { margin-left: auto; padding: 2px 10px; font-size: 12px; }
+.leg-more { display: flex; flex-wrap: wrap; gap: 8px 28px; align-items: center; margin-top: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.leg-more[hidden] { display: none; }
+.edge-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--ink-2); text-decoration: none; }
+.edge-badge.ok { border-color: var(--green); }
+.edge-badge.weak { border-color: var(--amber); }
+/* phones: filter chips become one swipeable row, and the top bar, controls and scale tighten up */
+@media (max-width: 640px) {
+  .controls .ctl { flex: 1 1 100%; min-width: 0; }
+  .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip { flex: none; }
+  .status { gap: 6px; }
+  .status .btn { padding: 3px 8px; }
+  .scale span { flex: 1 1 0; min-width: 0; padding: 2px 1px; font-size: 9.5px; letter-spacing: -0.02em; }
+  #legendScale .scale { flex: 1 1 100%; flex-wrap: nowrap; }
+  #legendScale { flex: 1 1 100%; flex-wrap: wrap; gap: 4px; }
+}
 .scale { display: inline-flex; flex-wrap: wrap; align-items: stretch; gap: 2px; max-width: 100%; }
 .scale span { min-width: 40px; padding: 3px 4px; text-align: center; border-radius: 4px; color: var(--ink); font-variant-numeric: tabular-nums; font-size: 11px; }
 .leg-item { display: inline-flex; align-items: center; gap: 6px; }
@@ -345,14 +363,13 @@ footer details summary { cursor: pointer; }
 </head>
 <body>
 <div class="wrap">
+  <!-- One slim top bar: title · when the data was refreshed (not real-time) · status and buttons -->
   <header>
     <div class="brand">
       <span class="logo" aria-hidden="true"><span>🔥</span></span>
-      <div>
-        <h1><span class="heat">heat</span><span class="tld">.sala.company</span></h1>
-        <p class="sub">Crypto heatmap of the top 100 by market cap, stablecoins excluded · RSI(14), 50/200-day MA trend and Bollinger Band width in every tile</p>
-      </div>
+      <h1 title="Crypto heatmap of the top 100 coins by market cap, stablecoins excluded"><span class="heat">heat</span><span class="tld">.sala.company</span></h1>
     </div>
+    <div class="fresh" id="fresh" role="status"><span>Loading prices…</span></div>
     <div class="status">
       <span id="status"><span class="dot"></span>Starting…</span>
       <button class="btn" id="refresh" title="Fetch fresh data">↻ Refresh</button>
@@ -361,18 +378,19 @@ footer details summary { cursor: pointer; }
     </div>
   </header>
 
-  <div class="fresh" id="fresh" role="status"><span class="f-ic" aria-hidden="true">🕒</span><span>Loading prices…</span></div>
-
   <div class="controls" role="toolbar" aria-label="Heatmap controls">
-    <div class="ctl"><span class="lab">Color by</span>
-      <div class="seg" id="colorBy">
-        <button data-v="24h" aria-pressed="true">24h</button>
-        <button data-v="7d" aria-pressed="false">7d</button>
-        <button data-v="30d" aria-pressed="false">30d</button>
-      </div>
+    <div class="seg" id="colorBy" role="group" aria-label="Color by">
+      <button data-v="24h" aria-pressed="true" title="Color by 24h change">24h</button>
+      <button data-v="7d" aria-pressed="false" title="Color by 7-day change">7d</button>
+      <button data-v="30d" aria-pressed="false" title="Color by 30-day change">30d</button>
     </div>
-    <div class="ctl"><span class="lab">Highlight</span>
-      <div class="chips" id="filters">
+    <div class="seg" id="view" role="group" aria-label="View">
+      <button data-v="grid" aria-pressed="true">Grid</button>
+      <button data-v="table" aria-pressed="false">Table</button>
+      <button data-v="score" aria-pressed="false">Scorecard</button>
+    </div>
+    <div class="ctl">
+      <div class="chips" id="filters" role="group" aria-label="Show only">
         <button class="chip" data-f="all" aria-pressed="true">All coins</button>
         <button class="chip" data-f="os" aria-pressed="false">Oversold <span class="n"></span></button>
         <button class="chip" data-f="ob" aria-pressed="false">Overbought <span class="n"></span></button>
@@ -380,21 +398,18 @@ footer details summary { cursor: pointer; }
         <button class="chip" data-f="down" aria-pressed="false">Downtrend <span class="n"></span></button>
         <button class="chip" data-f="sq" aria-pressed="false">Squeeze <span class="n"></span></button>
         <button class="chip" data-f="cross" aria-pressed="false">Recent cross <span class="n"></span></button>
-        <button class="chip" data-f="stop" aria-pressed="false">🛑 Closed past stop <span class="n"></span></button>
+        <button class="chip" data-f="stop" aria-pressed="false" title="Coins whose last daily close finished past a recommended stop">🛑 Past stop <span class="n"></span></button>
       </div>
     </div>
-    <div class="spacer"></div>
-    <div class="ctl">
-      <div class="seg" id="view">
-        <button data-v="grid" aria-pressed="true">Grid</button>
-        <button data-v="table" aria-pressed="false">Table</button>
-        <button data-v="score" aria-pressed="false">Scorecard</button>
-      </div>
-    </div>
-    <label class="check"><input type="checkbox" id="pegged"> Include stablecoins &amp; pegged</label>
+    <label class="check" title="Include stablecoins, tokenized gold and wrapped/staked copies"><input type="checkbox" id="pegged"> Stablecoins</label>
   </div>
 
-  <div class="legend" id="legend"></div>
+  <!-- Legend: one line (color scale, track-record badge); "How to read" opens the rest (remembered per browser) -->
+  <div class="legend" id="legend">
+    <div class="leg-line"><span id="legendScale" class="leg-item"></span><span id="legendEdge"></span>
+      <button class="btn leg-toggle" id="legendToggle" aria-expanded="false" aria-controls="legendMore">ⓘ How to read</button></div>
+    <div class="leg-more" id="legendMore" hidden></div>
+  </div>
 
   <main>
     <div class="grid" id="grid" aria-live="polite"></div>
@@ -403,6 +418,7 @@ footer details summary { cursor: pointer; }
   </main>
 
   <footer>
+    <div><b>heat.sala.company</b>: a crypto heatmap of the top 100 coins by market cap, stablecoins excluded, with RSI(14), the 50/200-day MA trend, Bollinger Band width, point &amp; figure trend and 30-day momentum in every tile.</div>
     <div><b>How to read a tile.</b> <b>RSI</b>: below the lower line is <i>oversold</i> and above the upper line is <i>overbought</i> (the exact levels are in the legend and can be retuned). The marker shows where RSI sits on 0–100.
       <b>Trend</b>: the fast moving average above the slow one (50/200-day by default) is an uptrend, below is a downtrend. The note says whether price agrees ("strong") or not ("pullback" / "bounce"). ✦ marks a golden or death cross in the last 14 days.
       <b>BB width</b>: (upper − lower) / middle band, ranked against the last 180 days. Bottom 25% is a <i>squeeze</i> (volatility is compressed, and a big move often follows, in either direction). Top 20% is <i>expanded</i>.</div>
@@ -487,8 +503,8 @@ const S = {
   params: SIG.withDefaults(null), scorecard: null, scoreWin: 'd30', scoreH: 1, chart: 'price',
 };
 const prefs = store.get('hm.prefs') || {};
-Object.assign(S, { colorBy: prefs.colorBy || '24h', view: prefs.view || 'grid', pegged: !!prefs.pegged, chart: prefs.chart === 'pnf' ? 'pnf' : 'price' });
-const savePrefs = () => store.set('hm.prefs', { colorBy: S.colorBy, view: S.view, pegged: S.pegged, chart: S.chart, theme: document.documentElement.dataset.theme || '' });
+Object.assign(S, { colorBy: prefs.colorBy || '24h', view: prefs.view || 'grid', pegged: !!prefs.pegged, chart: prefs.chart === 'pnf' ? 'pnf' : 'price', legendOpen: !!prefs.legendOpen });
+const savePrefs = () => store.set('hm.prefs', { colorBy: S.colorBy, view: S.view, pegged: S.pegged, chart: S.chart, legendOpen: S.legendOpen, theme: document.documentElement.dataset.theme || '' });
 
 function setStatus(text, kind = '') { $('#status').innerHTML = `<span class="dot ${kind}"></span>${esc(text)}`; }
 
@@ -742,6 +758,13 @@ function signalEdge() {
   if (!s?.ic || s.ic.mean == null) return null;
   return { proven: s.ic.t >= 2, backwards: s.ic.t <= -2, rocketsUp: s.rockets?.upRate, baseUp: s.all?.upRate, sadDown: s.sad?.downRate };
 }
+// Short version for the one-line legend: a badge that jumps to the Scorecard
+function edgeBadge() {
+  const e = signalEdge();
+  if (!e) return '';
+  const word = e.proven ? 'a real edge' : e.backwards ? 'backwards lately' : 'no proven edge yet';
+  return `<a href="#" class="edge-badge ${e.proven ? 'ok' : 'weak'}" data-goto-score title="Track record, last 90 days: 🚀 coins went up next day ${pc(e.rocketsUp)} of the time vs ${pc(e.baseUp)} for all coins. Open the Scorecard">🚀/😢: ${word} ›</a>`;
+}
 function edgeLegend() {
   const e = signalEdge();
   if (!e) return '';
@@ -759,9 +782,9 @@ function renderLegend() {
     ['h-4', `≤ −${t[3]}`], ['h-3', `−${t[2]}…${t[3]}`], ['h-2', `−${t[1]}…${t[2]}`], ['h-1', `−${t[0]}…${t[1]}`], ['h0', `±${t[0]}`],
     ['h1', `${t[0]}…${t[1]}`], ['h2', `${t[1]}…${t[2]}`], ['h3', `${t[2]}…${t[3]}`], ['h4', `≥ +${t[3]}`],
   ];
-  $('#legend').innerHTML = `
-    <span class="leg-item">${S.colorBy} change %</span>
-    <span class="scale">${cells.map(([k, l]) => `<span class="${k}">${l}</span>`).join('')}</span>
+  $('#legendScale').innerHTML = `${S.colorBy} change % <span class="scale">${cells.map(([k, l]) => `<span class="${k}">${l}</span>`).join('')}</span>`;
+  $('#legendEdge').innerHTML = edgeBadge();
+  $('#legendMore').innerHTML = `
     <span class="leg-item"><span class="gauge" style="width:60px;flex:none"><i style="left:50%"></i></span> RSI 0–100 (under ${P().rsiLow} oversold · over ${P().rsiHigh} overbought)</span>
     <span class="leg-item"><span class="up-t" style="display:inline-flex">${ICON.up}</span>/<span class="dn-t" style="display:inline-flex">${ICON.down}</span> ${P().maFast}MA vs ${P().maSlow}MA</span>
     <span class="leg-item"><b>STOP</b> = recommended stop-loss: <b>L</b> for long positions, <b>S</b> for short, ${P().stopMult}× the coin's average daily move from the last daily close (00:00 UTC) · ⚠ past it intraday = watch · 🛑 a daily close past it = suggested exit</span>
@@ -1353,6 +1376,10 @@ function seg(id, key, after) {
 }
 seg('colorBy', 'colorBy', renderAll);
 seg('view', 'view', () => { hideDetail(true); renderAll(); });
+// "How to read": the full legend opens below the one-line legend, and stays open or closed per browser
+const setLegend = open => { S.legendOpen = open; $('#legendMore').hidden = !open; $('#legendToggle').setAttribute('aria-expanded', open); $('#legendToggle').textContent = open ? '✕ Hide legend' : 'ⓘ How to read'; };
+setLegend(S.legendOpen);
+$('#legendToggle').addEventListener('click', () => { setLegend(!S.legendOpen); savePrefs(); });
 $('#scorewrap').addEventListener('click', e => {
   const b = e.target.closest('[data-w]');
   if (b) { S.scoreWin = b.dataset.w; renderScorecard(); return; }
@@ -1438,11 +1465,10 @@ function renderFresh(now) {
   const tm = new Date(S.updated).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   const ago = mins < 1 ? 'just now' : mins === 1 ? '1 min ago' : mins < 120 ? `${mins} min ago` : `${Math.floor(mins / 60)} h ago`;
   const late = age > REFRESH_MIN * 2.5 * 60e3;
-  const next = S.busy ? 'refreshing now' : S.nextAuto > now ? `next refresh in about ${Math.max(1, Math.ceil((S.nextAuto - now) / 60e3))} min` : 'checking for new prices';
+  const next = S.busy ? 'refreshing now' : S.nextAuto > now ? `next in ~${Math.max(1, Math.ceil((S.nextAuto - now) / 60e3))} min` : 'checking for new prices';
   el.classList.toggle('late', late);
-  const html = `<span class="f-ic" aria-hidden="true">🕒</span><span><b>Last refreshed ${tm}</b> (${ago}) · ${next}. `
-    + (late ? '<b>This update is running late, so you are seeing the last good data.</b> ' : '')
-    + `Prices are <b>not real-time</b>: they refresh every ${REFRESH_MIN} minutes.</span>`
+  const html = `<span>🕒 <b>Last refreshed ${tm}</b> (${ago}) · ${next} · <b>not real-time</b>, every ${REFRESH_MIN} min`
+    + (late ? ' · <b>⚠ this update is running late: showing the last good data</b>' : '') + '</span>'
     + `<a class="cg-attr" href="https://www.coingecko.com/" target="_blank" rel="noopener">Powered by CoinGecko</a>`;   // attribution required for the free CoinGecko API key
   if (el.innerHTML !== html) el.innerHTML = html;
 }

@@ -32,6 +32,21 @@ test('loads everything from data.json, with no outside API calls', async ({ page
   expect(external).toEqual([]);
 });
 
+test('compact top: coins start in the top third of a 13-inch screen; the full legend opens on demand and is remembered', async ({ page }) => {
+  const gridTop = await page.locator('#grid').evaluate(el => el.getBoundingClientRect().top);
+  expect(gridTop).toBeLessThan(page.viewportSize().height / 3);
+  await expect(page.locator('#fresh')).toContainText('not real-time');
+  const more = page.locator('#legendMore');
+  await expect(more).toBeHidden();
+  await page.locator('#legendToggle').click();
+  await expect(more).toBeVisible();
+  await expect(more).toContainText('STOP');
+  await page.reload();
+  await expect(page.locator('#legendMore')).toBeVisible();             // stays open after a reload
+  await page.locator('#legendToggle').click();
+  await expect(page.locator('#legendMore')).toBeHidden();
+});
+
 test('CoinGecko attribution is shown (required for the free API key)', async ({ page }) => {
   for (const where of ['#fresh', 'footer']) {
     const link = page.locator(`${where} a[href="https://www.coingecko.com/"]`);
