@@ -196,6 +196,9 @@ button.sc-chip:hover, button.sc-chip[aria-expanded="true"] { box-shadow: inset 0
 .edge-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--ink-2); text-decoration: none; }
 .edge-badge.ok { border-color: var(--green); }
 .edge-badge.weak { border-color: var(--amber); }
+.scale { display: inline-flex; flex-wrap: wrap; align-items: stretch; gap: 2px; max-width: 100%; }
+.scale span { min-width: 40px; padding: 3px 4px; text-align: center; border-radius: 4px; color: var(--ink); font-variant-numeric: tabular-nums; font-size: 11px; }
+.leg-item { display: inline-flex; align-items: center; gap: 6px; }
 /* phones: filter chips become one swipeable row, and the top bar, controls and scale tighten up */
 @media (max-width: 640px) {
   .controls .ctl { flex: 1 1 100%; min-width: 0; }
@@ -208,9 +211,6 @@ button.sc-chip:hover, button.sc-chip[aria-expanded="true"] { box-shadow: inset 0
   #legendScale .scale { flex: 1 1 100%; flex-wrap: nowrap; }
   #legendScale { flex: 1 1 100%; flex-wrap: wrap; gap: 4px; }
 }
-.scale { display: inline-flex; flex-wrap: wrap; align-items: stretch; gap: 2px; max-width: 100%; }
-.scale span { min-width: 40px; padding: 3px 4px; text-align: center; border-radius: 4px; color: var(--ink); font-variant-numeric: tabular-nums; font-size: 11px; }
-.leg-item { display: inline-flex; align-items: center; gap: 6px; }
 
 /* ---------- heat tile colors (7 diverging classes, gray midpoint) ---------- */
 /* One continuous ramp: gloomy near-black red (most negative) → white (flat) → rich sea blue (most positive) */
