@@ -50,7 +50,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          for f in data/scorecard.json data/pairs.json params.json data/forex-scorecard.json data/forex-extras.json params-forex.json; do [ -f "$f" ] && git add "$f"; done
+          for f in data/scorecard.json data/pairs.json params.json data/universe-history.json data/forex-scorecard.json data/forex-extras.json params-forex.json; do [ -f "$f" ] && git add "$f"; done
           if git diff --cached --quiet; then echo "Nothing changed"; exit 0; fi
           msg="chore: signal scorecard $(date -u +%F)"
           git diff --cached --name-only | grep -qx params.json && msg="$msg (tuner adopted new settings)"

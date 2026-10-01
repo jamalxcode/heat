@@ -1,0 +1,24 @@
+# Hourly check that the live site's data is still updating (scripts/check-fresh.mjs). The other jobs can all
+# "succeed" while publishing old data (a source quietly serving a saved copy, a reused file); this catches that.
+# A failure here sends GitHub's failed-workflow email. GitHub's schedule is late or skipped at times, so this is a
+# safety net, not a precise timer: cron-job.org can also call it (workflow_dispatch) for a tighter check.
+name: Freshness check
+
+on:
+  schedule:
+    - cron: '43 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: node scripts/check-fresh.mjs https://heat.sala.company

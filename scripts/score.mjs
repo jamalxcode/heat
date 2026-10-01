@@ -51,15 +51,23 @@ await pool(universe, 5, async c => {
 });
 console.log(`History for ${coins.length}/${universe.length} coins (${verified} on pairs verified by ID)${missing.length ? ' · none for ' + missing.join(', ') : ''}`);
 
-// 4. Score, and tune on Sundays (or when asked, or the first time)
-const { card, newParams } = SIG.buildScorecard(coins, params, { prev, tuneNow });
+// 4. Point-in-time list: record today's top 100, so the scorecard can also judge each day using only the coins that
+// were in the list on that day (scoring today's list alone flatters the signals: coins are there because they rose)
+const isoToday = new Date(today * DAY).toISOString().slice(0, 10);
+const uniHist = await readJSON('data/universe-history.json', { v: 1, days: {} });
+uniHist.days[isoToday] = universe.map(c => c.id);
+
+// 5. Score, and tune on Sundays (or when asked, or the first time). Costs: ~0.1% per side on a large exchange.
+const { card, newParams } = SIG.buildScorecard(coins, params, { prev, tuneNow, costPct: 0.002, universe: uniHist.days });
 
 await mkdir(new URL('data/', root), { recursive: true });
 await writeFile(new URL('data/scorecard.json', root), JSON.stringify(card));
+await writeFile(new URL('data/universe-history.json', root), JSON.stringify(uniHist));
 if (newParams) await writeFile(new URL('params.json', root), JSON.stringify(newParams, null, 2) + '\n');
 
 const pct = v => v == null ? '—' : (v * 100).toFixed(1) + '%';
 const y = card.yesterday.stats, t = card.tuning.last;
+console.log(`Point-in-time list: ${card.pit?.days ?? 0} day(s) recorded since ${card.pit?.from ?? isoToday}`);
 console.log(`Signals of ${card.signalDay} → ${card.outcomeDay}: ${y.rockets.n} 🚀 coins (${pct(y.rockets.upRate)} up), ${y.sad.n} 😢 coins (${pct(y.sad.downRate)} down), market ${pct(card.yesterday.market)}`);
 for (const h of SIG.HORIZONS) {
   const w = card.windows.d30[h];
@@ -68,5 +76,6 @@ for (const h of SIG.HORIZONS) {
 if (t && card.tuning.lastRun && Date.now() - Date.parse(card.tuning.lastRun) < 3600e3) {
   console.log(`Tuning: ${t.adopted ? 'ADOPTED new settings' : 'kept current settings'} · won ${t.wins}/${t.folds.length} check periods · avg IC ${t.testIC.before?.toFixed(4)} → ${t.testIC.after?.toFixed(4)}`);
   for (const n of t.notes) console.log('  ' + n);
+  if (t.holdout) console.log(`  untouched last days ${t.holdout.from}…${t.holdout.to}: IC current ${t.holdout.current?.toFixed(4)} · proposed ${t.holdout.proposed?.toFixed(4)}`);
   if (t.stop) console.log(`  stop distance: ${t.stop.table.map(s => s.m + 'x ' + (s.avg * 100).toFixed(2) + '%').join(', ')} → ${t.stop.adopt ? 'switched to ' + t.stop.to + 'x' : 'kept ' + t.stop.from + 'x'}`);
 }

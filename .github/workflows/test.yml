@@ -1,9 +1,9 @@
-# Unit tests for the signal engine (signals.mjs) on every push and pull request.
+# Unit tests (node --test) on every push to any branch and on pull requests, so a branch is checked before it reaches main.
 name: Tests
 
 on:
   push:
-    branches: [main]
+    branches: ['**']   # every branch: work happens on a branch and is merged into main only when this passes
   pull_request:
   workflow_dispatch:
 

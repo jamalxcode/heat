@@ -239,6 +239,7 @@ const cap = h => 0.3 * Math.sqrt(h);   // ±30% a day, wider for longer horizons
 // `days` (optional): the UTC day number of each close, for markets that skip days (forex: business days only).
 // Without it the closes are one per calendar day from t0 (crypto). Horizons count closes, so for forex the
 // "next 1 / 3 / 7 days" are trading days.
+// `skip` (optional): a Set of close indices to leave out, e.g. the days around an unusual jump in a currency feed.
 // One row per coin per day: the signals at that close and the move over the following 1 / 3 / 7 days.
 export function signalRows(coins, p) {
   const P = withDefaults(p);
@@ -249,6 +250,7 @@ export function signalRows(coins, p) {
     const d0 = Math.floor(coin.t0 / DAY), n = coin.c.length;
     const dayOf = coin.days ? i => coin.days[i] : i => d0 + i;
     for (let i = warm; i < n - 1; i++) {
+      if (coin.skip?.has(i)) continue;   // days around an unusual jump (possible data glitch) are left out of the scoring
       const a = componentsAt(s, i, P);
       if (Object.values(a).some(v => v == null)) continue;
       const { good, bad, score, squeeze } = scoreOf(a, P);
@@ -463,7 +465,7 @@ function objective(rows, from, to) {
 // Walk-forward in several folds: the newest half of history is cut into `folds` check periods. For each one, settings
 // are chosen only on the days before it, then compared with the current settings on it. The new settings (chosen on
 // all history) are adopted only if that procedure beat the current settings in most folds and on average.
-export function tune(coins, current, { folds = 3, minT = 2.5, margin = 0.003, momPcts } = {}) {
+export function tune(coins, current, { folds = 3, minT = 2.5, margin = 0.003, momPcts, holdoutDays = 90 } = {}) {
   const cur = withDefaults(current);
   // Rows for a given setting (~80k rows for 100 coins × 2.7 years). Keep only the 8 most recently used: caching every
   // variant tried across all folds ran GitHub's runner out of memory (4 GB) once momentum and stop variants were added.
@@ -477,19 +479,24 @@ export function tune(coins, current, { folds = 3, minT = 2.5, margin = 0.003, mo
     return rows;
   };
 
-  const days = [...new Set(rowsFor(cur).map(r => r.day))].sort((a, b) => a - b);
+  // Holdout: the newest holdoutDays are never used to choose anything (check periods, signal roles, stops), so how the
+  // current and the proposed settings did there is a genuinely unseen test. Skipped on short histories (tests).
+  const allDays = [...new Set(rowsFor(cur).map(r => r.day))].sort((a, b) => a - b);
+  const hold = allDays.length && allDays[allDays.length - 1] - allDays[0] >= holdoutDays * 4 ? holdoutDays : 0;
+  const lastDay = allDays[allDays.length - 1], cutoff = lastDay - hold;   // the last day the tuner may look at
+  const days = allDays.filter(d => d <= cutoff);
   const start = Math.floor(days.length * 0.5), block = Math.floor((days.length - start) / folds);
   const results = [];
   for (let k = 0; k < folds; k++) {
-    const from = days[start + k * block], to = k === folds - 1 ? Infinity : days[start + (k + 1) * block];
+    const from = days[start + k * block], to = k === folds - 1 ? cutoff + 1 : days[start + (k + 1) * block];
     const sel = selectParams(cur, rowsFor, from, minT, momPcts).params;
     const before = objective(rowsFor(cur), from, to), after = objective(rowsFor(sel), from, to);
-    results.push({ from, to: Number.isFinite(to) ? to - 1 : days[days.length - 1], before, after, won: after > before });
+    results.push({ from, to: to - 1, before, after, won: after > before });
   }
   const avg = f => mean(results.map(f));
   const before = avg(r => r.before), after = avg(r => r.after), wins = results.filter(r => r.won).length;
 
-  const final = selectParams(cur, rowsFor, Infinity, minT, momPcts);
+  const final = selectParams(cur, rowsFor, cutoff + 1, minT, momPcts);
   const anyOn = Object.values(final.params.weights).some(w => w !== 0);
   const changed = JSON.stringify(final.params) !== JSON.stringify(cur);
   const adopt = changed && anyOn && after > 0 && after > before + margin && wins >= Math.ceil(folds / 2);
@@ -520,15 +527,21 @@ export function tune(coins, current, { folds = 3, minT = 2.5, margin = 0.003, mo
   if (stop.adopt) params.stopMult = stop.to;
   return {
     adopt, params, proposed: final.params, notes: final.notes, stop,
-    folds: results, wins, split: { trainFrom: days[0], cut: days[start], testTo: days[days.length - 1] },
+    folds: results, wins, split: { trainFrom: days[0], cut: days[start], testTo: cutoff },
     testIC: { before, after },
+    // the untouched newest days: how the current and the proposed settings did there (null when too short to hold out)
+    holdout: hold ? { from: cutoff + 1, to: lastDay, current: objective(rowsFor(cur), cutoff + 1, Infinity), proposed: objective(rowsFor(final.params), cutoff + 1, Infinity) } : null,
   };
 }
 
 /* ---------- the daily scorecard ---------- */
 const isoDay = d => new Date(d * DAY).toISOString().slice(0, 10);
 // coins: complete daily closes only. Returns { card, newParams } where newParams is set only if the tuner adopted settings.
-export function buildScorecard(coins, current, { prev = null, tuneNow = false, now = Date.now(), momPcts } = {}) {
+// costPct: an estimated round-trip trading cost (fraction, e.g. 0.002 = 0.2%), recorded on the card so results can be
+//   shown after costs; it doesn't change the rank-based verdicts.
+// universe: { 'YYYY-MM-DD': [ids] }, the coins that were in the list on each day. Rows for days with a snapshot are
+//   also scored point-in-time (only coins that were in that day's list), which removes survivorship bias.
+export function buildScorecard(coins, current, { prev = null, tuneNow = false, now = Date.now(), momPcts, costPct = 0, universe = null } = {}) {
   const params = withDefaults(current);
   const rows = signalRows(coins, params);
   const lastDay = Math.max(...rows.filter(r => r.ret[1] != null).map(r => r.day)); // latest close whose next day is complete
@@ -555,6 +568,7 @@ export function buildScorecard(coins, current, { prev = null, tuneNow = false, n
       adopted: res.adopt, notes: res.notes, testIC: res.testIC, wins: res.wins, folds: res.folds.map(f => ({ from: isoDay(f.from), to: isoDay(f.to), before: f.before, after: f.after, won: f.won })),
       trainFrom: isoDay(res.split.trainFrom), testFrom: isoDay(res.split.cut), testTo: isoDay(res.split.testTo),
       stop: res.stop,
+      holdout: res.holdout && { ...res.holdout, from: isoDay(res.holdout.from), to: isoDay(res.holdout.to) },
     };
     if (res.adopt || res.stop.adopt) {
       newParams = res.params;
@@ -572,8 +586,15 @@ export function buildScorecard(coins, current, { prev = null, tuneNow = false, n
       stats: stats(y, 1),
     },
     windows: { d30: perH(since(30)), d90: perH(since(90)), all: perH(rows) },
-    daily, tuning,
+    daily, tuning, costs: { roundTrip: costPct },
   };
+  // Point-in-time: only coin-days where the coin was in that day's list (snapshots start when recording began)
+  if (universe) {
+    const inList = new Map(Object.entries(universe).map(([d, ids]) => [d, new Set(ids)]));
+    const pit = rows.filter(r => inList.get(isoDay(r.day))?.has(r.id));
+    const pitDays = new Set(pit.map(r => r.day));
+    card.pit = { days: pitDays.size, from: pitDays.size ? isoDay(Math.min(...pitDays)) : null, windows: pit.length ? { all: perH(pit) } : null };
+  }
   return { card, newParams };
 }
 

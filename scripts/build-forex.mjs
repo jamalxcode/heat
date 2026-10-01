@@ -116,6 +116,21 @@ export async function fetchExtras(date) {
   return null;
 }
 
+// Unusual jumps: a one-day move at least SPIKE_X times the currency's typical (median) move over the previous 60
+// days, and at least SPIKE_MIN_PCT. Real devaluations (EGP 2024, CHF 2015) are flagged too: either way it's a move
+// the indicators weren't built for, and for the extra feed it may be a source switching between official and street
+// rates. Returns the indices of the closes that jumped.
+export const SPIKE_X = 10, SPIKE_MIN_PCT = 2.5;
+export function findSpikes(c) {
+  const moves = c.map((v, i) => i ? Math.abs(Math.log(v / c[i - 1])) : 0), out = [];
+  for (let i = 1; i < c.length; i++) {
+    const past = moves.slice(Math.max(1, i - 60), i).sort((a, b) => a - b);
+    const typical = past.length >= 10 ? past[Math.floor(past.length / 2)] : 0;
+    if (moves[i] * 100 >= SPIKE_MIN_PCT && moves[i] >= SPIKE_X * typical) out.push(i);
+  }
+  return out;
+}
+
 // Business-day closes per currency on the ECB calendar. ecb: as from fetchEcb; extras: { date: { rub: … } }.
 // A missing extra-feed value is carried forward from the day before (marked in `filled`).
 export function assemble(ecb, extras) {
@@ -134,7 +149,7 @@ export function assemble(ecb, extras) {
       days.push(dayNum(date));
       c.push(priceOf(cur, v));
     }
-    out[cur.code] = { days, c, filled };
+    out[cur.code] = { days, c, filled, spikes: findSpikes(c) };
   }
   return out;
 }
@@ -154,6 +169,8 @@ export function toSnapshot(series, { now = Date.now(), params = null, fetched = 
     markets.push({
       id, fx: true, symbol: pairOf(cur), name: cur.name, flag: cur.flag, image: '', market_cap_rank: k + 1,
       current_price: price, market_cap: null, pegged: !!cur.pegged, warn: !!cur.warn, src: cur.src,
+      // the latest unusual jump within the last 21 business days (about a month), if any: shown as ⚠ on the tile
+      spike: (() => { const i = s.spikes.filter(j => j >= s.c.length - 21).at(-1); return i == null ? null : { date: isoDay(s.days[i]), pct: (s.c[i] / s.c[i - 1] - 1) * 100 }; })(),
       price_change_percentage_24h_in_currency: chg(s.c, BACK['24h']),
       price_change_percentage_7d_in_currency: chg(s.c, BACK['7d']),
       price_change_percentage_30d_in_currency: chg(s.c, BACK['30d']),
@@ -162,7 +179,7 @@ export function toSnapshot(series, { now = Date.now(), params = null, fetched = 
     hist[id] = {
       src: cur.src === 'ecb' ? 'ECB' : 'exchange-api', pair: pairOf(cur), ok: cur.src === 'ecb' ? 1 : 0, t: fetched, t0,
       d: s.days.map(x => x - s.days[0]),   // business days: offsets from t0 (crypto's data.json has one close per day)
-      c: s.c,
+      c: s.c, sp: s.spikes,   // sp: indices of unusual one-day jumps (findSpikes)
     };
   });
   return {

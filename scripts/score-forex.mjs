@@ -42,16 +42,21 @@ console.log(`Extra feed: ${got}/${need.length} new days fetched, ${Object.keys(c
 
 // 3. One series per scored currency, with its real business days (signals.mjs uses `days` for dates and grouping)
 const series = assemble(ecb, cache.rates);
-const coins = [];
+const coins = [], spiky = [];
 for (const cur of CURRENCIES.filter(scored)) {
   const s = series[cur.code];
   if (!s || s.c.length < 300) { console.log(`Skipped ${cur.code}: ${s?.c.length || 0} closes`); continue; }
-  coins.push({ id: cur.code.toLowerCase(), symbol: pairOf(cur), name: cur.name, t0: s.days[0] * DAY, c: s.c, days: s.days });
+  // leave out each unusual jump and the 7 closes before it (their 1–7-day outcomes include the jump): a glitch or a
+  // devaluation would otherwise swamp the averages
+  const skip = new Set(s.spikes.flatMap(j => Array.from({ length: 8 }, (_, k) => j - k)));
+  if (s.spikes.length) spiky.push(`${cur.code} ${s.spikes.length}`);
+  coins.push({ id: cur.code.toLowerCase(), symbol: pairOf(cur), name: cur.name, t0: s.days[0] * DAY, c: s.c, days: s.days, skip });
 }
-console.log(`Scoring ${coins.length} currencies${tuneNow ? ', tuning' : ''}`);
+console.log(`Scoring ${coins.length} currencies${tuneNow ? ', tuning' : ''}${spiky.length ? ` · unusual jumps left out: ${spiky.join(', ')}` : ''}`);
 
 // 4. Score, and tune on Sundays (or when asked, or the first time)
-const { card, newParams } = SIG.buildScorecard(coins, params, { prev, tuneNow, now, momPcts: MOM_PCTS });
+// costs: ~0.05% round trip (bid-ask spread on major pairs; wider for the extra-feed currencies)
+const { card, newParams } = SIG.buildScorecard(coins, params, { prev, tuneNow, now, momPcts: MOM_PCTS, costPct: 0.0005 });
 card.market = 'forex';
 await mkdir(new URL('data/', root), { recursive: true });
 await writeFile(new URL('data/forex-scorecard.json', root), JSON.stringify(card));

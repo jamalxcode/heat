@@ -1,9 +1,9 @@
-# Browser tests: the real page in headless Chrome against deterministic test data, on every push.
+# Browser tests: the real page in headless Chrome against deterministic test data, on every push to any branch.
 name: Browser tests
 
 on:
   push:
-    branches: [main]
+    branches: ['**']   # every branch: work happens on a branch and is merged into main only when this passes
   pull_request:
   workflow_dispatch:
 
