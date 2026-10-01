@@ -125,7 +125,8 @@ export function findSpikes(c) {
   const moves = c.map((v, i) => i ? Math.abs(Math.log(v / c[i - 1])) : 0), out = [];
   for (let i = 1; i < c.length; i++) {
     const past = moves.slice(Math.max(1, i - 60), i).sort((a, b) => a - b);
-    const typical = past.length >= 10 ? past[Math.floor(past.length / 2)] : 0;
+    if (past.length < 10) continue;                       // too little history to know what's normal: don't flag
+    const typical = past[Math.floor(past.length / 2)];
     if (moves[i] * 100 >= SPIKE_MIN_PCT && moves[i] >= SPIKE_X * typical) out.push(i);
   }
   return out;
