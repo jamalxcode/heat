@@ -598,6 +598,15 @@
    "Gate.io": "FF",
    "MEXC": "FF",
    "KuCoin": "FF"
+  },
+  "monad": {
+   "OKX": "MON",
+   "Gate.io": "MON",
+   "KuCoin": "MON",
+   "MEXC": "MON"
+  },
+  "backpack": {
+   "MEXC": "BP"
   }
  }
 }
