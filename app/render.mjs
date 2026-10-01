@@ -119,7 +119,7 @@ export function verifyMark(c) {
 // findSpikes in scripts/build-forex.mjs)
 export const cautionNotes = c => [
   c.warn && 'Official and market rates differ a lot for this currency',
-  c.spike && `Unusual jump of ${fmtPct(c.spike.pct, 1)} on ${c.spike.date}: a data glitch or a real devaluation, so check another source. Days around it are left out of the scorecard`,
+  c.spike && `Unusual jump of ${fmtPct(c.spike.pct, 1)} on ${c.spike.date}${c.src === 'x' ? ': a data glitch or a real devaluation, so check another source. Days around it are left out of the scorecard' : ': an official ECB rate, so a real market move'}`,
 ].filter(Boolean);
 export function cautionMark(c) {
   const notes = cautionNotes(c);

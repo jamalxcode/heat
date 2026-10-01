@@ -46,10 +46,12 @@ const coins = [], spiky = [];
 for (const cur of CURRENCIES.filter(scored)) {
   const s = series[cur.code];
   if (!s || s.c.length < 300) { console.log(`Skipped ${cur.code}: ${s?.c.length || 0} closes`); continue; }
-  // leave out each unusual jump and the 7 closes before it (their 1–7-day outcomes include the jump): a glitch or a
-  // devaluation would otherwise swamp the averages
-  const skip = new Set(s.spikes.flatMap(j => Array.from({ length: 8 }, (_, k) => j - k)));
-  if (s.spikes.length) spiky.push(`${cur.code} ${s.spikes.length}`);
+  // Extra-feed currencies: leave out each unusual jump and the 7 closes before it (their 1–7-day outcomes include it),
+  // since a jump there may be the source switching rates. Official ECB rates are kept: their jumps (the lira crises,
+  // the franc in 2015) really happened, and leaving them out would make the track record look calmer than reality.
+  const doubtful = cur.src === 'x' ? s.spikes : [];
+  const skip = new Set(doubtful.flatMap(j => Array.from({ length: 8 }, (_, k) => j - k)));
+  if (doubtful.length) spiky.push(`${cur.code} ${doubtful.length}`);
   coins.push({ id: cur.code.toLowerCase(), symbol: pairOf(cur), name: cur.name, t0: s.days[0] * DAY, c: s.c, days: s.days, skip });
 }
 console.log(`Scoring ${coins.length} currencies${tuneNow ? ', tuning' : ''}${spiky.length ? ` · unusual jumps left out: ${spiky.join(', ')}` : ''}`);
