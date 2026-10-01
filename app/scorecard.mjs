@@ -2,7 +2,7 @@
 import * as SIG from '/signals.mjs';
 import { call, legendName, roleOf, signals } from './render.mjs';
 import { P } from './data.mjs';
-import { $, esc, fmtPct, heatClass, M, MARKET, S } from './core.mjs';
+import { $, esc, fmtPct, heatClass, M, S } from './core.mjs';
 
 /* ================= scorecard (daily check of the 🚀 / 😢, built by scripts/score.mjs) ================= */
 export async function loadScorecard() {
@@ -62,9 +62,7 @@ export function basketChart(daily) {
       </svg>
       <div class="sc-tip" hidden></div>
     </div>
-    <p class="sc-muted">Each day: the average next-day move of that day's 🚀 ${M.noun}, 😢 ${M.noun} and all ${M.noun}, compounded over the last ${pts.length} days. It's a scorekeeping line, not a trading result: there are no fees or slippage${MARKET === 'forex'
-      ? ', and every rate is quoted against the US dollar, so the "all currencies" line mostly reflects the US dollar\'s own move'
-      : `, and the coins are today's top 100, several of which made the list <i>because</i> they rose, so all three lines look better than reality`}. Compare the lines with each other, not with zero.</p>`;
+    <p class="sc-muted">Each day: the average next-day move of that day's 🚀 ${M.noun}, 😢 ${M.noun} and all ${M.noun}, compounded over the last ${pts.length} days. It's a scorekeeping line, not a trading result: there are no fees or slippage${M.basketNote}. Compare the lines with each other, not with zero.</p>`;
 }
 export function wireChart() {
   const box = $('#scorewrap .sc-chart');
@@ -132,11 +130,17 @@ export function renderScorecard() {
   const sq = w.squeeze;
   const sqLine = sq?.n ? `${sq.ratio >= 1.1 ? 'Yes' : sq.ratio <= 0.9 ? 'No, smaller' : 'About the same'}: moves over ${hw} were <b>${sq.ratio.toFixed(2)}×</b> the usual size (${spc(sq.avgAbs, 1)} vs ${spc(sq.baseAbs, 1)}), and ${pc(sq.upRate)} went up.` : 'No squeezes in this period.';
 
+  // costs (a round trip, as a fraction) and the point-in-time check, when the scorer recorded them
+  const cost = sc.costs?.roundTrip ?? null;
+  const pit = sc.pit;
+  const pitW = pit?.windows?.all?.[h];
+  const pitHTML = !pit ? '' : `<p class="sc-muted"><b>Point-in-time check:</b> ${pit.days} day${pit.days === 1 ? '' : 's'} scored so far using only the ${M.noun} that were in the list on each day (recording since ${pit.from ?? 'today'}). ${pit.days >= 60 && pitW ? `Verdict on those days: <b>${icVerdict(pitW.ic)}</b> (t = ${pitW.ic.t?.toFixed(1) ?? '—'}).` : 'A verdict needs about 60 days; until then the figures above use today’s list, which flatters the 🚀 (coins are in it because they rose).'}</p>`;
   const t = sc.tuning || {}, last = t.last;
   const foldsHTML = last?.folds ? `<ul>${last.folds.map(f => `<li>${f.from} → ${f.to}: current ${f.before?.toFixed(3) ?? '—'} vs candidate ${f.after?.toFixed(3) ?? '—'} ${f.won ? '✅' : '❌'}</li>`).join('')}</ul>` : '';
   const tuneHTML = !t.lastRun || !last ? '<p class="sc-muted">The tuner hasn\'t run yet. It runs every Sunday.</p>' : `
     <p><b>Last run ${new Date(t.lastRun).toLocaleDateString()}</b>: ${last.adopted ? '✅ <b>adopted new settings</b>: they beat the current ones on periods they weren\'t tuned on.' : 'kept the current settings. The alternative didn\'t clearly beat them on periods it wasn\'t tuned on.'}
       ${last.folds ? `Won <b>${last.wins} of ${last.folds.length}</b> check periods · average score (rank correlation over 1/3/7 days): current <b>${last.testIC.before?.toFixed(3) ?? '—'}</b> vs candidate <b>${last.testIC.after?.toFixed(3) ?? '—'}</b>.` : `Check-period score: current <b>${last.testIC.before?.toFixed(3) ?? '—'}</b> vs candidate <b>${last.testIC.after?.toFixed(3) ?? '—'}</b>.`}</p>
+    ${last.holdout ? `<p><b>Untouched check</b> (${last.holdout.from} → ${last.holdout.to}, never used for tuning): current settings scored <b>${last.holdout.current?.toFixed(3) ?? '—'}</b>, the alternative <b>${last.holdout.proposed?.toFixed(3) ?? '—'}</b> <span class="sc-muted">(same score as above; around 0 means no link)</span>.</p>` : ''}
     ${last.stop ? `<p><b>Stop distance</b>: tested ${last.stop.table.map(s => `${s.m}× (exits ${s.avg >= 0 ? 'saved' : 'cost'} ${pc(Math.abs(s.avg), 2)} over 3 days)`).join(', ')}. ${last.stop.adopt ? `✅ <b>Switched from ${last.stop.from}× to ${last.stop.to}×</b>: it did better in ${last.stop.wins} of 3 check periods.` : `Kept <b>${last.stop.from}×</b>: no other distance did clearly better.`}</p>` : ''}
     ${foldsHTML ? `<details><summary>Check periods</summary>${foldsHTML}</details>` : ''}
     <details><summary>What the tuner found for each signal</summary><ul>${(last.notes || []).map(n => `<li>${esc(n)}</li>`).join('')}</ul></details>
@@ -171,10 +175,14 @@ export function renderScorecard() {
           ${segBtns('scoreWin', 'w', S.scoreWin, [['d30', '30 days'], ['d90', '90 days'], ['all', 'All']])}
         </div></div>
       <div class="sc-tiles">
-        ${tile(`When a ${M.one} had more 🚀 than 😢`, `${pc(w.rockets.upRate)} went up over ${hw}`, [`${pc(w.rockets.beatRate)} beat the market · ${w.rockets.n.toLocaleString()} calls`])}
-        ${tile(`When a ${M.one} had more 😢 than 🚀`, `${pc(w.sad.downRate)} went down over ${hw}`, [`${pc(w.sad.lagRate)} lagged the market · ${w.sad.n.toLocaleString()} calls`])}
+        ${tile(`When a ${M.one} had more 🚀 than 😢`, `${pc(w.rockets.upRate)} went up over ${hw}`, [`${pc(w.rockets.beatRate)} beat the market · ${w.rockets.n.toLocaleString()} calls`,
+          ...(cost != null && w.rockets.avgRet != null ? [`buying: average ${spc(w.rockets.avgRet)}, <b>${spc(w.rockets.avgRet - cost)} after costs</b>`] : [])])}
+        ${tile(`When a ${M.one} had more 😢 than 🚀`, `${pc(w.sad.downRate)} went down over ${hw}`, [`${pc(w.sad.lagRate)} lagged the market · ${w.sad.n.toLocaleString()} calls`,
+          ...(cost != null && w.sad.avgRet != null ? [`selling short: average ${spc(-w.sad.avgRet)}, <b>${spc(-w.sad.avgRet - cost)} after costs</b>`] : [])])}
         ${tile('Coin-flip baseline', `${pc(w.all.upRate)} of all ${M.noun} went up`, [`${w.days} days · ${w.rows.toLocaleString()} ${M.one}-days`])}
       </div>
+      ${cost != null ? `<p class="sc-muted">Costs: about ${pc(cost, 2)} per round trip (${M.costWords}), taken off once per holding period. A small edge can disappear after costs.</p>` : ''}
+      ${pitHTML}
       <p class="sc-verdict">Verdict: <b>${icVerdict(w.ic)}</b>. <span class="sc-muted">(Daily rank correlation between score and the move over ${hw}: ${w.ic.mean?.toFixed(3) ?? '—'}, t = ${w.ic.t?.toFixed(1) ?? '—'}. Around 0 means no link; t above 2 means it's unlikely to be luck.${h > 1 ? ' Multi-day moves overlap, so t is scaled down to stay honest.' : ''})</span></p>
       <p><b>⚡ Did a squeeze lead to bigger moves?</b> ${sqLine}${sq?.n ? ` <span class="sc-muted">${sq.n.toLocaleString()} squeezes.</span>` : ''}</p>
       ${stopsHTML(w.stops, h, hw)}
@@ -185,9 +193,9 @@ export function renderScorecard() {
     </div>
 
     <div class="sc-card">
-      <h2>Self-tuning <span class="sc-muted">weekly, on about 2.7 years of history</span></h2>
+      <h2>Self-tuning <span class="sc-muted">weekly, on ${M.tuneHistory}</span></h2>
       ${tuneHTML}
-      <p class="sc-muted">How it works: each Sunday the tuner tries other RSI levels, moving-average pairs and wide-band thresholds. For each signal it decides whether it should count as a 🚀, a 😢, or be switched off, and it judges them over the next 1, 3 and 7 days. The newest half of history is cut into three check periods. For each one, settings are chosen using only earlier days, then compared with the current settings on that period. New settings are adopted only if they win at least 2 of the 3 and do better on average. A signal also needs a stronger-than-usual result (t ≥ 2.5) to be switched on, because trying many variants makes some look good by luck. ⚡ squeezes are never counted as 🚀 or 😢.</p>
+      <p class="sc-muted">How it works: each Sunday the tuner tries other RSI levels, moving-average pairs and wide-band thresholds. For each signal it decides whether it should count as a 🚀, a 😢, or be switched off, and it judges them over the next 1, 3 and 7 days. The newest half of history is cut into three check periods. For each one, settings are chosen using only earlier days, then compared with the current settings on that period. New settings are adopted only if they win at least 2 of the 3 and do better on average. A signal also needs a stronger-than-usual result (t ≥ 2.5) to be switched on, because trying many variants makes some look good by luck. The newest 90 days are never used for tuning at all: they are the untouched check shown above. ⚡ squeezes are never counted as 🚀 or 😢.</p>
     </div>`;
   wireChart();
 }

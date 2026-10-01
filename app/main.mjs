@@ -1,7 +1,7 @@
 // heat.sala.company page script: main (split from index.html; see app/main.mjs for the order things start in)
 import * as SIG from '/signals.mjs';
 import { applyEdge, applyParams, renderAll, renderCounts, renderFooter } from './render.mjs';
-import { $, DAY, fmtWait, LIVE_EVERY, M, MARKET, MARKETS_TTL, REFRESH_MIN, S, setStatus, SNAPSHOT_GRACE, SNAPSHOT_MAX_AGE, SNAPSHOT_RETRY, store } from './core.mjs';
+import { $, DAY, fmtWait, LIVE_EVERY, M, MARKETS_TTL, REFRESH_MIN, S, setStatus, SNAPSHOT_GRACE, SNAPSHOT_MAX_AGE, SNAPSHOT_RETRY, store } from './core.mjs';
 import { loadScorecard } from './scorecard.mjs';
 import { applyHist, pickCoins } from './data.mjs';
 import './interact.mjs';   // hover, clicks, switches and keyboard: sets up its listeners when loaded
@@ -47,17 +47,7 @@ export function renderFresh(now) {
   const late = age > REFRESH_MIN * 2.5 * 60e3;
   const next = S.busy ? 'refreshing now' : S.nextAuto > now ? `next in ~${Math.max(1, Math.ceil((S.nextAuto - now) / 60e3))} min` : 'checking for new prices';
   el.classList.toggle('late', late);
-  if (MARKET === 'forex') {               // the rate date is what matters: one official rate per business day
-    const rd = S.rateDate ? new Date(S.rateDate + 'T12:00:00Z').toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }) : '—';
-    const fx = `<span>🕒 <b>Rates of ${rd}</b> · <b>not real-time</b>: one rate per business day, published about 16:00 Frankfurt time · checked ${ago}`
-      + (late ? ' · <b>⚠ updates are running late</b>' : '') + '</span>'
-      + `<a class="cg-attr" href="https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html" target="_blank" rel="noopener">Source: ECB</a>`;
-    if (el.innerHTML !== fx) el.innerHTML = fx;
-    return;
-  }
-  const html = `<span>🕒 <b>Last refreshed ${tm}</b> (${ago}) · ${next} · <b>not real-time</b>, every ${REFRESH_MIN} min`
-    + (late ? ' · <b>⚠ this update is running late: showing the last good data</b>' : '') + '</span>'
-    + `<a class="cg-attr" href="https://www.coingecko.com/" target="_blank" rel="noopener">Powered by CoinGecko</a>`;   // attribution required for the free CoinGecko API key
+  const html = M.fresh({ tm, ago, next, late, refreshMin: REFRESH_MIN, rateDate: S.rateDate });   // includes the data credit
   if (el.innerHTML !== html) el.innerHTML = html;
 }
 
@@ -84,13 +74,14 @@ export function done() {
 // and the 🚀/😢 all follow. Only the display changes: forex.json and the scorecard stay USD/XXX.
 export const flipPct = v => v == null ? null : (1 / (1 + v / 100) - 1) * 100;
 export function quoteView(data) {
-  if (MARKET !== 'forex' || S.quote !== 'usd') return data;
+  if (!M.quoteSwitch || S.quote !== 'usd') return data;
   const flip = id => data.markets.find(m => m.id === id)?.symbol.startsWith('USD/');
   const markets = data.markets.map(m => !m.symbol.startsWith('USD/') ? m : {
     ...m, symbol: m.symbol.slice(4) + '/USD', current_price: 1 / m.current_price,
     price_change_percentage_24h_in_currency: flipPct(m.price_change_percentage_24h_in_currency),
     price_change_percentage_7d_in_currency: flipPct(m.price_change_percentage_7d_in_currency),
     price_change_percentage_30d_in_currency: flipPct(m.price_change_percentage_30d_in_currency),
+    spike: m.spike && { ...m.spike, pct: flipPct(m.spike.pct) },
   });
   const hist = Object.fromEntries(Object.entries(data.hist || {}).map(([id, h]) =>
     [id, flip(id) ? { ...h, pair: h.pair.startsWith('USD/') ? h.pair.slice(4) + '/USD' : h.pair, c: h.c.map(v => 1 / v) } : h]));

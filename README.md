@@ -35,7 +35,7 @@ A crypto heatmap of the top 100 coins by market cap, with stablecoins, tokenized
 - **Right:** the key numbers, the long and short stop cards, and where the price history comes from (✓ or ?).
 
 Hovering is built so the popup never gets in the way of the coin you're reaching for:
-- it opens only once the mouse **rests** on a coin for about 2 seconds, so gliding across tiles opens nothing
+- it opens once the mouse **rests** on a coin for about 0.7 seconds, so gliding across tiles opens nothing; or point at the small **ⓘ** in a tile’s corner to open it at once
 - it opens on the **side the mouse came from** (to the left or above when you move right or down), leaving the tiles ahead of the mouse visible
 - moving toward the popup keeps it open, even across other tiles, so you can reach it
 - moving away toward another coin closes it quickly, and that coin opens once the mouse rests on it
@@ -44,7 +44,7 @@ Click the popup (or the tile) to pin it open, and click outside it to close it. 
 
 **Top of the page.** One slim bar: the title, when the data was last refreshed (and that it is **not real-time**), the coin count, the refresh countdown, theme and WIP buttons. Below it, one row of controls: color by 24h / 7d / 30d, Grid / Table / Scorecard, the filter buttons and the Stablecoins checkbox. On phones the filter buttons are one swipeable row.
 
-**Filters.** The filter buttons (Oversold, Overbought, Uptrend, Downtrend, Squeeze, Recent cross, 🛑 Past stop) show only the matching coins, in both grid and table. Each button shows its count. **All coins** (or clicking the active button again) brings everything back. **Color scale:** click a range on the scale (e.g. "≤ −10" or "±1") to show only the coins in that color band. It combines with the filter buttons; click the range again, or **All coins**, to show everything.
+**Filters.** The filter buttons (Oversold, Overbought, Uptrend, Downtrend, 🛑 Past stop, and under **More ▾** Squeeze and Recent cross; on phones all of them sit in one swipeable row) show only the matching coins, in both grid and table. Each button shows its count. **All coins** (or clicking the active button again) brings everything back. **Color scale:** click a range on the scale (e.g. "≤ −10" or "±1") to show only the coins in that color band. It combines with the filter buttons; click the range again, or **All coins**, to show everything.
 
 The **Table** view sorts by any column, including the recommended stops. The **Scorecard** view shows how the signals have actually performed.
 
@@ -61,11 +61,18 @@ Every day at **00:20 UTC** a GitHub job scores the previous day:
   - whether a squeeze (bottom 10% band width) was really followed by bigger moves than usual
   - for the recommended stops: how often they were crossed, and whether, after getting out, price kept going the wrong way (a good exit) or came back (shaken out)
 
-**Self-tuning, every Sunday.** The tuner tries moving-average pairs (20/50, 20/100, 50/200) and momentum thresholds (10%, 20%, 30%), and decides whether each trend, momentum and P&F signal should count as a 🚀, a 😢, or be switched off, judging it over the next 1, 3 and 7 days. It still measures RSI and wide-band variants and logs what it *would* do with them, but it keeps them off. Since Sept 2026 only the MA trend, P&F trend and momentum are scored; before that, RSI and Bollinger signals counted too, and momentum and P&F were off. The newest half of history is cut into **three check periods**. For each one, settings are chosen using only the days before it, then compared with the current settings on that period. New settings are written to `params.json` **only if they win at least 2 of the 3 periods and do better on average**. Because many variants get tried, a signal needs t ≥ 2.5 (not the usual 2) to be switched on. The site picks new settings up automatically, and every change is logged on the Scorecard.
+**Self-tuning, every Sunday.** The newest **90 days are never used for tuning**: the Scorecard shows how the current and the proposed settings did on that untouched stretch, a genuinely unseen check. The tuner tries moving-average pairs (20/50, 20/100, 50/200) and momentum thresholds (10%, 20%, 30%), and decides whether each trend, momentum and P&F signal should count as a 🚀, a 😢, or be switched off, judging it over the next 1, 3 and 7 days. It still measures RSI and wide-band variants and logs what it *would* do with them, but it keeps them off. Since Sept 2026 only the MA trend, P&F trend and momentum are scored; before that, RSI and Bollinger signals counted too, and momentum and P&F were off. The newest half of history is cut into **three check periods**. For each one, settings are chosen using only the days before it, then compared with the current settings on that period. New settings are written to `params.json` **only if they win at least 2 of the 3 periods and do better on average**. Because many variants get tried, a signal needs t ≥ 2.5 (not the usual 2) to be switched on. The site picks new settings up automatically, and every change is logged on the Scorecard.
 
 Statistics cap moves at ±30% a day (wider for 3 and 7 days), so a bad price print can't dominate the averages. The Scorecard still shows each coin's real move. A signal needs at least 20 firings before it gets a verdict.
 
 *Honest baseline (first runs, Sept 2026):* the default signals showed **no reliable next-day edge**. The daily rank correlation was about 0, and 🚀 coins went up 48% of the time, the same as all coins. Two signals pointed the wrong way: overbought and wide-band coins tended to *keep* outperforming (momentum). So far the tuner has kept the defaults, because the momentum settings didn't hold up on the most recent months. And ⚡ squeezes (bottom 10% of band width) were followed by *smaller* moves than usual (about 0.85×), not bigger ones. The recommended stops were crossed about 22% of the time within 3 days, and after an exit the next move was roughly a coin flip. Among the three distances, **2.5×** exits saved the most (about 0.43% over 3 days, vs 0.18% at 2×), so the tuner is set to switch to it at its next run. **30-day momentum** was the strongest single signal found (t ≈ 2.9), but the full set of proposed settings hasn't yet beaten the current ones on recent data. That's typical: a stop doesn't predict direction, it caps how much you can lose.
+
+**How honest is the scorecard?** Some safeguards against fooling ourselves:
+- **Conditions, not predictions:** the emoji describe a coin's current trend, point & figure column and momentum. The Scorecard tests whether they would have predicted anything, and the page says so (**ⓘ How to read**).
+- **Costs:** results are also shown after an estimated round-trip trading cost: about 0.2% for crypto (0.1% each way on a large exchange) and about 0.05% for forex (the spread). A small edge can disappear after costs.
+- **Untouched holdout:** the tuner never sees the newest 90 days (see Self-tuning).
+- **Point-in-time list:** scoring today's top 100 flatters the 🚀, because coins make the list *by* rising. From Oct 2026 the scorer records each day's list (`data/universe-history.json`) and scores those coin-days separately. A verdict needs about 60 days of records.
+- **Unusual jumps** in currency rates are flagged and left out (see Forex).
 
 ## Forex: heat.sala.company/forex/
 
@@ -74,7 +81,9 @@ The same heatmap for **48 currencies against the US dollar**. The **🪙 Crypto 
 - **It's the same page.** `/forex/` is made from `index.html` at deploy (`scripts/forex-page.mjs`), with only the search tags, the About/FAQ text and the source credits swapped in (`seo/forex-*.html`). The page picks its market from its address, and everything market-specific sits in one `MARKETS` settings block at the top of the page script. So any change to tiles, popups, filters, the scorecard or the engine shows on both pages.
 - **Rates:** official **ECB euro reference rates** (via the Frankfurter API) for 29 currencies, set once per business day around 14:15 Frankfurt time, with history back to 1999. Currencies the ECB doesn't publish (the ruble, the Gulf and other Arab currencies, the rial, the Syrian pound) come from the public-domain **exchange-api** feed and get the **?** mark. ECB rates get **✓**. Weekends have no rates, so charts and indicators use business days.
 - **Quoting:** every pair **dollar first** by default (USD/EUR, USD/GBP, USD/JPY…), so all tiles read the same way: blue means the dollar gained against that currency. The **USD/… | …/USD** switch flips every pair to **currency first** (EUR/USD, GBP/USD, JPY/USD…), where blue means that currency gained. Rates, charts, stops and 🚀/😢 are all recalculated from the flipped history. `forex.json` and the Scorecard are always USD/… (the Scorecard says so in the …/USD view). Note that brokers quote EUR, GBP, AUD and NZD currency first (EUR/USD) and most other currencies dollar first (USD/JPY).
+- **Flags:** real flag emoji on phones and Macs; on Windows, which has none, a small country-code badge (EU, JP …) instead.
 - **Pegged currencies** (SAR, AED, QAR, BHD, OMR, JOD, IQD, LBP and HKD) are hidden unless you tick **Pegged**, and they're never scored. This setting is separate from crypto's Stablecoins checkbox.
+- **Unusual jumps:** a one-day move at least 10× the currency’s typical move over the previous 60 days (and at least 2.5%) is flagged. In the last month it gets a **⚠** on the tile and an explanation in the popup. It may be a data glitch, or a real devaluation (EGP, LBP, SDG, the rial). Either way, that day and the 7 days before it are left out of the scorecard.
 - **IRR and SYP:** their official and street rates differ a lot, so they're shown with **⚠** and a note in the popup, and never scored.
 - **Forex-sized settings:** the color scale runs ±0.1% … ±1% for a day. Timeframes are **1d / 1w / 1m** (1, 5 and 21 business days). Momentum is a 21-business-day move above or below 3%. P&F boxes go down to 0.1%.
 - **Scorecard and tuner:** `scripts/score-forex.mjs` runs in the same nightly job (and tunes on Sundays), on ECB history since 2010 plus the extra feed since March 2024. It writes `data/forex-scorecard.json`, `params-forex.json` (when the tuner adopts new settings) and `data/forex-extras.json` (a cache of the extra feed, so each run only fetches new days). *First run (Oct 2026):* about 116,000 currency-days, with no reliable edge for any scored signal.
@@ -96,7 +105,8 @@ GitHub Actions: daily 00:20 UTC (via cron-job.org)
 
 | File | What it is |
 |---|---|
-| `index.html` | The whole site (HTML, CSS and JS in one page), including its search and link-preview tags |
+| `index.html` | The page: HTML, CSS, and its search and link-preview tags |
+| `app/` | The page script, as ES modules: `markets.mjs` (everything market-specific, one adapter per market), `core.mjs` (helpers and state), `data.mjs` (indicators per tile), `render.mjs` (tiles, legend, table), `scorecard.mjs`, `interact.mjs` (popup, hover, clicks, switches) and `main.mjs` (loading and refresh; it starts the page) |
 | `og-image.png`, `og-image-forex.png`, `robots.txt` | The link-preview images (crypto and forex) and the robots file, published with the site (the deploy job also writes `sitemap.xml`) |
 | `scripts/build-forex.mjs` | Builds `forex.json`: the currency list, both rate sources, business-day closes. Reuses the last file and refetches hourly |
 | `scripts/score-forex.mjs` | Daily forex scorecard and weekly tuning |
@@ -111,8 +121,10 @@ GitHub Actions: daily 00:20 UTC (via cron-job.org)
 | `data/pairs.json` | Each coin's exact USDT pair on Binance, Gate.io, OKX, MEXC and KuCoin, from CoinGecko's per-coin tickers. Refreshed weekly by the scorer (and for coins new to the top 100), so a ticker shared by two coins, or a renamed coin (Toncoin now trades as GRAM), can't pull in the wrong price history. |
 | `.github/workflows/update-data.yml` | Builds `data.json` and deploys the site to GitHub Pages every 10 minutes and on every push to `main` |
 | `.github/workflows/score-signals.yml` | Daily scoring (plus Sunday tuning). It commits the results, which also keeps the schedules from being paused for inactivity. |
-| `.github/workflows/test.yml` | Runs the unit tests on every push |
-| `.github/workflows/e2e.yml` | **Browser tests** (Playwright, headless Chrome) on every push: no outside API calls, filters, both stop states, the popup (fits a 13-inch screen, opens only on a resting mouse, closes when moving away, stays put when moving onto it, pins and closes), the phone bottom sheet, and the Scorecard view |
+| `.github/workflows/test.yml` | Runs the unit tests on every push to any branch |
+| `.github/workflows/freshness.yml`, `scripts/check-fresh.mjs` | **Hourly freshness check** of the live site: fails (and GitHub emails you) if `data.json`, `forex.json` or a scorecard stops updating, even when every other job "succeeds" |
+| `data/universe-history.json` | Each day's top-100 list, for the point-in-time scorecard |
+| `.github/workflows/e2e.yml` | **Browser tests** (Playwright, headless Chrome) on every push to any branch: no outside API calls, filters, both stop states, the popup (fits a 13-inch screen, opens only on a resting mouse, closes when moving away, stays put when moving onto it, pins and closes), the phone bottom sheet, and the Scorecard view |
 | `tests/e2e/` | The browser tests, deterministic test data (`fixtures.mjs`) and a local server (`serve.mjs`, also `npm run dev`) |
 
 **How the data stays safe and fresh:**
@@ -122,6 +134,8 @@ GitHub Actions: daily 00:20 UTC (via cron-job.org)
 - Stablecoins, tokenized gold, wrapped/staked copies and fund tokens are excluded. The checkbox next to **How to read** brings them back.
 
 ## Running it yourself
+
+- **Making changes:** work on a branch. The unit and browser tests run on every push to any branch; merge into `main` only when both pass. Only `main` deploys.
 
 - **Rebuild from scratch:** [`docs/rebuild-prompts.md`](docs/rebuild-prompts.md) has the 12 prompts, in order, that built this project with Claude.
 - **Manual runs:** go to **Actions → Update heatmap data → Run workflow**, or **Actions → Score signals → Run workflow**. Tick *"Run the tuner now"* to tune immediately.

@@ -98,10 +98,11 @@ export function showDetail(id, anchor, keepPos) {
   const box = $('#detail');
   if (!c) return hideDetail(true);
   const ind = S.ind[id], h = S.hist[id];
-  let body = `<div class="d-head">${logo(c, 22)}<b>${esc(c.name)}</b><span style="color:var(--ink-2)">${esc(c.symbol.toUpperCase())}${c.fx ? '' : ` · #${c.market_cap_rank}`}</span></div>
+  let body = `<div class="d-head">${logo(c, 22)}<b>${esc(c.name)}</b><span style="color:var(--ink-2)">${esc(c.symbol.toUpperCase())}${M.ranked ? ` · #${c.market_cap_rank}` : ''}</span></div>
     <div class="d-price">${fmtPrice(c.current_price)}</div>
-    <div class="d-chg"><span>${TF('24h')} ${fmtPct(chgOf(c, '24h'))}</span><span>${TF('7d')} ${fmtPct(chgOf(c, '7d'))}</span><span>${TF('30d')} ${fmtPct(chgOf(c, '30d'))}</span>${c.fx ? '' : `<span>Cap ${fmtBig(c.market_cap)}</span>`}</div>
-    ${c.warn ? `<div class="d-src">⚠ <b>${esc(c.name)}: the official rate and the street (market) rate differ a lot.</b> This rate comes from a community feed whose sources aren't documented, so it may not match what you'd actually get. It is left out of the scorecard.</div>` : ''}`;
+    <div class="d-chg"><span>${TF('24h')} ${fmtPct(chgOf(c, '24h'))}</span><span>${TF('7d')} ${fmtPct(chgOf(c, '7d'))}</span><span>${TF('30d')} ${fmtPct(chgOf(c, '30d'))}</span>${M.ranked ? `<span>Cap ${fmtBig(c.market_cap)}</span>` : ''}</div>
+    ${c.warn ? `<div class="d-src">⚠ <b>${esc(c.name)}: the official rate and the street (market) rate differ a lot.</b> This rate comes from a community feed whose sources aren't documented, so it may not match what you'd actually get. It is left out of the scorecard.</div>` : ''}
+    ${c.spike ? `<div class="d-src">⚠ <b>Unusual jump of ${fmtPct(c.spike.pct, 1)} on ${c.spike.date}</b>: far outside this ${M.one}'s normal daily range. It may be a data glitch or a real devaluation, so check another source before relying on it. The days around it are left out of the scorecard.</div>` : ''}`;
   if (ind && !ind.error) {
     body += `<div class="d-cols"><div class="d-left">${chartSwitch()}${S.chart === 'pnf' ? pnfChart(ind) : detailChart(ind)}</div><div class="d-right">`;
     const trendTxt = ind.trend ? `${ind.trend === 'up' ? '▲ Uptrend' : '▼ Downtrend'} (${ind.strong ? 'price agrees' : ind.trend === 'up' ? `price below ${P().maFast}MA` : `price above ${P().maFast}MA`})` : `${P().maSlow}-day history not available yet`;
@@ -123,12 +124,10 @@ export function showDetail(id, anchor, keepPos) {
         return `<div class="d-stop ${s}"><div class="d-st">Recommended stop · <b>${side}</b> positions</div><div class="d-sv">${fmtPrice(ind.stop[side])} <span>${fmtPct(ind.stop[side + 'Pct'], 1)}</span></div><div class="d-sn">${note}</div></div>`;
       }).join('')}
     </div>
-    <div class="d-src">Stops = ${P().stopMult}× the average daily move (${(ind.stop.dist / P().stopMult * 100).toFixed(c.fx ? 2 : 1)}%) from the ${new Date(ind.t[ind.stop.anchorIdx ?? ind.n - 2] ?? Date.now()).toISOString().slice(0, 10)} ${c.fx ? 'rate' : 'close'}. Suggested levels, not advice: set them with ${M.stopWhere}, as this page isn't real-time.</div>` : ''}
-    <div class="d-src">${!h ? '' : c.fx
-      ? `${h.ok ? '✓ Official ECB reference rate' : '? Community exchange-api feed (public domain)'} · ${ind.n} business days`
-      : `${h.src} ${h.pair} · ${h.ok ? '✓ verified by CoinGecko ID' : '⚠ matched by ticker only (not verified)'} · ${ind.n} daily candles`}${ind.bbShort ? ' · BBW percentile uses under 90 days' : ''}</div>`;
+    <div class="d-src">Stops = ${P().stopMult}× the average daily move (${(ind.stop.dist / P().stopMult * 100).toFixed(M.stopDecimals)}%) from the ${new Date(ind.t[ind.stop.anchorIdx ?? ind.n - 2] ?? Date.now()).toISOString().slice(0, 10)} ${M.closeShort}. Suggested levels, not advice: set them with ${M.stopWhere}, as this page isn't real-time.</div>` : ''}
+    <div class="d-src">${h ? M.sourceLine(c, h, ind) : ''}${ind.bbShort ? ' · BBW percentile uses under 90 days' : ''}</div>`;
     body += '</div></div>';
-  } else body += `<div class="d-src">${ind?.error ? (c.fx ? 'No rate history available for this currency.' : 'No daily history found on Binance, Gate.io, OKX or CoinGecko.') : 'Loading candles…'}</div>`;
+  } else body += `<div class="d-src">${ind?.error ? M.noHistory : 'Loading candles…'}</div>`;
   box.querySelector('.body').innerHTML = body;
   box.classList.add('show');
   if (keepPos) {                              // redrawn in place (e.g. chart switch): stay inside the window
@@ -209,7 +208,7 @@ export function headingInto(rect) {
   return true;
 }
 export let openTimer = 0, hideTimer = 0, overDetail = false, pendingId = null;
-export const HOVER_OPEN_MS = 2000, HOVER_HIDE_MS = 250, HOVER_AWAY_MS = 120;
+export const HOVER_OPEN_MS = 700, HOVER_HIDE_MS = 250, HOVER_AWAY_MS = 120;   // rest 0.7 s on a coin (or point at its ⓘ) to open it
 export const cancelHide = () => { clearTimeout(hideTimer); hideTimer = 0; };
 export const cancelOpen = () => { clearTimeout(openTimer); pendingId = null; };
 export const hideSoon = ms => { if (!hideTimer) hideTimer = setTimeout(() => { hideTimer = 0; if (!overDetail) hideDetail(); }, ms); };
@@ -228,6 +227,8 @@ $('#grid').addEventListener('mousemove', e => {
   if (S.pinned || !finePointer.matches) return;
   const t = e.target.closest('.tile'), box = $('#detail'), shown = box.classList.contains('show');
   if (!t) { cancelOpen(); return; }
+  // ⓘ: open at once, unless the mouse is just sweeping past it on its way somewhere else
+  if (e.target.closest('.ti') && S.hoverId !== t.dataset.id && ptrSpeed() < 0.3) { cancelHide(); cancelOpen(); showDetail(t.dataset.id, t); return; }
   if (shown && S.hoverId === t.dataset.id) { cancelHide(); cancelOpen(); return; }   // still on the open coin
   if (shown && headingInto(box.getBoundingClientRect())) { cancelHide(); cancelOpen(); return; }   // on the way to the popup
   if (shown) hideSoon(HOVER_AWAY_MS);                      // moving away toward another coin
@@ -291,7 +292,7 @@ export function seg(id, key, after) {
 seg('colorBy', 'colorBy', renderAll);
 seg('view', 'view', () => { hideDetail(true); renderAll(); });
 // Forex: USD/… | …/USD. Redraws everything from the same rates, flipped or not (see quoteView)
-$('#quote').hidden = MARKET !== 'forex';
+$('#quote').hidden = !M.quoteSwitch;
 seg('quote', 'quote', () => { hideDetail(true); if (S.raw) { S.coins = []; show(S.raw, S.mode === 'live'); } });
 // "How to read": the full legend opens below the one-line legend, and stays open or closed per browser
 export const setLegend = open => { S.legendOpen = open; $('#legendMore').hidden = !open; $('#legendToggle').setAttribute('aria-expanded', open); $('#legendToggle').textContent = open ? '✕ Hide legend' : 'ⓘ How to read'; };
@@ -313,15 +314,25 @@ $('#scorewrap').addEventListener('click', e => {
 export function setFilter(f) {
   S.filter = f;
   if (f === 'all') S.heat = null;               // "All coins" / "Show all coins" also clears a color-scale range
-  $$('#filters .chip').forEach(x => x.setAttribute('aria-pressed', x.dataset.f === S.filter));
+  $$('#filters .chip[data-f]').forEach(x => x.setAttribute('aria-pressed', x.dataset.f === S.filter));
+  // a filter picked from "More ▾" closes the menu and shows on its button: "More: Squeeze ▾"
+  const more = $('#moreFilters'), inMore = more.querySelector(`[data-f="${S.filter}"]`);
+  more.toggleAttribute('data-active', !!inMore);
+  more.querySelector('summary').textContent = inMore ? `More: ${inMore.firstChild.textContent.trim()} ▾` : 'More ▾';
+  if (!phone.matches) more.open = false;
   hideDetail(true);
   renderAll();
 }
 // clicking the active filter again (or "All coins") shows every coin
 $('#filters').addEventListener('click', e => {
-  const b = e.target.closest('.chip'); if (!b) return;
+  const b = e.target.closest('.chip[data-f]'); if (!b) return;   // the "More ▾" button just opens its menu
   setFilter(S.filter === b.dataset.f && b.dataset.f !== 'all' ? 'all' : b.dataset.f);
 });
+// "More ▾" closes on a click elsewhere; on phones it's always open, inline in the swipeable row
+const phone = matchMedia('(max-width: 640px)');
+const syncMore = () => { $('#moreFilters').open = phone.matches; };
+phone.addEventListener('change', syncMore); syncMore();
+document.addEventListener('click', e => { if (!phone.matches && !e.composedPath().includes($('#moreFilters'))) $('#moreFilters').open = false; });
 // Color scale: click a range to show only coins in it; click it again to show every coin
 $('#legendScale').addEventListener('click', e => {
   const b = e.target.closest('[data-heat]'); if (!b) return;

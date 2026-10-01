@@ -1,6 +1,6 @@
 // heat.sala.company page script: render (split from index.html; see app/main.mjs for the order things start in)
 import * as SIG from '/signals.mjs';
-import { $, $$, BINS, chgOf, esc, fmtBig, fmtPct, fmtPrice, heatClass, logo, M, MARKET, S, TF, TOP_N } from './core.mjs';
+import { $, $$, BINS, chgOf, esc, fmtBig, fmtPct, fmtPrice, heatClass, logo, M, S, TF, TOP_N } from './core.mjs';
 import { compute, match, P, withLive } from './data.mjs';
 import { emo, pc, renderScorecard } from './scorecard.mjs';
 import { showDetail } from './interact.mjs';
@@ -93,7 +93,7 @@ export function emojiHTML(ind) {
   const trendHTML = trend.length ? `<span class="emo" title="${esc(trendTitle)}" aria-label="${esc(trendTitle)}">${trend.map(roleOf).join('')}</span>` : '';
   const m30 = ind?.chg?.['30d'];
   const momHTML = mom.map(k => {
-    const t = `${MOM_EMO[k]} ${SIG.COMPONENTS[k]}${m30 != null ? ` (${fmtPct(m30, 1)} in ${MARKET === 'forex' ? `${P().momDays} business days` : `${P().momDays} days`})` : ''}: counts as a ${call(k)}`;
+    const t = `${MOM_EMO[k]} ${SIG.COMPONENTS[k]}${m30 != null ? ` (${fmtPct(m30, 1)} in ${M.days(P().momDays)})` : ''}: counts as a ${call(k)}`;
     return `<span class="emo mom" title="${esc(t)}" aria-label="${esc(t)}">${MOM_EMO[k]}</span>`;
   }).join('');
   return trendHTML + pnfMark(ind) + momHTML;
@@ -113,13 +113,17 @@ export function pnfMark(ind) {
 // ✓ = price history comes from a trading pair confirmed by the coin's CoinGecko ID; ? = matched by ticker only
 export function verifyMark(c) {
   const h = S.hist[c.id];
-  if (!h) return '';
-  if (MARKET === 'forex') return h.ok      // ✓ = official ECB rate; ? = the extra community feed
-    ? `<span class="vf ok" title="Official ECB reference rate" aria-label="official ECB rate">✓</span>`
-    : `<span class="vf guess" title="Rate from the community exchange-api feed (public domain, sources not documented)${c.warn ? '. Official and market rates differ a lot for this currency' : ''}" aria-label="community feed, not official">?</span>`;
-  return h.ok
-    ? `<span class="vf ok" title="Price history: ${esc(h.src)} ${esc(h.pair)}, verified by CoinGecko ID" aria-label="verified">✓</span>`
-    : `<span class="vf guess" title="Price history: ${esc(h.src)} ${esc(h.pair)}, matched by ticker only (not verified)" aria-label="not verified">?</span>`;
+  return h ? M.verify(c, h) : '';
+}
+// ⚠ on a tile: the rate source can't be trusted (warn), or the price made an unusual jump lately (spike, see
+// findSpikes in scripts/build-forex.mjs)
+export const cautionNotes = c => [
+  c.warn && 'Official and market rates differ a lot for this currency',
+  c.spike && `Unusual jump of ${fmtPct(c.spike.pct, 1)} on ${c.spike.date}: a data glitch or a real devaluation, so check another source. Days around it are left out of the scorecard`,
+].filter(Boolean);
+export function cautionMark(c) {
+  const notes = cautionNotes(c);
+  return notes.length ? `<span class="rk caution" title="${esc(notes.join('. '))}" aria-label="caution: ${esc(notes.join('. '))}">⚠</span>` : '';
 }
 
 export function tileHTML(c) {
@@ -129,12 +133,13 @@ export function tileHTML(c) {
   const stopCls = !ind?.stop ? '' : [ind.stop.longState, ind.stop.shortState].includes('closed') ? ' stop-closed' : [ind.stop.longState, ind.stop.shortState].includes('intraday') ? ' stop-intraday' : '';
   return `<button class="tile ${heatClass(ch, S.colorBy)}${stopCls}" data-id="${esc(c.id)}" aria-label="${esc(label)}">
     <div class="top">
-      <div class="sym">${logo(c, 18)}<span>${esc(c.symbol.toUpperCase())}</span>${verifyMark(c)}${c.fx ? (c.warn ? '<span class="rk" title="Official and market rates differ a lot for this currency">⚠</span>' : '') : `<span class="rk">#${c.market_cap_rank}</span>`}</div>
+      <div class="sym">${logo(c, 18)}<span>${esc(c.symbol.toUpperCase())}</span>${verifyMark(c)}${cautionMark(c)}${M.ranked ? `<span class="rk">#${c.market_cap_rank}</span>` : ''}</div>
       <div class="chg">${fmtPct(ch, ch != null && Math.abs(ch) >= 10 ? 1 : 2)}</div>
       <div class="name"><span class="nm">${esc(c.name)}</span>${emojiHTML(ind)}</div>
       <div class="px">${fmtPrice(c.current_price)}</div>
     </div>
     <div class="ind">${indHTML(ind)}</div>
+    <span class="ti" aria-hidden="true" title="Open the chart card now">ⓘ</span>
   </button>`;
 }
 
@@ -173,7 +178,13 @@ export function renderLegend() {
   $('#legendScale').innerHTML = `${TF(S.colorBy)} change % <span class="scale${S.heat ? ' picking' : ''}" role="group" aria-label="Show only ${M.noun} in this ${TF(S.colorBy)} range">${cells.map(([k, l]) =>
     `<button type="button" class="${k}" data-heat="${k}" aria-pressed="${S.heat === k}" title="Show only ${M.noun} with a ${TF(S.colorBy)} change of ${l}%">${l}</button>`).join('')}</span>`;
   $('#legendEdge').innerHTML = edgeBadge();
+  // The one place that explains the page: what a tile shows, then the current rules and track record
   $('#legendMore').innerHTML = `
+    <p class="leg-read"><b>What the emoji mean.</b> 🚀/😢, X📈/O📉 and 🔥/🧊 describe a ${M.one}'s <b>current conditions</b> (its trend, point &amp; figure column and momentum), <b>not predictions</b>. The <a href="#" data-goto-score>Scorecard</a> checks every day whether they would have predicted the next moves; so far they haven't reliably, so read them as a quick summary of the chart, not as advice.</p>
+    <p class="leg-read"><b>Reading a tile.</b> <b>RSI</b>: the marker shows where RSI sits on 0–100; below the lower line is <i>oversold</i>, above the upper line <i>overbought</i>.
+      <b>MA</b>: the fast moving average above the slow one is an uptrend, below is a downtrend; "strong" means the price agrees, "pullback" or "bounce" that it doesn't; ✦ marks a golden or death cross in the last 14 days.
+      <b>BBW</b>: Bollinger Band width, ranked against the last 180 days; the bottom 25% is a <i>squeeze</i> (quiet price, a big move often follows, either way), the top 20% <i>expanded</i>.
+      <b>✓ / ?</b>: how reliable the price source is (hover it). <b>⚠</b>: a caution about this ${M.one}'s data (hover it). <b>ⓘ</b>: point at it to open the chart card at once.</p>
     <span class="leg-item"><span class="gauge" style="width:60px;flex:none"><i style="left:50%"></i></span> RSI 0–100 (under ${P().rsiLow} oversold · over ${P().rsiHigh} overbought)</span>
     <span class="leg-item"><span class="up-t" style="display:inline-flex">${ICON.up}</span>/<span class="dn-t" style="display:inline-flex">${ICON.down}</span> ${P().maFast}MA vs ${P().maSlow}MA</span>
     <span class="leg-item"><b>STOP</b> = recommended stop-loss: <b>L</b> for long positions, <b>S</b> for short, ${P().stopMult}× the ${M.one}'s average daily move from the last ${M.closeWord}${M.live ? ' · ⚠ past it intraday = watch' : ''} · 🛑 a ${M.live ? 'daily close' : 'rate'} past it = suggested exit</span>
@@ -222,7 +233,7 @@ export function scheduleSide() {
 }
 
 export function renderCounts() {
-  for (const b of $$('#filters .chip')) {
+  for (const b of $$('#filters .chip[data-f]')) {
     const f = b.dataset.f;
     if (f === 'all') continue;
     b.querySelector('.n').textContent = S.coins.filter(c => match(S.ind[c.id], f)).length;
@@ -240,13 +251,13 @@ export function stopCell(st, side) {
 
 export const COLS = [
   ['rank', '#', c => c.market_cap_rank],
-  ['name', MARKET === 'forex' ? 'Currency' : 'Coin', c => c.name.toLowerCase()],
+  ['name', M.nameCol, c => c.name.toLowerCase()],
   ['sig', 'Signals', c => { const s = signals(S.ind[c.id]); return s.good.length - s.bad.length; }],
   ['price', 'Price', c => c.current_price],
   ['24h', TF('24h'), c => chgOf(c, '24h')],
   ['7d', TF('7d'), c => chgOf(c, '7d')],
   ['30d', TF('30d'), c => chgOf(c, '30d')],
-  ...(MARKET === 'crypto' ? [['mcap', 'Mkt cap', c => c.market_cap]] : []),   // currencies have no market cap
+  ...(M.ranked ? [['mcap', 'Mkt cap', c => c.market_cap]] : []),   // currencies have no market cap
   ['rsi', 'RSI', c => S.ind[c.id]?.rsiNow],
   ['trend', 'Trend', c => { const i = S.ind[c.id]; return i?.trend ? (i.trend === 'up' ? 2 : 0) + (i.strong ? (i.trend === 'up' ? 1 : -0.5) : 0) : null; }],
   ['dF', 'vs fast MA', c => { const i = S.ind[c.id]; return i?.mF ? (i.last / i.mF - 1) * 100 : null; }],
@@ -271,12 +282,12 @@ export function renderTable() {
     const trend = i.trend ? `<span class="${i.trend === 'up' ? 'up-t' : 'dn-t'}">${i.trend === 'up' ? '▲ Up' : '▼ Down'}</span>${i.cross ? ' ✦' : ''}` : '—';
     const bbp = i.bbPct != null ? `${i.bbPct.toFixed(0)}${i.bbState === 'tight' || i.bbState === 'squeeze' ? ' · Squeeze' : ''}` : '—';
     return `<tr data-id="${esc(c.id)}"><td>${c.market_cap_rank}</td><td><b>${esc(c.symbol.toUpperCase())}</b> <span style="color:var(--ink-2)">${esc(c.name)}</span></td><td style="text-align:left">${emojiHTML(S.ind[c.id]) || ''}</td>
-      <td>${fmtPrice(c.current_price)}</td><td>${heat('24h')}</td><td>${heat('7d')}</td><td>${heat('30d')}</td>${MARKET === 'crypto' ? `<td>${fmtBig(c.market_cap)}</td>` : ''}
+      <td>${fmtPrice(c.current_price)}</td><td>${heat('24h')}</td><td>${heat('7d')}</td><td>${heat('30d')}</td>${M.ranked ? `<td>${fmtBig(c.market_cap)}</td>` : ''}
       <td>${rsi}</td><td>${trend}</td><td>${fmtPct(i.mF ? (i.last / i.mF - 1) * 100 : null, 1)}</td><td>${fmtPct(i.mS ? (i.last / i.mS - 1) * 100 : null, 1)}</td>
       <td>${i.bbw != null ? i.bbw.toFixed(1) + '%' : '—'}</td><td>${bbp}</td>
       <td>${stopCell(i.stop, 'long')}</td><td>${stopCell(i.stop, 'short')}</td></tr>`;
   }).join('');
-  $('#tablewrap').innerHTML = `<table><caption class="sr">${MARKET === 'forex' ? 'Currencies against the US dollar' : `Top ${TOP_N} coins`} with indicators</caption><thead><tr>${head}</tr></thead><tbody>${body || `<tr><td colspan="${COLS.length}" style="text-align:left">${emptyHTML()}</td></tr>`}</tbody></table>`;
+  $('#tablewrap').innerHTML = `<table><caption class="sr">${M.tableCaption(TOP_N)} with indicators</caption><thead><tr>${head}</tr></thead><tbody>${body || `<tr><td colspan="${COLS.length}" style="text-align:left">${emptyHTML()}</td></tr>`}</tbody></table>`;
 }
 
 export function renderFooter() {
@@ -284,14 +295,11 @@ export function renderFooter() {
   for (const c of S.coins) { const h = S.hist[c.id]; if (h) src[h.src] = (src[h.src] || 0) + 1; }
   const parts = Object.entries(src).map(([k, v]) => `${v} from ${k}`);
   const withHist = S.coins.filter(c => S.hist[c.id]), ok = withHist.filter(c => S.hist[c.id].ok).length;
-  $('#srcinfo').textContent = MARKET === 'forex'
-    ? `Rates: ${parts.join(' · ') || '—'}${S.stale ? ' (saved copy, sources busy)' : ''}. ✓ marks an official ECB reference rate; ? marks the community feed.`
-    : `Prices & rankings: ${S.marketSrc || '—'}${S.stale ? ' (saved copy, sources busy)' : ''}.` + (parts.length ? ` Daily candles: ${parts.join(' · ')}.` : '')
-      + (withHist.length ? ` ✓ ${ok} of ${withHist.length} coins matched to their exchange pair by CoinGecko ID; ? marks a ticker-only match.` : '');
+  $('#srcinfo').textContent = M.srcInfo({ marketSrc: S.marketSrc, stale: S.stale, parts, ok, total: withHist.length });
   const ex = $('#excluded');
   ex.hidden = S.pegged || !S.excluded.length;
   ex.querySelector('summary').textContent = `Excluded ${S.excluded.length} ${M.pegWords} (tick "${M.pegLabel}" to show them)`;
-  ex.querySelector('div').textContent = S.excluded.slice(0, 60).map(c => c.fx ? c.symbol : `${c.symbol.toUpperCase()} (#${c.market_cap_rank})`).join(', ');
+  ex.querySelector('div').textContent = S.excluded.slice(0, 60).map(M.excludedName).join(', ');
 }
 
 export function renderAll() {

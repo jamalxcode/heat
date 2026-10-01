@@ -76,6 +76,7 @@ export function makeForexFixtures(now = Date.now()) {
   for (const [code, seed, drift] of FX_SPEC) {
     const base = { EUR: 0.9, JPY: 150, GBP: 0.78, CHF: 0.85, RUB: 85, EGP: 48, SAR: 3.75, IRR: 1.2e6 }[code];
     const c = seed ? walk(seed, FX_N, drift, 0.004).map(v => v / 100 * base) : Array(FX_N).fill(base);
+    if (code === 'EGP') c[FX_N - 1] = c[FX_N - 2] * 1.15;   // an unusual one-day jump: flagged ⚠ (findSpikes)
     const src = CURRENCIES.find(x => x.code === code).src;
     days.forEach((d, i) => {
       const date = isoDay(d);

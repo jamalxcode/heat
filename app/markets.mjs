@@ -1,0 +1,79 @@
+// heat.sala.company: one adapter per market. The same page serves every market (/ is crypto, /forex/ is forex: a copy
+// of index.html with its own search tags, made at deploy by scripts/forex-page.mjs), and EVERYTHING market-specific
+// lives here: data files, color ranges, timeframe names, number formats, wording, which columns and switches exist.
+// Tiles, popups, filters, the scorecard and the signal engine are shared and ask `M.…`, so a change to them shows on
+// every market. A new market (stocks, commodities) is mostly a new entry here plus its data script.
+
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const linkCG = '<a class="cg-attr" href="https://www.coingecko.com/" target="_blank" rel="noopener">Powered by CoinGecko</a>';   // required for the free CoinGecko API key
+const linkECB = '<a class="cg-attr" href="https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html" target="_blank" rel="noopener">Source: ECB</a>';
+
+export const MARKETS = {
+  crypto: {
+    key: 'crypto', data: '/data.json', scorecard: '/scorecard.json', top: 100, noun: 'coins', one: 'coin', nameCol: 'Coin',
+    live: true,                       // a live price between daily candles; today's candle is still forming
+    ranked: true,                     // tiles show the market-cap rank (#1, #2 …) and the table has a market-cap column
+    quoteSwitch: false,               // no USD/… | …/USD switch
+    pegPref: 'pegged',                // localStorage key for "show stablecoins"
+    bins: { '24h': [1, 3, 6, 10], '7d': [2.5, 7, 15, 25], '30d': [5, 15, 30, 50] },
+    back: { '24h': 1, '7d': 7, '30d': 30 },          // candles back for each change (one candle per day)
+    label: { '24h': '24h', '7d': '7d', '30d': '30d' },
+    pegLabel: 'Stablecoins', pegTitle: 'Include stablecoins, tokenized gold and wrapped/staked copies',
+    pegWords: 'stablecoins, pegged and fund tokens', closeWord: 'daily close (00:00 UTC)', closeShort: 'close', stopWhere: 'your exchange',
+    stopDecimals: 1, days: n => `${n} days`, tableCaption: n => `Top ${n} coins`, noHistory: 'No daily history found on Binance, Gate.io, OKX or CoinGecko.',
+    price(p) {
+      if (p >= 1000) return '$' + p.toLocaleString('en-US', { maximumFractionDigits: 0 });
+      if (p >= 1) return '$' + p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      if (p >= 0.01) return '$' + p.toFixed(4);
+      return '$' + Number(p.toPrecision(3)).toString();
+    },
+    // ✓ = price history from an exchange pair confirmed by the coin's CoinGecko ID; ? = matched by ticker only
+    verify: (c, h) => h.ok
+      ? `<span class="vf ok" title="Price history: ${esc(h.src)} ${esc(h.pair)}, verified by CoinGecko ID" aria-label="verified">✓</span>`
+      : `<span class="vf guess" title="Price history: ${esc(h.src)} ${esc(h.pair)}, matched by ticker only (not verified)" aria-label="not verified">?</span>`,
+    sourceLine: (c, h, ind) => `${h.src} ${h.pair} · ${h.ok ? '✓ verified by CoinGecko ID' : '⚠ matched by ticker only (not verified)'} · ${ind.n} daily candles`,
+    srcInfo: ({ marketSrc, stale, parts, ok, total }) => `Prices & rankings: ${marketSrc || '—'}${stale ? ' (saved copy, sources busy)' : ''}.`
+      + (parts.length ? ` Daily candles: ${parts.join(' · ')}.` : '')
+      + (total ? ` ✓ ${ok} of ${total} coins matched to their exchange pair by CoinGecko ID; ? marks a ticker-only match.` : ''),
+    excludedName: c => `${c.symbol.toUpperCase()} (#${c.market_cap_rank})`,
+    costWords: 'about 0.1% each way on a large exchange', tuneHistory: 'about 2.7 years of history',
+    basketNote: `, and the coins are today's top 100, several of which made the list <i>because</i> they rose, so all three lines look better than reality`,
+    fresh: ({ tm, ago, next, late, refreshMin }) => `<span>🕒 <b>Last refreshed ${tm}</b> (${ago}) · ${next} · <b>not real-time</b>, every ${refreshMin} min`
+      + (late ? ' · <b>⚠ this update is running late: showing the last good data</b>' : '') + '</span>' + linkCG,
+  },
+  forex: {
+    key: 'forex', data: '/forex.json', scorecard: '/forex-scorecard.json', top: 999, noun: 'currencies', one: 'currency', nameCol: 'Currency',
+    live: false,                      // one official rate per business day: nothing forms in between
+    ranked: false, quoteSwitch: true, pegPref: 'peggedFx',
+    bins: { '24h': [0.1, 0.3, 0.6, 1], '7d': [0.25, 0.75, 1.5, 3], '30d': [0.5, 1.5, 3, 6] },
+    back: { '24h': 1, '7d': 5, '30d': 21 },          // business days: 5 ≈ a week, 21 ≈ a month
+    label: { '24h': '1d', '7d': '1w', '30d': '1m' },
+    pegLabel: 'Pegged', pegTitle: 'Include currencies pegged to the US dollar (Gulf currencies, HKD, JOD, IQD, LBP)',
+    pegWords: 'currencies pegged to the dollar', closeWord: 'ECB rate', closeShort: 'rate', stopWhere: 'your broker',
+    stopDecimals: 2, days: n => `${n} business days`, tableCaption: () => 'Currencies against the US dollar', noHistory: 'No rate history available for this currency.',
+    // exchange rates: no $, decimals as quoted (0.88067 · 157.00 · 1,355); tiny rates (JPY/USD 0.006369,
+    // IRR/USD 0.0000005904) keep 4 significant digits
+    price(p) {
+      const d = p >= 1000 ? 0 : p >= 100 ? 2 : p >= 10 ? 3 : p >= 1 ? 4 : p >= 0.1 ? 5 : Math.min(12, 3 - Math.floor(Math.log10(p)));
+      return p.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+    },
+    // ✓ = official ECB reference rate; ? = the community exchange-api feed
+    verify: (c, h) => h.ok
+      ? '<span class="vf ok" title="Official ECB reference rate" aria-label="official ECB rate">✓</span>'
+      : `<span class="vf guess" title="Rate from the community exchange-api feed (public domain, sources not documented)${c.warn ? '. Official and market rates differ a lot for this currency' : ''}" aria-label="community feed, not official">?</span>`,
+    sourceLine: (c, h, ind) => `${h.ok ? '✓ Official ECB reference rate' : '? Community exchange-api feed (public domain)'} · ${ind.n} business days`,
+    srcInfo: ({ stale, parts }) => `Rates: ${parts.join(' · ') || '—'}${stale ? ' (saved copy, sources busy)' : ''}. ✓ marks an official ECB reference rate; ? marks the community feed.`,
+    excludedName: c => c.symbol,
+    costWords: 'the bid-ask spread on major pairs; wider on smaller currencies', tuneHistory: 'ECB rates since 2010 and the other currencies since March 2024',
+    basketNote: ', and every rate is quoted against the US dollar, so the "all currencies" line mostly reflects the dollar’s own move',
+    // the rate date is what matters: one official rate per business day
+    fresh: ({ rateDate, ago, late }) => {
+      const rd = rateDate ? new Date(rateDate + 'T12:00:00Z').toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }) : '—';
+      return `<span>🕒 <b>Rates of ${rd}</b> · <b>not real-time</b>: one rate per business day, published about 16:00 Frankfurt time · checked ${ago}`
+        + (late ? ' · <b>⚠ updates are running late</b>' : '') + '</span>' + linkECB;
+    },
+  },
+};
+export const MARKET = location.pathname.startsWith('/forex') ? 'forex' : 'crypto';
+export const M = MARKETS[MARKET];
+export const TF = tf => M.label[tf];                       // what a timeframe is called on this market (24h / 1d …)

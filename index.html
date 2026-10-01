@@ -48,7 +48,7 @@
         { "@type": "Question", "name": "How often is the data updated?",
           "acceptedAnswer": { "@type": "Answer", "text": "Every 10 minutes. Prices are not real-time. Market data is powered by CoinGecko, with daily candles from Binance, Gate.io, OKX, MEXC and KuCoin." } },
         { "@type": "Question", "name": "What do the rocket and sad-face emoji mean?",
-          "acceptedAnswer": { "@type": "Answer", "text": "A rocket marks a strong 50/200-day uptrend and a sad face a strong downtrend. X and O show the point & figure trend, and fire and ice show strong or weak 30-day momentum. A daily scorecard checks whether these calls predicted the next moves; so far they show no reliable edge, so treat them as hints, not advice." } },
+          "acceptedAnswer": { "@type": "Answer", "text": "They describe current conditions, not predictions: a rocket marks a strong 50/200-day uptrend and a sad face a strong downtrend. X and O show the point & figure trend, and fire and ice show strong or weak 30-day momentum. A daily scorecard checks whether these calls predicted the next moves; so far they show no reliable edge, so treat them as hints, not advice." } },
         { "@type": "Question", "name": "How are the recommended stop-losses set?",
           "acceptedAnswer": { "@type": "Answer", "text": "From the last daily close (00:00 UTC), a multiple of the coin's average daily move over the last 20 days: below the close for long positions and above it for short positions. They are suggested levels only; set real stops on your exchange." } },
         { "@type": "Question", "name": "Is this financial advice?",
@@ -238,10 +238,19 @@ button.sc-chip:hover, button.sc-chip[aria-expanded="true"] { box-shadow: inset 0
 .seg a:hover { color: var(--ink); }
 /* forex tiles: a flag instead of a logo */
 .flag { flex: none; font-size: 15px; line-height: 1; }
+.flag-code { flex: none; display: inline-grid; place-items: center; min-width: 20px; height: 15px; padding: 0 2px; border-radius: 3px; font-size: 9px; font-weight: 800; letter-spacing: .02em; line-height: 1; color: var(--ink); background: color-mix(in oklab, var(--surface) 70%, transparent); box-shadow: inset 0 0 0 1px var(--axis); }   /* where flag emoji are missing (Windows) */
 .chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .chip { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 3px 7px; cursor: pointer; font-size: 12.5px; color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; }
 .chip[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
 .chip .n { font-variant-numeric: tabular-nums; opacity: .7; }
+/* "More ▾": a dropdown of less-used filter chips */
+.more { position: relative; }
+.more > summary { list-style: none; user-select: none; }
+.more > summary::-webkit-details-marker { display: none; }
+.more[data-active] > summary { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.more .menu .chip { white-space: nowrap; }
+.more .menu { position: absolute; top: calc(100% + 4px); right: 0; z-index: 15; display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 6px 20px rgba(0,0,0,.15); }
+@media (max-width: 640px) { .more { display: flex; flex: none; } .more > summary { display: none; } .more .menu { position: static; flex-direction: row; padding: 0; border: 0; box-shadow: none; background: none; } }   /* phones: always open (app/interact.mjs), inline in the swipeable row */
 .check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); cursor: pointer; }
 .spacer { flex: 1; }
 
@@ -252,6 +261,8 @@ button.sc-chip:hover, button.sc-chip[aria-expanded="true"] { box-shadow: inset 0
 .leg-line .leg-toggle { padding: 2px 10px; font-size: 12px; }
 .leg-more { display: flex; flex-wrap: wrap; gap: 8px 28px; align-items: center; margin-top: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
 .leg-more[hidden] { display: none; }
+.leg-more .leg-read { flex-basis: 100%; margin: 0; line-height: 1.5; color: var(--ink-2); }
+.leg-more .leg-read a { color: inherit; }
 .edge-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--ink-2); text-decoration: none; }
 .edge-badge.ok { border-color: var(--green); }
 .edge-badge.weak { border-color: var(--amber); }
@@ -301,6 +312,12 @@ button.sc-chip:hover, button.sc-chip[aria-expanded="true"] { box-shadow: inset 0
   transition: opacity .2s, transform .12s;
 }
 .tile:hover { transform: translateY(-1px); }
+/* ⓘ: point at it to open the chart card at once (resting anywhere else on a tile opens it after 0.7 s) */
+.tile { position: relative; }
+.tile .ti { position: absolute; right: 7px; bottom: 5px; font-size: 13px; line-height: 1; color: var(--ink-2); opacity: .5; padding: 2px; }
+.tile:hover .ti { opacity: .9; }
+.tile .ind .row:last-child { padding-right: 16px; }   /* keep the STOP row clear of the ⓘ */
+@media (hover: none) { .tile .ti { display: none; } }   /* touch: a tap opens it anyway */
 .tile .top { background: var(--tint, var(--neutral)); color: var(--tint-ink, var(--ink)); padding: 10px 12px 9px; display: grid; grid-template-columns: 1fr auto; gap: 1px 8px; align-items: baseline; }
 .tile .sym { font-weight: 700; font-size: 16px; display: flex; align-items: center; gap: 6px; min-width: 0; }
 .tile .sym img { width: 18px; height: 18px; border-radius: 50%; flex: none; background: var(--surface); }
@@ -474,9 +491,15 @@ footer .about p { margin: 0; }
         <button class="chip" data-f="ob" aria-pressed="false">Overbought <span class="n"></span></button>
         <button class="chip" data-f="up" aria-pressed="false">Uptrend <span class="n"></span></button>
         <button class="chip" data-f="down" aria-pressed="false">Downtrend <span class="n"></span></button>
-        <button class="chip" data-f="sq" aria-pressed="false">Squeeze <span class="n"></span></button>
-        <button class="chip" data-f="cross" aria-pressed="false">Recent cross <span class="n"></span></button>
         <button class="chip" data-f="stop" aria-pressed="false" title="Coins whose last daily close finished past a recommended stop">🛑 Past stop <span class="n"></span></button>
+        <!-- less-used filters, so the controls row keeps room -->
+        <details class="more" id="moreFilters">
+          <summary class="chip" aria-label="More filters">More ▾</summary>
+          <div class="menu">
+            <button class="chip" data-f="sq" aria-pressed="false">Squeeze <span class="n"></span></button>
+            <button class="chip" data-f="cross" aria-pressed="false">Recent cross <span class="n"></span></button>
+          </div>
+        </details>
       </div>
     </div>
   </div>
@@ -496,9 +519,6 @@ footer .about p { margin: 0; }
   </main>
 
   <footer>
-    <div><b>How to read a tile.</b> <b>RSI</b>: below the lower line is <i>oversold</i> and above the upper line is <i>overbought</i> (the exact levels are in the legend and can be retuned). The marker shows where RSI sits on 0–100.
-      <b>Trend</b>: the fast moving average above the slow one (50/200-day by default) is an uptrend, below is a downtrend. The note says whether price agrees ("strong") or not ("pullback" / "bounce"). ✦ marks a golden or death cross in the last 14 days.
-      <b>BB width</b>: (upper − lower) / middle band, ranked against the last 180 days. Bottom 25% is a <i>squeeze</i> (volatility is compressed, and a big move often follows, in either direction). Top 20% is <i>expanded</i>.</div>
     <!-- About + FAQ: plain text for readers and search engines (the same questions as the FAQ structured data above) -->
     <!-- ABOUT:start: the forex page gets its own About text (seo/forex-about.html), swapped in by scripts/forex-page.mjs -->
     <section class="about" aria-labelledby="about-h">
@@ -509,7 +529,7 @@ footer .about p { margin: 0; }
       <h3>How often is the data updated?</h3>
       <p>Every 10 minutes. Prices are not real-time. Market data is powered by CoinGecko, with daily candles from Binance, Gate.io, OKX, MEXC and KuCoin.</p>
       <h3>What do the rocket and sad-face emoji mean?</h3>
-      <p>A rocket marks a strong 50/200-day uptrend and a sad face a strong downtrend. X and O show the point &amp; figure trend, and fire and ice show strong or weak 30-day momentum. A daily scorecard checks whether these calls predicted the next moves; so far they show no reliable edge, so treat them as hints, not advice.</p>
+      <p>They describe current conditions, not predictions: a rocket marks a strong 50/200-day uptrend and a sad face a strong downtrend. X and O show the point &amp; figure trend, and fire and ice show strong or weak 30-day momentum. A daily scorecard checks whether these calls predicted the next moves; so far they show no reliable edge, so treat them as hints, not advice.</p>
       <h3>How are the recommended stop-losses set?</h3>
       <p>From the last daily close (00:00 UTC), a multiple of the coin's average daily move over the last 20 days: below the close for long positions and above it for short positions. They are suggested levels only; set real stops on your exchange.</p>
       <h3>Is this financial advice?</h3>

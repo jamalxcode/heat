@@ -78,12 +78,52 @@ test('filters show only matching coins, and "All coins" restores them', async ({
   for (const f of ['up', 'down', 'ob', 'sq', 'cross', 'stop']) {
     const chip = page.locator(`#filters .chip[data-f="${f}"]`);
     const count = Number(await chip.locator('.n').textContent());
+    if (['sq', 'cross'].includes(f)) await page.locator('#moreFilters summary').click();   // these two live in "More ▾"
     await chip.click();
     if (count) await expect(tiles(page)).toHaveCount(count);
     else await expect(page.locator('#grid .empty')).toContainText('right now');
   }
   await page.locator('#filters .chip[data-f="all"]').click();
   await expect(tiles(page)).toHaveCount(N);
+});
+
+test('"More ▾" holds the less-used filters: picking one closes the menu and shows on its button', async ({ page }) => {
+  const more = page.locator('#moreFilters');
+  await expect(more.locator('[data-f="sq"]')).toBeHidden();
+  await more.locator('summary').click();
+  await expect(more.locator('[data-f="sq"]')).toBeVisible();
+  await more.locator('[data-f="sq"]').click();
+  await expect(more.locator('summary')).toHaveText('More: Squeeze ▾');
+  await expect(more.locator('[data-f="sq"]')).toBeHidden();                  // closed after picking
+  await page.locator('#filters .chip[data-f="all"]').click();
+  await expect(more.locator('summary')).toHaveText('More ▾');
+  await more.locator('summary').click();
+  await page.locator('h1').click();                                         // a click elsewhere closes it
+  await expect(more.locator('[data-f="sq"]')).toBeHidden();
+});
+
+test('ⓘ on a tile opens its chart card at once; resting elsewhere on a tile opens it after ~0.7 s', async ({ page }) => {
+  const popup = page.locator('#detail');
+  const ti = tile(page, 'beta-coin').locator('.ti');
+  const b = await ti.boundingBox();
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+  await expect(popup).toHaveClass(/show/, { timeout: 400 });                 // no 0.7 s wait
+  await expect(popup.locator('.d-head b')).toHaveText('Beta Coin');
+  await page.mouse.move(5, 5);
+  await expect(popup).not.toHaveClass(/show/);
+  const a = await tile(page, 'alpha-coin').boundingBox();
+  await page.mouse.move(a.x + a.width / 2, a.y + 40);
+  await page.waitForTimeout(350);
+  await expect(popup).not.toHaveClass(/show/);
+  await expect(popup).toHaveClass(/show/, { timeout: 1500 });
+});
+
+test('"How to read" is the one place that explains the page, including that the emoji are conditions, not predictions', async ({ page }) => {
+  await page.locator('#legendToggle').click();
+  const more = page.locator('#legendMore');
+  await expect(more).toContainText('not predictions');
+  await expect(more).toContainText('Reading a tile');
+  await expect(page.locator('footer')).not.toContainText('How to read a tile');   // no second copy in the footer
 });
 
 test('color scale: clicking a range shows only coins in it; again (or All coins) shows every coin', async ({ page }) => {
@@ -321,6 +361,21 @@ test.describe('forex', () => {
     await expect(jpy.locator('.sym')).toContainText('USD/JPY');
     await page.goto('/');
     await expect(page.locator('#quote')).toBeHidden();                          // crypto has no quote switch
+  });
+
+  test('flags: a flag emoji where the system has them, a country-code badge where it doesn\'t (Windows)', async ({ page }) => {
+    const sym = tile(page, 'eur').locator('.sym');
+    expect(await sym.locator('.flag').count() + await sym.locator('.flag-code').count()).toBe(1);
+    if (await sym.locator('.flag-code').count()) await expect(sym.locator('.flag-code')).toHaveText('EU');
+  });
+
+  test('an unusual one-day jump gets a ⚠ on the tile and an explanation in the popup', async ({ page }) => {
+    const egp = tile(page, 'egp');
+    await expect(egp.locator('.caution')).toHaveCount(1);
+    expect(await egp.locator('.caution').getAttribute('title')).toMatch(/Unusual jump of \+1[45]\.\d% on/);
+    await egp.click();
+    await expect(page.locator('#detail')).toContainText('far outside this currency');
+    await expect(tile(page, 'jpy').locator('.caution')).toHaveCount(0);
   });
 
   test('rial: the popup warns that official and market rates differ', async ({ page }) => {

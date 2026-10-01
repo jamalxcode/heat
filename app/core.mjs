@@ -2,32 +2,9 @@
 import * as SIG from '/signals.mjs';
 
 /* ================= market ================= */
-// The same page serves every market: / is crypto, /forex/ is forex (a copy of this file with its own search tags,
-// made at deploy by scripts/forex-page.mjs). Everything market-specific lives here; tiles, popups, filters, the
-// scorecard and the signal engine are shared, so a change to them shows on every market.
-export const MARKETS = {
-  crypto: {
-    data: '/data.json', scorecard: '/scorecard.json', top: 100, noun: 'coins', one: 'coin',
-    live: true,                                     // a live price between daily candles; today's candle still forming
-    bins: { '24h': [1, 3, 6, 10], '7d': [2.5, 7, 15, 25], '30d': [5, 15, 30, 50] },
-    back: { '24h': 1, '7d': 7, '30d': 30 },         // candles back for each change (one candle per day)
-    label: { '24h': '24h', '7d': '7d', '30d': '30d' },
-    pegLabel: 'Stablecoins', pegTitle: 'Include stablecoins, tokenized gold and wrapped/staked copies',
-    pegWords: 'stablecoins, pegged and fund tokens', closeWord: 'daily close (00:00 UTC)', stopWhere: 'your exchange',
-  },
-  forex: {
-    data: '/forex.json', scorecard: '/forex-scorecard.json', top: 999, noun: 'currencies', one: 'currency',
-    live: false,                                    // one official rate per business day: nothing forms in between
-    bins: { '24h': [0.1, 0.3, 0.6, 1], '7d': [0.25, 0.75, 1.5, 3], '30d': [0.5, 1.5, 3, 6] },
-    back: { '24h': 1, '7d': 5, '30d': 21 },         // business days: 5 ≈ a week, 21 ≈ a month
-    label: { '24h': '1d', '7d': '1w', '30d': '1m' },
-    pegLabel: 'Pegged', pegTitle: 'Include currencies pegged to the US dollar (Gulf currencies, HKD, JOD, IQD, LBP)',
-    pegWords: 'currencies pegged to the dollar', closeWord: 'ECB rate', stopWhere: 'your broker',
-  },
-};
-export const MARKET = location.pathname.startsWith('/forex') ? 'forex' : 'crypto';
-export const M = MARKETS[MARKET];
-export const TF = tf => M.label[tf];                       // what a timeframe is called on this market (24h / 1d …)
+// Everything market-specific (crypto, forex) is in markets.mjs; re-exported here so modules import it with the rest
+import { MARKETS, MARKET, M, TF } from './markets.mjs';
+export { MARKETS, MARKET, M, TF };
 
 /* ================= config ================= */
 export const TOP_N = M.top;
@@ -50,16 +27,7 @@ export const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* quota or blocked */ } },
 };
 export function fmtPrice(p) {
-  if (p == null || !isFinite(p)) return '—';
-  if (MARKET === 'forex') {                       // exchange rates: no $, decimals as quoted (1.0842 · 148.21 · 0.30869)
-    // tiny rates (JPY/USD 0.006369, IRR/USD 0.0000005904) keep 4 significant digits
-    const d = p >= 1000 ? 0 : p >= 100 ? 2 : p >= 10 ? 3 : p >= 1 ? 4 : p >= 0.1 ? 5 : Math.min(12, 3 - Math.floor(Math.log10(p)));
-    return p.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
-  }
-  if (p >= 1000) return '$' + p.toLocaleString('en-US', { maximumFractionDigits: 0 });
-  if (p >= 1) return '$' + p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  if (p >= 0.01) return '$' + p.toFixed(4);
-  return '$' + Number(p.toPrecision(3)).toString();
+  return p == null || !isFinite(p) ? '—' : M.price(p);   // $84,109 for crypto, 0.88067 for an exchange rate
 }
 export function fmtBig(n) {
   if (n == null) return '—';
@@ -79,7 +47,21 @@ export function chgOf(c, tf) {
   const v = c['price_change_percentage_' + tf + '_in_currency'] ?? (tf === '24h' ? c.price_change_percentage_24h : null);
   return v ?? S.ind[c.id]?.chg?.[tf] ?? null;
 }
-export const logo = (c, px) => c.flag ? `<span class="flag" style="font-size:${px - 2}px" aria-hidden="true">${c.flag}</span>`
+// Flag emoji: real flags on phones and Macs, but Windows has none and shows two bare letters. Detect it once (a color
+// emoji draws colored pixels; the letter fallback is black text) and show a small country-code badge there instead.
+export const FLAG_EMOJI = (() => {
+  try {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 24;
+    const x = cv.getContext('2d', { willReadFrequently: true });
+    x.font = '18px sans-serif'; x.textBaseline = 'top'; x.fillStyle = '#000'; x.fillText('🇺🇸', 0, 0);
+    const d = x.getImageData(0, 0, 24, 24).data;
+    for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 40 && (Math.abs(d[i] - d[i + 1]) > 30 || Math.abs(d[i + 1] - d[i + 2]) > 30)) return true;
+    return false;
+  } catch { return true; }
+})();
+const flagCode = f => [...f].map(ch => String.fromCharCode(ch.codePointAt(0) - 0x1F1E6 + 65)).join('');   // 🇪🇺 → EU
+export const logo = (c, px) => c.flag
+  ? FLAG_EMOJI ? `<span class="flag" style="font-size:${px - 2}px" aria-hidden="true">${c.flag}</span>` : `<span class="flag-code" aria-hidden="true">${flagCode(c.flag)}</span>`
   : c.image ? `<img src="${esc(c.image)}" alt="" loading="lazy" width="${px}" height="${px}">`
   : `<span class="ph" style="width:${px}px;height:${px}px" aria-hidden="true">${esc(c.symbol.slice(0, 1).toUpperCase())}</span>`;
 
@@ -93,9 +75,9 @@ export const S = {
   params: SIG.withDefaults(null), scorecard: null, scoreWin: 'd30', scoreH: 1, chart: 'price',
 };
 export const prefs = store.get('hm.prefs') || {};
-export const PEG_PREF = MARKET === 'forex' ? 'peggedFx' : 'pegged';   // each market remembers its own 'show pegged' choice
-Object.assign(S, { quote: prefs.fxQuote === 'usd' && MARKET === 'forex' ? 'usd' : 'market', colorBy: prefs.colorBy || '24h', view: prefs.view || 'grid', pegged: !!prefs[PEG_PREF], chart: prefs.chart === 'pnf' ? 'pnf' : 'price', legendOpen: !!prefs.legendOpen });
-export const savePrefs = () => store.set('hm.prefs', { ...(store.get('hm.prefs') || {}), ...(MARKET === 'forex' ? { fxQuote: S.quote } : {}), colorBy: S.colorBy, view: S.view, [PEG_PREF]: S.pegged, chart: S.chart, legendOpen: S.legendOpen, theme: document.documentElement.dataset.theme || '' });
+export const PEG_PREF = M.pegPref;   // each market remembers its own 'show pegged' choice
+Object.assign(S, { quote: prefs.fxQuote === 'usd' && M.quoteSwitch ? 'usd' : 'market', colorBy: prefs.colorBy || '24h', view: prefs.view || 'grid', pegged: !!prefs[PEG_PREF], chart: prefs.chart === 'pnf' ? 'pnf' : 'price', legendOpen: !!prefs.legendOpen });
+export const savePrefs = () => store.set('hm.prefs', { ...(store.get('hm.prefs') || {}), ...(M.quoteSwitch ? { fxQuote: S.quote } : {}), colorBy: S.colorBy, view: S.view, [PEG_PREF]: S.pegged, chart: S.chart, legendOpen: S.legendOpen, theme: document.documentElement.dataset.theme || '' });
 
 export function setStatus(text, kind = '') { $('#status').innerHTML = `<span class="dot ${kind}"></span>${esc(text)}`; }
 
