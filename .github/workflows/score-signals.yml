@@ -38,14 +38,23 @@ jobs:
           COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}   # CoinGecko blocks GitHub's IPs without a key
         run: node scripts/score.mjs ${{ inputs.tune && '--tune' || '' }}
 
+      # Forex: the same scoring and Sunday tuning on ECB rates (scripts/score-forex.mjs). Its own step, so a forex
+      # problem never stops the crypto scorecard from being committed.
+      - name: Score forex signals
+        continue-on-error: true
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144   # 16 years of business days for ~37 currencies
+        run: node scripts/score-forex.mjs ${{ inputs.tune && '--tune' || '' }}
+
       - name: Commit the scorecard
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          for f in data/scorecard.json data/pairs.json params.json; do [ -f "$f" ] && git add "$f"; done
+          for f in data/scorecard.json data/pairs.json params.json data/forex-scorecard.json data/forex-extras.json params-forex.json; do [ -f "$f" ] && git add "$f"; done
           if git diff --cached --quiet; then echo "Nothing changed"; exit 0; fi
           msg="chore: signal scorecard $(date -u +%F)"
-          git diff --cached --name-only | grep -q params.json && msg="$msg (tuner adopted new settings)"
+          git diff --cached --name-only | grep -qx params.json && msg="$msg (tuner adopted new settings)"
+          git diff --cached --name-only | grep -qx params-forex.json && msg="$msg (forex tuner adopted new settings)"
           git commit -m "$msg"
           git pull --rebase --quiet
           git push

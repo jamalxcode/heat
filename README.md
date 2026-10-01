@@ -2,7 +2,7 @@
 
 **Live: https://heat.sala.company**
 
-A crypto heatmap of the top 100 coins by market cap, with stablecoins, tokenized gold and wrapped/staked copies left out. Every tile combines the price move with technical indicators, and a daily scorecard checks whether the 🚀 / 😢 calls actually predicted anything.
+A crypto heatmap of the top 100 coins by market cap, with stablecoins, tokenized gold and wrapped/staked copies left out, and a [forex heatmap](https://heat.sala.company/forex/) of 48 currencies against the US dollar. Every tile combines the price move with technical indicators, and a daily scorecard checks whether the 🚀 / 😢 calls actually predicted anything.
 
 > ⚠️ **Work in progress. Use at your own risk.** Data can be late, wrong or missing, and nothing here is financial advice. Prices are **not real-time**: they refresh every 10 minutes.
 
@@ -67,6 +67,18 @@ Statistics cap moves at ±30% a day (wider for 3 and 7 days), so a bad price pri
 
 *Honest baseline (first runs, Sept 2026):* the default signals showed **no reliable next-day edge**. The daily rank correlation was about 0, and 🚀 coins went up 48% of the time, the same as all coins. Two signals pointed the wrong way: overbought and wide-band coins tended to *keep* outperforming (momentum). So far the tuner has kept the defaults, because the momentum settings didn't hold up on the most recent months. And ⚡ squeezes (bottom 10% of band width) were followed by *smaller* moves than usual (about 0.85×), not bigger ones. The recommended stops were crossed about 22% of the time within 3 days, and after an exit the next move was roughly a coin flip. Among the three distances, **2.5×** exits saved the most (about 0.43% over 3 days, vs 0.18% at 2×), so the tuner is set to switch to it at its next run. **30-day momentum** was the strongest single signal found (t ≈ 2.9), but the full set of proposed settings hasn't yet beaten the current ones on recent data. That's typical: a stop doesn't predict direction, it caps how much you can lose.
 
+## Forex: heat.sala.company/forex/
+
+The same heatmap for **48 currencies against the US dollar**. The **🪙 Crypto | 💱 Forex** switch at the start of the controls row moves between the two pages.
+
+- **It's the same page.** `/forex/` is made from `index.html` at deploy (`scripts/forex-page.mjs`), with only the search tags, the About/FAQ text and the source credits swapped in (`seo/forex-*.html`). The page picks its market from its address, and everything market-specific sits in one `MARKETS` settings block at the top of the page script. So any change to tiles, popups, filters, the scorecard or the engine shows on both pages.
+- **Rates:** official **ECB euro reference rates** (via the Frankfurter API) for 29 currencies, set once per business day around 14:15 Frankfurt time, with history back to 1999. Currencies the ECB doesn't publish (the ruble, the Gulf and other Arab currencies, the rial, the Syrian pound) come from the public-domain **exchange-api** feed and get the **?** mark. ECB rates get **✓**. Weekends have no rates, so charts and indicators use business days.
+- **Quoting:** market convention, as brokers show it: EUR/USD, GBP/USD, AUD/USD and NZD/USD as dollars per unit, every other currency as USD/XXX. A rising tile means the first currency of the pair got stronger.
+- **Pegged currencies** (SAR, AED, QAR, BHD, OMR, JOD, IQD, LBP and HKD) are hidden unless you tick **Pegged**, and they're never scored. This setting is separate from crypto's Stablecoins checkbox.
+- **IRR and SYP:** their official and street rates differ a lot, so they're shown with **⚠** and a note in the popup, and never scored.
+- **Forex-sized settings:** the color scale runs ±0.1% … ±1% for a day. Timeframes are **1d / 1w / 1m** (1, 5 and 21 business days). Momentum is a 21-business-day move above or below 3%. P&F boxes go down to 0.1%.
+- **Scorecard and tuner:** `scripts/score-forex.mjs` runs in the same nightly job (and tunes on Sundays), on ECB history since 2010 plus the extra feed since March 2024. It writes `data/forex-scorecard.json`, `params-forex.json` (when the tuner adopts new settings) and `data/forex-extras.json` (a cache of the extra feed, so each run only fetches new days). *First run (Oct 2026):* about 116,000 currency-days, with no reliable edge for any scored signal.
+
 ## How it works
 
 ```
@@ -85,7 +97,11 @@ GitHub Actions: daily 00:20 UTC (via cron-job.org)
 | File | What it is |
 |---|---|
 | `index.html` | The whole site (HTML, CSS and JS in one page), including its search and link-preview tags |
-| `og-image.png`, `robots.txt` | The link-preview image and the robots file, published with the site (the deploy job also writes `sitemap.xml`) |
+| `og-image.png`, `og-image-forex.png`, `robots.txt` | The link-preview images (crypto and forex) and the robots file, published with the site (the deploy job also writes `sitemap.xml`) |
+| `scripts/build-forex.mjs` | Builds `forex.json`: the currency list, both rate sources, business-day closes. Reuses the last file and refetches hourly |
+| `scripts/score-forex.mjs` | Daily forex scorecard and weekly tuning |
+| `scripts/forex-page.mjs`, `seo/` | Makes `/forex/` from `index.html`, swapping in the forex search tags, About/FAQ and source credits |
+| `params-forex.json`, `data/forex-scorecard.json`, `data/forex-extras.json` | Forex signal settings, the latest forex scorecard, and the cached extra-feed rates |
 | `signals.mjs` | The shared signal engine: indicators, 🚀/😢/⚡ rules, scoring stats, tuner. Used by the page, the scorer and the tuner, so they always agree. |
 | `tests/signals.test.mjs` | Unit tests: RSI against the StockCharts worked example, Bollinger/SMA against hand-computed values, scoring and tuning sanity checks |
 | `scripts/build-data.mjs` | Builds `data.json`: top-250 rankings plus 260 daily closes for the top 150 (enough for 100 after exclusions), with fallbacks across six data sources |

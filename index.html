@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- SEO:start: search and link-preview tags for the crypto page; the forex page gets seo/forex-head.html instead (scripts/forex-page.mjs) -->
 <title>Crypto Heatmap: Top 100 Coins, RSI &amp; Trend | heat.sala.company</title>
 <meta name="description" content="Free crypto heatmap of the top 100 coins: price moves, RSI, 50/200-day trend, point &amp; figure and suggested stop-losses. Updated every 10 minutes.">
 <link rel="canonical" href="https://heat.sala.company/">
@@ -57,6 +58,7 @@
   ]
 }
 </script>
+<!-- SEO:end -->
 <meta name="theme-color" content="#b3161b">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='88'%3E%F0%9F%94%A5%3C/text%3E%3C/svg%3E">
 <style>
@@ -231,6 +233,11 @@ button.sc-chip:hover, button.sc-chip[aria-expanded="true"] { box-shadow: inset 0
 .seg { display: inline-flex; background: var(--neutral); border-radius: 8px; padding: 2px; }
 .seg button { border: 0; background: transparent; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--ink-2); }
 .seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); font-weight: 600; }
+.seg a { padding: 4px 10px; border-radius: 6px; font-size: 13px; color: var(--ink-2); text-decoration: none; white-space: nowrap; }
+.seg a[aria-current="page"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); font-weight: 600; }
+.seg a:hover { color: var(--ink); }
+/* forex tiles: a flag instead of a logo */
+.flag { flex: none; font-size: 15px; line-height: 1; }
 .chips { display: flex; flex-wrap: wrap; gap: 5px; }
 .chip { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 3px 8px; cursor: pointer; font-size: 12.5px; color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; }
 .chip[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
@@ -439,6 +446,11 @@ footer .about p { margin: 0; }
   </header>
 
   <div class="controls" role="toolbar" aria-label="Heatmap controls">
+    <!-- Market: each is its own page (/ and /forex/), built from this same file -->
+    <nav class="seg market" id="market" aria-label="Market">
+      <a href="/" data-m="crypto">🪙 Crypto</a>
+      <a href="/forex/" data-m="forex">💱 Forex</a>
+    </nav>
     <div class="seg" id="colorBy" role="group" aria-label="Color by">
       <button data-v="24h" aria-pressed="true" title="Color by 24h change">24h</button>
       <button data-v="7d" aria-pressed="false" title="Color by 7-day change">7d</button>
@@ -482,6 +494,7 @@ footer .about p { margin: 0; }
       <b>Trend</b>: the fast moving average above the slow one (50/200-day by default) is an uptrend, below is a downtrend. The note says whether price agrees ("strong") or not ("pullback" / "bounce"). ✦ marks a golden or death cross in the last 14 days.
       <b>BB width</b>: (upper − lower) / middle band, ranked against the last 180 days. Bottom 25% is a <i>squeeze</i> (volatility is compressed, and a big move often follows, in either direction). Top 20% is <i>expanded</i>.</div>
     <!-- About + FAQ: plain text for readers and search engines (the same questions as the FAQ structured data above) -->
+    <!-- ABOUT:start: the forex page gets its own About text (seo/forex-about.html), swapped in by scripts/forex-page.mjs -->
     <section class="about" aria-labelledby="about-h">
       <h2 id="about-h">About this crypto heatmap</h2>
       <p>heat.sala.company is a free crypto heatmap of the top 100 cryptocurrencies by market cap, including Bitcoin (BTC), Ethereum (ETH), Solana (SOL), XRP, BNB and Cardano (ADA). It combines the price move with technical indicators and suggested stop-losses in one view, and a daily scorecard checks how its signals actually did.</p>
@@ -496,10 +509,13 @@ footer .about p { margin: 0; }
       <h3>Is this financial advice?</h3>
       <p>No. It is an experimental, work-in-progress tool. Data can be late, wrong or missing.</p>
     </section>
+    <!-- ABOUT:end -->
     <div id="srcinfo"></div>
     <details id="excluded"><summary>Excluded tokens</summary><div></div></details>
+    <!-- SOURCES:start -->
     <div class="cg-foot">Market data <a href="https://www.coingecko.com/" target="_blank" rel="noopener"><b>Powered by CoinGecko</b></a>.</div>
     <div>Data is collected every 10 minutes from CoinGecko (CoinLore as backup) for prices and rankings, and from Binance, Gate.io, OKX, MEXC, KuCoin and CoinGecko for daily candles. Prices are not real-time. Today's candle is still forming, so indicators move during the day. <b>Recommended stop-losses</b> are suggested levels only: this page is not real-time and cannot exit a position for you, so set stops on your exchange. Not financial advice.</div>
+    <!-- SOURCES:end -->
   </footer>
 </div>
 
@@ -515,11 +531,39 @@ footer .about p { margin: 0; }
 <div id="detail" role="dialog" aria-label="Coin details"><button class="x" aria-label="Close">×</button><div class="body"></div></div>
 
 <script type="module">
-import * as SIG from './signals.mjs';
+import * as SIG from '/signals.mjs';
 (() => {
 
+/* ================= market ================= */
+// The same page serves every market: / is crypto, /forex/ is forex (a copy of this file with its own search tags,
+// made at deploy by scripts/forex-page.mjs). Everything market-specific lives here; tiles, popups, filters, the
+// scorecard and the signal engine are shared, so a change to them shows on every market.
+const MARKETS = {
+  crypto: {
+    data: '/data.json', scorecard: '/scorecard.json', top: 100, noun: 'coins', one: 'coin',
+    live: true,                                     // a live price between daily candles; today's candle still forming
+    bins: { '24h': [1, 3, 6, 10], '7d': [2.5, 7, 15, 25], '30d': [5, 15, 30, 50] },
+    back: { '24h': 1, '7d': 7, '30d': 30 },         // candles back for each change (one candle per day)
+    label: { '24h': '24h', '7d': '7d', '30d': '30d' },
+    pegLabel: 'Stablecoins', pegTitle: 'Include stablecoins, tokenized gold and wrapped/staked copies',
+    pegWords: 'stablecoins, pegged and fund tokens', closeWord: 'daily close (00:00 UTC)', stopWhere: 'your exchange',
+  },
+  forex: {
+    data: '/forex.json', scorecard: '/forex-scorecard.json', top: 999, noun: 'currencies', one: 'currency',
+    live: false,                                    // one official rate per business day: nothing forms in between
+    bins: { '24h': [0.1, 0.3, 0.6, 1], '7d': [0.25, 0.75, 1.5, 3], '30d': [0.5, 1.5, 3, 6] },
+    back: { '24h': 1, '7d': 5, '30d': 21 },         // business days: 5 ≈ a week, 21 ≈ a month
+    label: { '24h': '1d', '7d': '1w', '30d': '1m' },
+    pegLabel: 'Pegged', pegTitle: 'Include currencies pegged to the US dollar (Gulf currencies, HKD, JOD, IQD, LBP)',
+    pegWords: 'currencies pegged to the dollar', closeWord: 'ECB rate', stopWhere: 'your broker',
+  },
+};
+const MARKET = location.pathname.startsWith('/forex') ? 'forex' : 'crypto';
+const M = MARKETS[MARKET];
+const TF = tf => M.label[tf];                       // what a timeframe is called on this market (24h / 1d …)
+
 /* ================= config ================= */
-const TOP_N = 100;
+const TOP_N = M.top;
 const REFRESH_MIN = 10;              // data.json is rebuilt by GitHub Actions every 10 minutes
 const MARKETS_TTL = REFRESH_MIN * 60e3;
 const SNAPSHOT_GRACE = 2 * 60e3;     // Actions runs start late and Pages takes a minute to publish
@@ -527,7 +571,7 @@ const SNAPSHOT_RETRY = 2 * 60e3;     // poll this often once a new snapshot is d
 const SNAPSHOT_MAX_AGE = 45 * 60e3;  // older than this: the job is stuck, so build the data in the browser instead
 const LIVE_EVERY = REFRESH_MIN * 60e3; // ...but at most once per 10 minutes per browser
 const DAY = 864e5;
-const BINS = { '24h': [1, 3, 6, 10], '7d': [2.5, 7, 15, 25], '30d': [5, 15, 30, 50] };
+const BINS = M.bins;
 
 /* ================= helpers ================= */
 const $ = (s, r = document) => r.querySelector(s);
@@ -540,6 +584,10 @@ const store = {
 };
 function fmtPrice(p) {
   if (p == null || !isFinite(p)) return '—';
+  if (MARKET === 'forex') {                       // exchange rates: no $, decimals as quoted (1.0842 · 148.21 · 0.30869)
+    const d = p >= 1000 ? 0 : p >= 100 ? 2 : p >= 10 ? 3 : p >= 1 ? 4 : 5;
+    return p.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+  }
   if (p >= 1000) return '$' + p.toLocaleString('en-US', { maximumFractionDigits: 0 });
   if (p >= 1) return '$' + p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   if (p >= 0.01) return '$' + p.toFixed(4);
@@ -563,8 +611,8 @@ function chgOf(c, tf) {
   const v = c['price_change_percentage_' + tf + '_in_currency'] ?? (tf === '24h' ? c.price_change_percentage_24h : null);
   return v ?? S.ind[c.id]?.chg?.[tf] ?? null;
 }
-const logo = (c, px) => c.image
-  ? `<img src="${esc(c.image)}" alt="" loading="lazy" width="${px}" height="${px}">`
+const logo = (c, px) => c.flag ? `<span class="flag" style="font-size:${px - 2}px" aria-hidden="true">${c.flag}</span>`
+  : c.image ? `<img src="${esc(c.image)}" alt="" loading="lazy" width="${px}" height="${px}">`
   : `<span class="ph" style="width:${px}px;height:${px}px" aria-hidden="true">${esc(c.symbol.slice(0, 1).toUpperCase())}</span>`;
 
 /* ================= state ================= */
@@ -577,8 +625,9 @@ const S = {
   params: SIG.withDefaults(null), scorecard: null, scoreWin: 'd30', scoreH: 1, chart: 'price',
 };
 const prefs = store.get('hm.prefs') || {};
-Object.assign(S, { colorBy: prefs.colorBy || '24h', view: prefs.view || 'grid', pegged: !!prefs.pegged, chart: prefs.chart === 'pnf' ? 'pnf' : 'price', legendOpen: !!prefs.legendOpen });
-const savePrefs = () => store.set('hm.prefs', { colorBy: S.colorBy, view: S.view, pegged: S.pegged, chart: S.chart, legendOpen: S.legendOpen, theme: document.documentElement.dataset.theme || '' });
+const PEG_PREF = MARKET === 'forex' ? 'peggedFx' : 'pegged';   // each market remembers its own 'show pegged' choice
+Object.assign(S, { colorBy: prefs.colorBy || '24h', view: prefs.view || 'grid', pegged: !!prefs[PEG_PREF], chart: prefs.chart === 'pnf' ? 'pnf' : 'price', legendOpen: !!prefs.legendOpen });
+const savePrefs = () => store.set('hm.prefs', { ...(store.get('hm.prefs') || {}), colorBy: S.colorBy, view: S.view, [PEG_PREF]: S.pegged, chart: S.chart, legendOpen: S.legendOpen, theme: document.documentElement.dataset.theme || '' });
 
 function setStatus(text, kind = '') { $('#status').innerHTML = `<span class="dot ${kind}"></span>${esc(text)}`; }
 
@@ -596,9 +645,10 @@ function pickCoins() {
   S.coins = list;
 }
 
-// Swap today's (still forming) candle close for the latest price, so indicators track the market between candle fetches
+// Swap today's (still forming) candle close for the latest price, so indicators track the market between candle fetches.
+// Forex has no live price: the last ECB rate is the last close.
 function withLive(closes, price) {
-  if (!(price > 0) || !closes.length) return closes;
+  if (!M.live || !(price > 0) || !closes.length) return closes;
   const out = closes.slice(), last = out[out.length - 1];
   const today = Math.floor(Date.now() / DAY), day = Math.floor(last[0] / DAY);
   if (day === today) out[out.length - 1] = [last[0], price];
@@ -628,7 +678,7 @@ function compute(ser) {
   const s = SIG.series(c, p);
   const r = { t, c, rsi: s.rsi, maF: s.maF, maS: s.maS, bb: s.bb, n, last };
   const back = k => n - 1 - k >= 0 ? (last / c[n - 1 - k] - 1) * 100 : null;
-  r.chg = { '24h': back(1), '7d': back(7), '30d': back(30) };
+  r.chg = { '24h': back(M.back['24h']), '7d': back(M.back['7d']), '30d': back(M.back['30d']) };
 
   r.rsiNow = s.rsi[n - 1];
   r.rsiState = r.rsiNow == null ? null : r.rsiNow < p.rsiLow ? 'os' : r.rsiNow > p.rsiHigh ? 'ob' : 'mid';
@@ -661,7 +711,7 @@ function compute(ser) {
 
   // Recommended stops: set once a day from the last completed close, so they don't move with every refresh.
   // Today's candle is still forming, so anchor on the one before it.
-  const anchor = Math.floor(t[n - 1] / DAY) >= Math.floor(Date.now() / DAY) ? n - 2 : n - 1;
+  const anchor = M.live && Math.floor(t[n - 1] / DAY) >= Math.floor(Date.now() / DAY) ? n - 2 : n - 1;
   const lv = anchor > 0 ? SIG.stopLevels(c, anchor, p) : null;
   const prev = anchor > 1 ? SIG.stopLevels(c, anchor - 1, p) : null;   // the stop that applied during the last full day
   if (lv) {
@@ -754,7 +804,7 @@ function legendName(k) {
     trendUp: `strong uptrend (${p.maFast}/${p.maSlow} MA)`, trendDown: `strong downtrend (${p.maFast}/${p.maSlow} MA)`,
     oversold: `RSI(${p.rsiPeriod}) under ${p.rsiLow}`, overbought: `RSI(${p.rsiPeriod}) over ${p.rsiHigh}`,
     bbTight: `BB width in bottom ${p.bbTightPct}%`, bbWide: `BB width in top ${100 - p.bbWidePct}%`,
-    momUp: `30-day move above +${p.momPct}%`, momDown: `30-day move below −${p.momPct}%`,
+    momUp: `${p.momDays === 30 ? '30-day' : `${p.momDays}-business-day`} move above +${p.momPct}%`, momDown: `${p.momDays === 30 ? '30-day' : `${p.momDays}-business-day`} move below −${p.momPct}%`,
     pnfUp: `point & figure rising (X column)`, pnfDown: `point & figure falling (O column)`,
   }[k];
 }
@@ -782,7 +832,7 @@ function emojiHTML(ind) {
   const trendHTML = trend.length ? `<span class="emo" title="${esc(trendTitle)}" aria-label="${esc(trendTitle)}">${trend.map(roleOf).join('')}</span>` : '';
   const m30 = ind?.chg?.['30d'];
   const momHTML = mom.map(k => {
-    const t = `${MOM_EMO[k]} ${SIG.COMPONENTS[k]}${m30 != null ? ` (${fmtPct(m30, 1)} in 30 days)` : ''}: counts as a ${call(k)}`;
+    const t = `${MOM_EMO[k]} ${SIG.COMPONENTS[k]}${m30 != null ? ` (${fmtPct(m30, 1)} in ${MARKET === 'forex' ? `${P().momDays} business days` : `${P().momDays} days`})` : ''}: counts as a ${call(k)}`;
     return `<span class="emo mom" title="${esc(t)}" aria-label="${esc(t)}">${MOM_EMO[k]}</span>`;
   }).join('');
   return trendHTML + pnfMark(ind) + momHTML;
@@ -803,6 +853,9 @@ function pnfMark(ind) {
 function verifyMark(c) {
   const h = S.hist[c.id];
   if (!h) return '';
+  if (MARKET === 'forex') return h.ok      // ✓ = official ECB rate; ? = the extra community feed
+    ? `<span class="vf ok" title="Official ECB reference rate" aria-label="official ECB rate">✓</span>`
+    : `<span class="vf guess" title="Rate from the community exchange-api feed (public domain, sources not documented)${c.warn ? '. Official and market rates differ a lot for this currency' : ''}" aria-label="community feed, not official">?</span>`;
   return h.ok
     ? `<span class="vf ok" title="Price history: ${esc(h.src)} ${esc(h.pair)}, verified by CoinGecko ID" aria-label="verified">✓</span>`
     : `<span class="vf guess" title="Price history: ${esc(h.src)} ${esc(h.pair)}, matched by ticker only (not verified)" aria-label="not verified">?</span>`;
@@ -811,11 +864,11 @@ function verifyMark(c) {
 function tileHTML(c) {
   const ind = S.ind[c.id], ch = chgOf(c, S.colorBy);
   const sg = signals(ind);
-  const label = `${c.name}, ${fmtPrice(c.current_price)}, ${S.colorBy} ${fmtPct(ch)}, ${sg.good.length} rockets, ${sg.bad.length} cry faces${S.ind[c.id]?.sig?.squeeze ? ", squeeze: big move likely" : ""}`;
+  const label = `${c.name}, ${fmtPrice(c.current_price)}, ${TF(S.colorBy)} ${fmtPct(ch)}, ${sg.good.length} rockets, ${sg.bad.length} cry faces${S.ind[c.id]?.sig?.squeeze ? ", squeeze: big move likely" : ""}`;
   const stopCls = !ind?.stop ? '' : [ind.stop.longState, ind.stop.shortState].includes('closed') ? ' stop-closed' : [ind.stop.longState, ind.stop.shortState].includes('intraday') ? ' stop-intraday' : '';
   return `<button class="tile ${heatClass(ch, S.colorBy)}${stopCls}" data-id="${esc(c.id)}" aria-label="${esc(label)}">
     <div class="top">
-      <div class="sym">${logo(c, 18)}<span>${esc(c.symbol.toUpperCase())}</span>${verifyMark(c)}<span class="rk">#${c.market_cap_rank}</span></div>
+      <div class="sym">${logo(c, 18)}<span>${esc(c.symbol.toUpperCase())}</span>${verifyMark(c)}${c.fx ? (c.warn ? '<span class="rk" title="Official and market rates differ a lot for this currency">⚠</span>' : '') : `<span class="rk">#${c.market_cap_rank}</span>`}</div>
       <div class="chg">${fmtPct(ch, ch != null && Math.abs(ch) >= 10 ? 1 : 2)}</div>
       <div class="name"><span class="nm">${esc(c.name)}</span>${emojiHTML(ind)}</div>
       <div class="px">${fmtPrice(c.current_price)}</div>
@@ -856,13 +909,13 @@ function renderLegend() {
     ['h-4', `≤ −${t[3]}`], ['h-3', `−${t[2]}…${t[3]}`], ['h-2', `−${t[1]}…${t[2]}`], ['h-1', `−${t[0]}…${t[1]}`], ['h0', `±${t[0]}`],
     ['h1', `${t[0]}…${t[1]}`], ['h2', `${t[1]}…${t[2]}`], ['h3', `${t[2]}…${t[3]}`], ['h4', `≥ +${t[3]}`],
   ];
-  $('#legendScale').innerHTML = `${S.colorBy} change % <span class="scale${S.heat ? ' picking' : ''}" role="group" aria-label="Show only coins in this ${S.colorBy} range">${cells.map(([k, l]) =>
-    `<button type="button" class="${k}" data-heat="${k}" aria-pressed="${S.heat === k}" title="Show only coins with a ${S.colorBy} change of ${l}%">${l}</button>`).join('')}</span>`;
+  $('#legendScale').innerHTML = `${TF(S.colorBy)} change % <span class="scale${S.heat ? ' picking' : ''}" role="group" aria-label="Show only ${M.noun} in this ${TF(S.colorBy)} range">${cells.map(([k, l]) =>
+    `<button type="button" class="${k}" data-heat="${k}" aria-pressed="${S.heat === k}" title="Show only ${M.noun} with a ${TF(S.colorBy)} change of ${l}%">${l}</button>`).join('')}</span>`;
   $('#legendEdge').innerHTML = edgeBadge();
   $('#legendMore').innerHTML = `
     <span class="leg-item"><span class="gauge" style="width:60px;flex:none"><i style="left:50%"></i></span> RSI 0–100 (under ${P().rsiLow} oversold · over ${P().rsiHigh} overbought)</span>
     <span class="leg-item"><span class="up-t" style="display:inline-flex">${ICON.up}</span>/<span class="dn-t" style="display:inline-flex">${ICON.down}</span> ${P().maFast}MA vs ${P().maSlow}MA</span>
-    <span class="leg-item"><b>STOP</b> = recommended stop-loss: <b>L</b> for long positions, <b>S</b> for short, ${P().stopMult}× the coin's average daily move from the last daily close (00:00 UTC) · ⚠ past it intraday = watch · 🛑 a daily close past it = suggested exit</span>
+    <span class="leg-item"><b>STOP</b> = recommended stop-loss: <b>L</b> for long positions, <b>S</b> for short, ${P().stopMult}× the ${M.one}'s average daily move from the last ${M.closeWord}${M.live ? ' · ⚠ past it intraday = watch' : ''} · 🛑 a ${M.live ? 'daily close' : 'rate'} past it = suggested exit</span>
     ${edgeLegend()}
     ${['🚀', '😢'].map(e => {
       const ks = NAME_SIGNALS.filter(k => roleOf(k) === e);
@@ -875,8 +928,8 @@ const FILTER_WORDS = { os: 'oversold', ob: 'overbought', up: 'in an uptrend', do
 // A range on the color scale (S.heat, e.g. 'h-3') narrows it further to coins in that color band
 const inHeat = c => !S.heat || heatClass(chgOf(c, S.colorBy), S.colorBy) === S.heat;
 const visibleCoins = () => S.coins.filter(c => (S.filter === 'all' || match(S.ind[c.id], S.filter)) && inHeat(c));
-const heatWords = () => { const b = $(`#legendScale [data-heat="${S.heat}"]`); return b ? `with a ${S.colorBy} change of ${b.textContent}%` : ''; };
-const emptyHTML = () => `<div class="empty">No coins are ${[S.filter !== 'all' && (FILTER_WORDS[S.filter] || 'matching'), S.heat && heatWords()].filter(Boolean).join(' and ') || 'matching'} right now. <button class="btn" data-show-all>Show all coins</button></div>`;
+const heatWords = () => { const b = $(`#legendScale [data-heat="${S.heat}"]`); return b ? `with a ${TF(S.colorBy)} change of ${b.textContent}%` : ''; };
+const emptyHTML = () => `<div class="empty">No ${M.noun} are ${[S.filter !== 'all' && (FILTER_WORDS[S.filter] || 'matching'), S.heat && heatWords()].filter(Boolean).join(' and ') || 'matching'} right now. <button class="btn" data-show-all>Show all ${M.noun}</button></div>`;
 
 function renderGrid() {
   const list = visibleCoins();
@@ -926,13 +979,13 @@ function stopCell(st, side) {
 
 const COLS = [
   ['rank', '#', c => c.market_cap_rank],
-  ['name', 'Coin', c => c.name.toLowerCase()],
+  ['name', MARKET === 'forex' ? 'Currency' : 'Coin', c => c.name.toLowerCase()],
   ['sig', 'Signals', c => { const s = signals(S.ind[c.id]); return s.good.length - s.bad.length; }],
   ['price', 'Price', c => c.current_price],
-  ['24h', '24h', c => chgOf(c, '24h')],
-  ['7d', '7d', c => chgOf(c, '7d')],
-  ['30d', '30d', c => chgOf(c, '30d')],
-  ['mcap', 'Mkt cap', c => c.market_cap],
+  ['24h', TF('24h'), c => chgOf(c, '24h')],
+  ['7d', TF('7d'), c => chgOf(c, '7d')],
+  ['30d', TF('30d'), c => chgOf(c, '30d')],
+  ...(MARKET === 'crypto' ? [['mcap', 'Mkt cap', c => c.market_cap]] : []),   // currencies have no market cap
   ['rsi', 'RSI', c => S.ind[c.id]?.rsiNow],
   ['trend', 'Trend', c => { const i = S.ind[c.id]; return i?.trend ? (i.trend === 'up' ? 2 : 0) + (i.strong ? (i.trend === 'up' ? 1 : -0.5) : 0) : null; }],
   ['dF', 'vs fast MA', c => { const i = S.ind[c.id]; return i?.mF ? (i.last / i.mF - 1) * 100 : null; }],
@@ -957,12 +1010,12 @@ function renderTable() {
     const trend = i.trend ? `<span class="${i.trend === 'up' ? 'up-t' : 'dn-t'}">${i.trend === 'up' ? '▲ Up' : '▼ Down'}</span>${i.cross ? ' ✦' : ''}` : '—';
     const bbp = i.bbPct != null ? `${i.bbPct.toFixed(0)}${i.bbState === 'tight' || i.bbState === 'squeeze' ? ' · Squeeze' : ''}` : '—';
     return `<tr data-id="${esc(c.id)}"><td>${c.market_cap_rank}</td><td><b>${esc(c.symbol.toUpperCase())}</b> <span style="color:var(--ink-2)">${esc(c.name)}</span></td><td style="text-align:left">${emojiHTML(S.ind[c.id]) || ''}</td>
-      <td>${fmtPrice(c.current_price)}</td><td>${heat('24h')}</td><td>${heat('7d')}</td><td>${heat('30d')}</td><td>${fmtBig(c.market_cap)}</td>
+      <td>${fmtPrice(c.current_price)}</td><td>${heat('24h')}</td><td>${heat('7d')}</td><td>${heat('30d')}</td>${MARKET === 'crypto' ? `<td>${fmtBig(c.market_cap)}</td>` : ''}
       <td>${rsi}</td><td>${trend}</td><td>${fmtPct(i.mF ? (i.last / i.mF - 1) * 100 : null, 1)}</td><td>${fmtPct(i.mS ? (i.last / i.mS - 1) * 100 : null, 1)}</td>
       <td>${i.bbw != null ? i.bbw.toFixed(1) + '%' : '—'}</td><td>${bbp}</td>
       <td>${stopCell(i.stop, 'long')}</td><td>${stopCell(i.stop, 'short')}</td></tr>`;
   }).join('');
-  $('#tablewrap').innerHTML = `<table><caption class="sr">Top ${TOP_N} coins with indicators</caption><thead><tr>${head}</tr></thead><tbody>${body || `<tr><td colspan="${COLS.length}" style="text-align:left">${emptyHTML()}</td></tr>`}</tbody></table>`;
+  $('#tablewrap').innerHTML = `<table><caption class="sr">${MARKET === 'forex' ? 'Currencies against the US dollar' : `Top ${TOP_N} coins`} with indicators</caption><thead><tr>${head}</tr></thead><tbody>${body || `<tr><td colspan="${COLS.length}" style="text-align:left">${emptyHTML()}</td></tr>`}</tbody></table>`;
 }
 
 function renderFooter() {
@@ -970,12 +1023,14 @@ function renderFooter() {
   for (const c of S.coins) { const h = S.hist[c.id]; if (h) src[h.src] = (src[h.src] || 0) + 1; }
   const parts = Object.entries(src).map(([k, v]) => `${v} from ${k}`);
   const withHist = S.coins.filter(c => S.hist[c.id]), ok = withHist.filter(c => S.hist[c.id].ok).length;
-  $('#srcinfo').textContent = `Prices & rankings: ${S.marketSrc || '—'}${S.stale ? ' (saved copy, sources busy)' : ''}.` + (parts.length ? ` Daily candles: ${parts.join(' · ')}.` : '')
-    + (withHist.length ? ` ✓ ${ok} of ${withHist.length} coins matched to their exchange pair by CoinGecko ID; ? marks a ticker-only match.` : '');
+  $('#srcinfo').textContent = MARKET === 'forex'
+    ? `Rates: ${parts.join(' · ') || '—'}${S.stale ? ' (saved copy, sources busy)' : ''}. ✓ marks an official ECB reference rate; ? marks the community feed.`
+    : `Prices & rankings: ${S.marketSrc || '—'}${S.stale ? ' (saved copy, sources busy)' : ''}.` + (parts.length ? ` Daily candles: ${parts.join(' · ')}.` : '')
+      + (withHist.length ? ` ✓ ${ok} of ${withHist.length} coins matched to their exchange pair by CoinGecko ID; ? marks a ticker-only match.` : '');
   const ex = $('#excluded');
   ex.hidden = S.pegged || !S.excluded.length;
-  ex.querySelector('summary').textContent = `Excluded ${S.excluded.length} stablecoins, pegged and fund tokens (tick "Include stablecoins & pegged" to show them)`;
-  ex.querySelector('div').textContent = S.excluded.slice(0, 60).map(c => `${c.symbol.toUpperCase()} (#${c.market_cap_rank})`).join(', ');
+  ex.querySelector('summary').textContent = `Excluded ${S.excluded.length} ${M.pegWords} (tick "${M.pegLabel}" to show them)`;
+  ex.querySelector('div').textContent = S.excluded.slice(0, 60).map(c => c.fx ? c.symbol : `${c.symbol.toUpperCase()} (#${c.market_cap_rank})`).join(', ');
 }
 
 function renderAll() {
@@ -991,7 +1046,7 @@ function renderAll() {
 /* ================= scorecard (daily check of the 🚀 / 😢, built by scripts/score.mjs) ================= */
 async function loadScorecard() {
   try {
-    const r = await fetch(`scorecard.json?b=${Math.floor(Date.now() / 600e3)}`, { cache: 'no-store' });
+    const r = await fetch(`${M.scorecard}?b=${Math.floor(Date.now() / 600e3)}`, { cache: 'no-store' });
     S.scorecard = r.ok ? await r.json() : null;
   } catch { S.scorecard = null; }
 }
@@ -1265,9 +1320,10 @@ function showDetail(id, anchor, keepPos) {
   const box = $('#detail');
   if (!c) return hideDetail(true);
   const ind = S.ind[id], h = S.hist[id];
-  let body = `<div class="d-head">${logo(c, 22)}<b>${esc(c.name)}</b><span style="color:var(--ink-2)">${esc(c.symbol.toUpperCase())} · #${c.market_cap_rank}</span></div>
+  let body = `<div class="d-head">${logo(c, 22)}<b>${esc(c.name)}</b><span style="color:var(--ink-2)">${esc(c.symbol.toUpperCase())}${c.fx ? '' : ` · #${c.market_cap_rank}`}</span></div>
     <div class="d-price">${fmtPrice(c.current_price)}</div>
-    <div class="d-chg"><span>24h ${fmtPct(chgOf(c, '24h'))}</span><span>7d ${fmtPct(chgOf(c, '7d'))}</span><span>30d ${fmtPct(chgOf(c, '30d'))}</span><span>Cap ${fmtBig(c.market_cap)}</span></div>`;
+    <div class="d-chg"><span>${TF('24h')} ${fmtPct(chgOf(c, '24h'))}</span><span>${TF('7d')} ${fmtPct(chgOf(c, '7d'))}</span><span>${TF('30d')} ${fmtPct(chgOf(c, '30d'))}</span>${c.fx ? '' : `<span>Cap ${fmtBig(c.market_cap)}</span>`}</div>
+    ${c.warn ? `<div class="d-src">⚠ <b>${esc(c.name)}: the official rate and the street (market) rate differ a lot.</b> This rate comes from a community feed whose sources aren't documented, so it may not match what you'd actually get. It is left out of the scorecard.</div>` : ''}`;
   if (ind && !ind.error) {
     body += `<div class="d-cols"><div class="d-left">${chartSwitch()}${S.chart === 'pnf' ? pnfChart(ind) : detailChart(ind)}</div><div class="d-right">`;
     const trendTxt = ind.trend ? `${ind.trend === 'up' ? '▲ Uptrend' : '▼ Downtrend'} (${ind.strong ? 'price agrees' : ind.trend === 'up' ? `price below ${P().maFast}MA` : `price above ${P().maFast}MA`})` : `${P().maSlow}-day history not available yet`;
@@ -1289,10 +1345,12 @@ function showDetail(id, anchor, keepPos) {
         return `<div class="d-stop ${s}"><div class="d-st">Recommended stop · <b>${side}</b> positions</div><div class="d-sv">${fmtPrice(ind.stop[side])} <span>${fmtPct(ind.stop[side + 'Pct'], 1)}</span></div><div class="d-sn">${note}</div></div>`;
       }).join('')}
     </div>
-    <div class="d-src">Stops = ${P().stopMult}× the average daily move (${(ind.stop.dist / P().stopMult * 100).toFixed(1)}%) from the ${new Date(ind.t[ind.stop.anchorIdx ?? ind.n - 2] ?? Date.now()).toISOString().slice(0, 10)} close. Suggested levels, not advice: set them on your exchange, as this page isn't real-time.</div>` : ''}
-    <div class="d-src">${h ? `${h.src} ${h.pair} · ${h.ok ? '✓ verified by CoinGecko ID' : '⚠ matched by ticker only (not verified)'} · ${ind.n} daily candles` : ''}${ind.bbShort ? ' · BBW percentile uses under 90 days' : ''}</div>`;
+    <div class="d-src">Stops = ${P().stopMult}× the average daily move (${(ind.stop.dist / P().stopMult * 100).toFixed(c.fx ? 2 : 1)}%) from the ${new Date(ind.t[ind.stop.anchorIdx ?? ind.n - 2] ?? Date.now()).toISOString().slice(0, 10)} ${c.fx ? 'rate' : 'close'}. Suggested levels, not advice: set them with ${M.stopWhere}, as this page isn't real-time.</div>` : ''}
+    <div class="d-src">${!h ? '' : c.fx
+      ? `${h.ok ? '✓ Official ECB reference rate' : '? Community exchange-api feed (public domain)'} · ${ind.n} business days`
+      : `${h.src} ${h.pair} · ${h.ok ? '✓ verified by CoinGecko ID' : '⚠ matched by ticker only (not verified)'} · ${ind.n} daily candles`}${ind.bbShort ? ' · BBW percentile uses under 90 days' : ''}</div>`;
     body += '</div></div>';
-  } else body += `<div class="d-src">${ind?.error ? 'No daily history found on Binance, Gate.io, OKX or CoinGecko.' : 'Loading candles…'}</div>`;
+  } else body += `<div class="d-src">${ind?.error ? (c.fx ? 'No rate history available for this currency.' : 'No daily history found on Binance, Gate.io, OKX or CoinGecko.') : 'Loading candles…'}</div>`;
   box.querySelector('.body').innerHTML = body;
   box.classList.add('show');
   if (keepPos) {                              // redrawn in place (e.g. chart switch): stay inside the window
@@ -1494,6 +1552,12 @@ document.addEventListener('click', e => {
   if (e.target.closest('[data-show-all]')) setFilter('all');
   if (e.target.closest('[data-goto-score]')) { e.preventDefault(); $('#view button[data-v=score]').click(); window.scrollTo({ top: $('#scorewrap').offsetTop - 12 }); }
 });
+// This market's names on the shared controls
+$$('#market a').forEach(a => { if (a.dataset.m === MARKET) a.setAttribute('aria-current', 'page'); });
+$$('#colorBy button').forEach(b => { b.textContent = TF(b.dataset.v); b.title = `Color by ${TF(b.dataset.v)} change`; });
+$('#filters .chip[data-f="all"]').textContent = `All ${M.noun}`;
+$('#pegged').parentElement.lastChild.textContent = ' ' + M.pegLabel;
+$('#pegged').parentElement.title = M.pegTitle;
 $('#pegged').checked = S.pegged;
 $('#pegged').addEventListener('change', e => { S.pegged = e.target.checked; savePrefs(); pickCoins(); renderAll(); applyHist(); done(); });
 
@@ -1517,14 +1581,15 @@ if (!(Date.now() - (store.get('hm.wip') || 0) < WIP_AGAIN)) setTimeout(showWip, 
 async function loadSnapshot() {
   try {
     // the minute bucket busts GitHub Pages' 10-minute CDN cache without hammering it
-    const r = await fetch(`data.json?b=${Math.floor(Date.now() / 60e3)}`, { cache: 'no-store' });
+    const r = await fetch(`${M.data}?b=${Math.floor(Date.now() / 60e3)}`, { cache: 'no-store' });
     if (r.status === 404) { S.noSnapshot = true; return null; }
     if (!r.ok) return null;
     const d = await r.json();
     return d && d.v === 1 && Array.isArray(d.markets) ? d : null;
   } catch { return null; }
 }
-const unpack = h => ({ src: h.src, pair: h.pair, ok: !!h.ok, t: h.t, closes: h.c.map((v, i) => [h.t0 + i * DAY, v]) });
+// one close per day from t0 (crypto), or at t0 + d[i] days when the market skips days (forex: business days)
+const unpack = h => ({ src: h.src, pair: h.pair, ok: !!h.ok, t: h.t, closes: h.c.map((v, i) => [h.t0 + (h.d ? h.d[i] : i) * DAY, v]) });
 
 // Backup when data.json is missing or stale: run the same build script GitHub runs, right here in the browser
 // (without the slow CoinGecko candle fallback), at most once per 10 minutes per browser, shared across tabs.
@@ -1534,7 +1599,7 @@ async function buildLive(stale) {
   if (Date.now() - (store.get('hm.liveAt') || 0) < LIVE_EVERY) return cached || stale; // another tab or reload just tried
   store.set('hm.liveAt', Date.now());
   setStatus('Fetching live prices…', 'busy');
-  const { build } = await import('./scripts/build-data.mjs');
+  const { build } = await import('/scripts/build-data.mjs');
   const prev = cached && (!stale || cached.generated > stale.generated) ? cached : stale;
   let pairs = null;
   try { pairs = (await (await fetch('pairs.json', { cache: 'no-store' })).json()).pairs; } catch { /* none published yet */ }
@@ -1553,6 +1618,14 @@ function renderFresh(now) {
   const late = age > REFRESH_MIN * 2.5 * 60e3;
   const next = S.busy ? 'refreshing now' : S.nextAuto > now ? `next in ~${Math.max(1, Math.ceil((S.nextAuto - now) / 60e3))} min` : 'checking for new prices';
   el.classList.toggle('late', late);
+  if (MARKET === 'forex') {               // the rate date is what matters: one official rate per business day
+    const rd = S.rateDate ? new Date(S.rateDate + 'T12:00:00Z').toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }) : '—';
+    const fx = `<span>🕒 <b>Rates of ${rd}</b> · <b>not real-time</b>: one rate per business day, published about 16:00 Frankfurt time · checked ${ago}`
+      + (late ? ' · <b>⚠ updates are running late</b>' : '') + '</span>'
+      + `<a class="cg-attr" href="https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html" target="_blank" rel="noopener">Source: ECB</a>`;
+    if (el.innerHTML !== fx) el.innerHTML = fx;
+    return;
+  }
   const html = `<span>🕒 <b>Last refreshed ${tm}</b> (${ago}) · ${next} · <b>not real-time</b>, every ${REFRESH_MIN} min`
     + (late ? ' · <b>⚠ this update is running late: showing the last good data</b>' : '') + '</span>'
     + `<a class="cg-attr" href="https://www.coingecko.com/" target="_blank" rel="noopener">Powered by CoinGecko</a>`;   // attribution required for the free CoinGecko API key
@@ -1574,13 +1647,13 @@ function done() {
   renderCounts();   // right away: the deferred refresh is paused in background tabs
   const ok = S.coins.filter(c => S.ind[c.id] && !S.ind[c.id].error).length;
   const via = S.mode === 'live' ? ` · built in your browser from ${S.marketSrc}` : '';
-  setStatus(`${ok}/${S.coins.length} coins with indicators${via}`, S.stale ? '' : 'live');
+  setStatus(`${ok}/${S.coins.length} ${M.noun} with indicators${via}`, S.stale ? '' : 'live');
 }
 
 async function show(data, live) {
   const isNew = data.generated !== S.updated;
   S.mode = live ? 'live' : 'snapshot';
-  S.markets = data.markets; S.updated = data.generated; S.marketSrc = data.marketSrc; S.stale = !!data.marketStale;
+  S.markets = data.markets; S.updated = data.generated; S.marketSrc = data.marketSrc; S.stale = !!data.marketStale; S.rateDate = data.rateDate;
   S.stable = new Set(data.cats?.stable || []); S.gold = new Set(data.cats?.gold || []);
   S.hist = {};
   for (const [id, h] of Object.entries(data.hist || {})) S.hist[id] = unpack(h);
@@ -1599,14 +1672,15 @@ async function run() {
   try {
     if (!S.coins.length) setStatus('Loading prices…', 'busy');
     const snap = S.noSnapshot ? null : await loadSnapshot();
-    if (snap && Date.now() - snap.generated < SNAPSHOT_MAX_AGE) {
+    // forex rates change once a day, so an older snapshot is still the latest rate: no in-browser rebuild
+    if (snap && (Date.now() - snap.generated < SNAPSHOT_MAX_AGE || !M.live)) {
       const isNew = await show(snap, false);
       // the next build lands ~10 min after this one; if it hasn't appeared yet, look again every 2 min
       S.nextAuto = isNew ? Math.max(S.updated + MARKETS_TTL + SNAPSHOT_GRACE, Date.now() + 30e3) : Date.now() + SNAPSHOT_RETRY;
     } else {
       // no data.json (local preview) or the scheduled job is stuck
       let data = null;
-      try { data = await buildLive(snap); } catch { data = null; }
+      if (M.live) try { data = await buildLive(snap); } catch { data = null; }
       if (!data) data = snap;
       if (!data) throw new Error('No price data available right now');
       await show(data, data !== snap);

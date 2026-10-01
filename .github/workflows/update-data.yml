@@ -42,13 +42,26 @@ jobs:
         run: |
           mkdir -p _site
           mkdir -p _site/scripts
-          cp index.html signals.mjs robots.txt og-image.png _site/
-          # sitemap for search engines: one page, whose data changes every day
-          printf '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>https://heat.sala.company/</loc><lastmod>%s</lastmod><changefreq>hourly</changefreq></url>\n</urlset>\n' "$(date -u +%F)" > _site/sitemap.xml
+          cp index.html signals.mjs robots.txt og-image.png og-image-forex.png _site/
+          # sitemap for search engines: the crypto and forex pages, whose data changes every day
+          printf '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>https://heat.sala.company/</loc><lastmod>%s</lastmod><changefreq>hourly</changefreq></url>\n  <url><loc>https://heat.sala.company/forex/</loc><lastmod>%s</lastmod><changefreq>daily</changefreq></url>\n</urlset>\n' "$(date -u +%F)" "$(date -u +%F)" > _site/sitemap.xml
           cp scripts/build-data.mjs _site/scripts/   # the page runs it itself if data.json ever goes stale
           [ -f data/scorecard.json ] && cp data/scorecard.json _site/ || true
           [ -f data/pairs.json ] && cp data/pairs.json _site/ || true
           node scripts/build-data.mjs _site/data.json
+
+      # Forex: the same page at /forex/ (with forex search tags) and forex.json. Rates change once a day, so the build
+      # reuses the last file and refetches hourly. A forex failure republishes the last good file and never blocks
+      # the crypto update.
+      - name: Fetch forex rates
+        env:
+          PREV_URL: ${{ steps.pages.outputs.base_url }}/forex.json
+          BASE_URL: ${{ steps.pages.outputs.base_url }}
+        run: |
+          node scripts/forex-page.mjs _site/forex/index.html
+          [ -f data/forex-scorecard.json ] && cp data/forex-scorecard.json _site/ || true
+          node scripts/build-forex.mjs _site/forex.json \
+            || { echo "::warning::forex build failed, republishing the last forex.json"; curl -sf "$BASE_URL/forex.json" -o _site/forex.json || true; }
 
       - uses: actions/upload-pages-artifact@v4
         with:

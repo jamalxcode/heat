@@ -7,8 +7,9 @@ export const DEFAULT_PARAMS = {
   bbPeriod: 20, bbK: 2, bbLookback: 180, bbTightPct: 10, bbWidePct: 80,
   // Recommended stop-loss: stopMult × the coin's average daily move over the last stopLookback days
   stopMult: 2, stopLookback: 20,
-  // Momentum: the coin's move over the last 30 days is above +momPct% (momUp) or below −momPct% (momDown)
-  momPct: 20,
+  // Momentum: the move over the last momDays candles is above +momPct% (momUp) or below −momPct% (momDown).
+  // Crypto: 30 daily candles = 30 days. Forex (business days only): 21 candles ≈ one month, and a much smaller momPct.
+  momPct: 20, momDays: 30,
   // +1 = counts as a 🚀, -1 = counts as a 😢, 0 = switched off. The tuner may flip or disable a signal.
   // Only what's shown next to the name is scored: the moving-average trend (🚀 / 😢), the point & figure trend
   // (X📈 / O📉) and 30-day momentum (🔥 / 🧊). RSI and Bollinger width stay in the tiles as information: the tuner
@@ -25,8 +26,8 @@ export const COMPONENTS = {
   trendDown:  'strong downtrend',
   overbought: 'RSI overbought',
   bbWide:     'wide Bollinger band',
-  momUp:      'strong 30-day momentum',
-  momDown:    'weak 30-day momentum',
+  momUp:      'strong 1-month momentum',
+  momDown:    'weak 1-month momentum',
   pnfUp:      'point & figure rising (X column)',
   pnfDown:    'point & figure falling (O column)',
 };
@@ -117,7 +118,7 @@ export function componentsAt(s, i, p) {
   const P = withDefaults(p);
   const c = s.c[i], r = s.rsi[i], f = s.maF[i], sl = s.maS[i], q = s.bbPct[i];
   const trend = f != null && sl != null;
-  const m30 = i >= 30 ? (c / s.c[i - 30] - 1) * 100 : null;
+  const md = P.momDays, m30 = i >= md ? (c / s.c[i - md] - 1) * 100 : null;
   const pf = pnfDirAt(s.c, i);
   return {
     pnfUp:      pf ? pf === 'X' : null,
@@ -178,8 +179,9 @@ export function pnfDirAt(closes, i) {
   return m.get(i);
 }
 // Box size from the coin's own volatility: its average daily move over the last 60 closes, snapped to a clean step.
-// About 1-1.5% for BTC and 2-3% for a typical coin, so every chart has a readable number of columns.
-const PNF_STEPS = [0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
+// About 1-1.5% for BTC and 2-3% for a typical coin, so every chart has a readable number of columns. The small
+// steps are for currencies: EUR/USD moves about 0.3% a day.
+const PNF_STEPS = [0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
 export function autoBoxPct(closes, lookback = 60) {
   const n = closes.length, from = Math.max(1, n - lookback);
   let s = 0, k = 0;
@@ -233,7 +235,10 @@ export function pointFigure(closes, { boxPct = autoBoxPct(closes), reversal = 3 
 const DAY = 864e5;
 const cap = h => 0.3 * Math.sqrt(h);   // ±30% a day, wider for longer horizons: stops one bad print swamping averages
 
-// coins: [{ id, symbol, t0 (ms, UTC midnight of first close), c: [daily closes, complete days only] }]
+// coins: [{ id, symbol, t0 (ms, UTC midnight of first close), c: [daily closes, complete days only], days? }]
+// `days` (optional): the UTC day number of each close, for markets that skip days (forex: business days only).
+// Without it the closes are one per calendar day from t0 (crypto). Horizons count closes, so for forex the
+// "next 1 / 3 / 7 days" are trading days.
 // One row per coin per day: the signals at that close and the move over the following 1 / 3 / 7 days.
 export function signalRows(coins, p) {
   const P = withDefaults(p);
@@ -242,6 +247,7 @@ export function signalRows(coins, p) {
   for (const coin of coins) {
     const s = series(coin.c, P);
     const d0 = Math.floor(coin.t0 / DAY), n = coin.c.length;
+    const dayOf = coin.days ? i => coin.days[i] : i => d0 + i;
     for (let i = warm; i < n - 1; i++) {
       const a = componentsAt(s, i, P);
       if (Object.values(a).some(v => v == null)) continue;
@@ -270,7 +276,7 @@ export function signalRows(coins, p) {
           stop[h] = { longHit: jL >= 0, longGood: after(jL, -1), longSaved: saved(jL, -1), shortHit: jS >= 0, shortGood: after(jS, 1), shortSaved: saved(jS, 1) };
         }
       }
-      rows.push({ day: d0 + i, id: coin.id, sym: coin.symbol, a, good, bad, score, squeeze, raw, ret, mkt: {}, exc: {}, stopD, stop });
+      rows.push({ day: dayOf(i), next: dayOf(i + 1), id: coin.id, sym: coin.symbol, a, good, bad, score, squeeze, raw, ret, mkt: {}, exc: {}, stopD, stop });
     }
   }
   // excess = coin's move minus the average of every coin over the same days (removes the market's move)
@@ -377,7 +383,7 @@ export function stats(rows, h = 1) {
 // For each signal, pick its setting and whether it's a 🚀, a 😢 or off, using only days before `until`.
 // A signal is switched on only if its effect clears |t| ≥ minT on average across the 1/3/7-day horizons;
 // the bar is above the usual 2 because about 30 variants get tried, and some would clear 2 by luck.
-function selectParams(cur, rowsFor, until, minT) {
+function selectParams(cur, rowsFor, until, minT, momPcts = [10, 20, 30]) {
   const next = withDefaults(cur), notes = [];
   const effect = (rows, k) => {
     let tSum = 0, avgSum = 0, n = Infinity;
@@ -430,9 +436,9 @@ function selectParams(cur, rowsFor, until, minT) {
   const wide = best([75, 80, 85, 90, 95].map(bbWidePct => ({ bbWidePct })), 'bbWide');
   if (wide) { next.bbWidePct = wide.v.bbWidePct; setSign('bbWide', wide.e); }
 
-  // Momentum (🔥 / 🧊 on the tiles): which 30-day threshold, and whether strong/weak momentum should be a 🚀, a 😢 or off
+  // Momentum (🔥 / 🧊 on the tiles): which threshold, and whether strong/weak momentum should be a 🚀, a 😢 or off
   let bestMom = null;
-  for (const momPct of [10, 20, 30]) {
+  for (const momPct of momPcts) {
     const rows = rowsFor({ ...next, momPct });
     const u = effect(rows, 'momUp'), d = effect(rows, 'momDown');
     const t = Math.abs(u.t) + Math.abs(d.t);
@@ -457,7 +463,7 @@ function objective(rows, from, to) {
 // Walk-forward in several folds: the newest half of history is cut into `folds` check periods. For each one, settings
 // are chosen only on the days before it, then compared with the current settings on it. The new settings (chosen on
 // all history) are adopted only if that procedure beat the current settings in most folds and on average.
-export function tune(coins, current, { folds = 3, minT = 2.5, margin = 0.003 } = {}) {
+export function tune(coins, current, { folds = 3, minT = 2.5, margin = 0.003, momPcts } = {}) {
   const cur = withDefaults(current);
   // Rows for a given setting (~80k rows for 100 coins × 2.7 years). Keep only the 8 most recently used: caching every
   // variant tried across all folds ran GitHub's runner out of memory (4 GB) once momentum and stop variants were added.
@@ -476,14 +482,14 @@ export function tune(coins, current, { folds = 3, minT = 2.5, margin = 0.003 } =
   const results = [];
   for (let k = 0; k < folds; k++) {
     const from = days[start + k * block], to = k === folds - 1 ? Infinity : days[start + (k + 1) * block];
-    const sel = selectParams(cur, rowsFor, from, minT).params;
+    const sel = selectParams(cur, rowsFor, from, minT, momPcts).params;
     const before = objective(rowsFor(cur), from, to), after = objective(rowsFor(sel), from, to);
     results.push({ from, to: Number.isFinite(to) ? to - 1 : days[days.length - 1], before, after, won: after > before });
   }
   const avg = f => mean(results.map(f));
   const before = avg(r => r.before), after = avg(r => r.after), wins = results.filter(r => r.won).length;
 
-  const final = selectParams(cur, rowsFor, Infinity, minT);
+  const final = selectParams(cur, rowsFor, Infinity, minT, momPcts);
   const anyOn = Object.values(final.params.weights).some(w => w !== 0);
   const changed = JSON.stringify(final.params) !== JSON.stringify(cur);
   const adopt = changed && anyOn && after > 0 && after > before + margin && wins >= Math.ceil(folds / 2);
@@ -522,7 +528,7 @@ export function tune(coins, current, { folds = 3, minT = 2.5, margin = 0.003 } =
 /* ---------- the daily scorecard ---------- */
 const isoDay = d => new Date(d * DAY).toISOString().slice(0, 10);
 // coins: complete daily closes only. Returns { card, newParams } where newParams is set only if the tuner adopted settings.
-export function buildScorecard(coins, current, { prev = null, tuneNow = false, now = Date.now() } = {}) {
+export function buildScorecard(coins, current, { prev = null, tuneNow = false, now = Date.now(), momPcts } = {}) {
   const params = withDefaults(current);
   const rows = signalRows(coins, params);
   const lastDay = Math.max(...rows.filter(r => r.ret[1] != null).map(r => r.day)); // latest close whose next day is complete
@@ -543,7 +549,7 @@ export function buildScorecard(coins, current, { prev = null, tuneNow = false, n
   const tuning = structuredClone(prev?.tuning || { history: [] });
   let newParams = null;
   if (tuneNow || !tuning.lastRun) {
-    const res = tune(coins, params);
+    const res = tune(coins, params, { momPcts });
     tuning.lastRun = new Date(now).toISOString();
     tuning.last = {
       adopted: res.adopt, notes: res.notes, testIC: res.testIC, wins: res.wins, folds: res.folds.map(f => ({ from: isoDay(f.from), to: isoDay(f.to), before: f.before, after: f.after, won: f.won })),
@@ -558,7 +564,7 @@ export function buildScorecard(coins, current, { prev = null, tuneNow = false, n
 
   const card = {
     v: 2, generated: now, params: newParams || params, coins: coins.length, horizons: HORIZONS,
-    signalDay: isoDay(lastDay), outcomeDay: isoDay(lastDay + 1),
+    signalDay: isoDay(lastDay), outcomeDay: isoDay(y[0]?.next ?? lastDay + 1),   // next close: the next business day for forex
     yesterday: {
       market: y[0]?.mkt[1] ?? null,
       // real move shown per coin; the averages use the capped one
@@ -575,6 +581,7 @@ export function buildScorecard(coins, current, { prev = null, tuneNow = false, n
 const EXCLUDE_NAME = /\b(fund|treasur\w*|t-bills?|securities|money market|heloc|wrapped|staked|bridged|restaked|gold|yield)\b/i;
 const EXCLUDE_SYMBOL = /^(w|st|wst|cb|we|bn|jito|m|r|ez|rs|l|solv|t)(btc|eth|bnb|sol|steth|beth|eeth)$/i;
 export function isPegged(c, cats) {
+  if (c.fx) return !!c.pegged;   // currencies: an explicit list (the crypto rules below would flag quiet pairs like EUR/USD)
   if (cats?.stable?.includes(c.id) || cats?.gold?.includes(c.id)) return true;
   if (EXCLUDE_NAME.test(c.name) || EXCLUDE_SYMBOL.test(c.symbol)) return true;
   if (/usd|eur/i.test(c.symbol) && c.current_price > 0.9 && c.current_price < 1.1) return true;

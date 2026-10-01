@@ -5,3 +5,6 @@ node_modules/
 test-results/
 playwright-report/
 package-lock.json
+/forex.json
+/forex-scorecard.json
+/forex/

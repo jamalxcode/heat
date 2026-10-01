@@ -1,0 +1,27 @@
+{
+  "rsiPeriod": 14,
+  "rsiLow": 30,
+  "rsiHigh": 70,
+  "maFast": 50,
+  "maSlow": 200,
+  "bbPeriod": 20,
+  "bbK": 2,
+  "bbLookback": 180,
+  "bbTightPct": 10,
+  "bbWidePct": 80,
+  "stopMult": 2,
+  "stopLookback": 20,
+  "momPct": 3,
+  "momDays": 21,
+  "weights": {
+    "trendUp": 1,
+    "oversold": 0,
+    "trendDown": -1,
+    "overbought": 0,
+    "bbWide": 0,
+    "momUp": 1,
+    "momDown": -1,
+    "pnfUp": 1,
+    "pnfDown": -1
+  }
+}

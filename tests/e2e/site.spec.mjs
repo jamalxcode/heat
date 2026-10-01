@@ -195,7 +195,7 @@ test('names show only the MA 🚀/😢, momentum 🔥/🧊 and the point & figur
   const dir = (await mark.getAttribute('class')).includes('pnf-X') ? 'X' : 'O';
   await expect(mark).toHaveText(dir === 'X' ? 'X📈' : 'O📉');
   await expect(page.locator('#grid .tile .name', { hasText: '⚡' })).toHaveCount(0);   // no BB emoji
-  for (const t of await page.locator('#grid .tile .emo').all()) expect(await t.getAttribute('title')).toMatch(/^(🚀 strong uptrend|😢 strong downtrend|🔥 strong 30-day momentum .*|🧊 weak 30-day momentum .*)$/);
+  for (const t of await page.locator('#grid .tile .emo').all()) expect(await t.getAttribute('title')).toMatch(/^(🚀 strong uptrend|😢 strong downtrend|🔥 strong 1-month momentum .*|🧊 weak 1-month momentum .*)$/);
   await expect(tile(page, 'moon-coin').locator('.emo.mom')).toHaveText('🔥');                      // up ~40% in 30 days
   await tile(page, 'moon-coin').click();
   await page.locator('#detail [data-chart="pnf"]').click();
@@ -247,6 +247,64 @@ test("scorecard: clicking one of yesterday's coins opens its chart card beside i
   await expect(popup.locator('.d-head b')).not.toHaveText('Moon Coin');
   await popup.locator('.x').click();
   await expect(popup).not.toHaveClass(/show/);
+});
+
+// Forex: the same page at /forex/, with forex.json (tests/e2e/fixtures.mjs: 8 currencies, SAR pegged, IRR warned)
+test.describe('forex', () => {
+  const FX_VISIBLE = 7;   // 8 in the test data, minus the pegged SAR
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/forex/');
+    await expect(page.locator('#status')).toContainText(`${FX_VISIBLE}/${FX_VISIBLE} currencies with indicators`);
+  });
+
+  test('loads its own data, labels and search tags; the market switch links the two pages', async ({ page }) => {
+    await expect(tiles(page)).toHaveCount(FX_VISIBLE);
+    await expect(page).toHaveTitle(/Forex Heatmap/);
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://heat.sala.company/forex/');
+    await expect(page.locator('#colorBy button')).toHaveText(['1d', '1w', '1m']);
+    await expect(page.locator('#fresh')).toContainText('Rates of');
+    await expect(page.locator('#fresh')).toContainText('not real-time');
+    await expect(page.locator('#market a[aria-current="page"]')).toHaveText(/Forex/);
+    await expect(page.locator('#market a[data-m="crypto"]')).toHaveAttribute('href', '/');
+    await expect(page.locator('#legendScale')).toContainText('±0.1');                        // forex-sized color ranges
+    const ld = JSON.parse(await page.locator('script[type="application/ld+json"]').textContent());
+    const faq = ld['@graph'].find(x => x['@type'] === 'FAQPage').mainEntity.map(q => q.name);
+    expect(await page.locator('footer .about h3').allTextContents()).toEqual(faq);
+    expect(external).toEqual([]);
+  });
+
+  test('tiles: market-convention pairs, rates without $, ✓ for ECB and ? for the extra feed', async ({ page }) => {
+    const eur = tile(page, 'eur');
+    await expect(eur.locator('.sym')).toContainText('EUR/USD');
+    await expect(tile(page, 'jpy').locator('.sym')).toContainText('USD/JPY');
+    expect(await eur.locator('.px').textContent()).toMatch(/^\d\.\d{4}$/);                   // e.g. 1.0842
+    await expect(eur.locator('.vf.ok')).toHaveCount(1);
+    await expect(tile(page, 'rub').locator('.vf.guess')).toHaveCount(1);
+    await expect(tile(page, 'sar')).toHaveCount(0);                                         // pegged: hidden
+  });
+
+  test('pegged currencies show with their own checkbox, separate from crypto stablecoins', async ({ page }) => {
+    await expect(page.locator('#pegged').locator('..')).toContainText('Pegged');
+    await page.locator('#pegged').check();
+    await expect(tiles(page)).toHaveCount(FX_VISIBLE + 1);
+    await expect(tile(page, 'sar')).toHaveCount(1);
+    await page.goto('/');
+    await expect(page.locator('#pegged')).not.toBeChecked();                                // crypto keeps its own choice
+  });
+
+  test('rial: the popup warns that official and market rates differ', async ({ page }) => {
+    await tile(page, 'irr').click();
+    await expect(page.locator('#detail')).toHaveClass(/pinned/);
+    await expect(page.locator('#detail')).toContainText('official rate and the street');
+    await expect(page.locator('#detail')).toContainText('1d');
+    await expect(page.locator('#detail')).not.toContainText('Cap ');
+  });
+
+  test('scorecard view renders from forex-scorecard.json', async ({ page }) => {
+    await page.locator('#view button[data-v="score"]').click();
+    await expect(page.locator('#scorewrap')).toContainText("Yesterday's calls");
+    await expect(page.locator('#scorewrap .sc-chart svg')).toBeVisible();
+  });
 });
 
 test.describe('phone', () => {
