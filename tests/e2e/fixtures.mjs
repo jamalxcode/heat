@@ -57,9 +57,9 @@ export function makeFixtures(now = Date.now()) {
 
 // Forex: business days only (no weekends), built through the real build-forex.mjs helpers, so the browser tests
 // also check that forex.json comes out in the shape the page expects.
-// [code, seed, daily drift] in units per US dollar (the builder flips EUR to EUR/USD)
+// [code, seed, daily drift] in units per US dollar (every pair is stored USD/XXX)
 export const FX_SPEC = [
-  ['EUR', 21, -0.0004],   // ECB, quoted EUR/USD
+  ['EUR', 21, -0.0004],   // ECB, USD/EUR
   ['JPY', 22, 0.0006],    // ECB, quoted USD/JPY
   ['GBP', 23, 0.0001],
   ['CHF', 24, -0.0002],

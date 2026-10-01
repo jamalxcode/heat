@@ -19,24 +19,27 @@ const XAPI = [
 export const XAPI_FROM = '2024-03-02';   // first day the extra feed has files for
 const HISTORY_DAYS = 400;                // calendar days fetched for the page: ~275 business days (indicators need 260)
 const REFETCH = 60 * 60e3;               // rates change once a day: check hourly, reuse the previous file in between
+const QUOTE = 'usd-xxx';                 // how pairs are stored; a file in another quoting is rebuilt, not reused
 
-// Market convention: EUR, GBP, AUD and NZD are quoted as XXX/USD (dollars per unit); everything else as USD/XXX.
+// Every pair is quoted USD/XXX (units of the currency per dollar), so all tiles read the same way: a rising rate means
+// the dollar gained. The page can flip them all to XXX/USD. (Brokers quote EUR, GBP, AUD and NZD the other way round:
+// EUR/USD. 'inv: true' on a currency would store it that way; none use it now.)
 // src 'ecb' = official ECB rate, 'x' = the extra feed. pegged = fixed to the dollar (hidden by default, never scored).
 // warn = official and market rates differ a lot; shown with a note, never scored.
 export const CURRENCIES = [
-  { code: 'EUR', name: 'Euro', flag: '🇪🇺', src: 'ecb', inv: true },
+  { code: 'EUR', name: 'Euro', flag: '🇪🇺', src: 'ecb' },
   { code: 'JPY', name: 'Japanese yen', flag: '🇯🇵', src: 'ecb' },
-  { code: 'GBP', name: 'British pound', flag: '🇬🇧', src: 'ecb', inv: true },
+  { code: 'GBP', name: 'British pound', flag: '🇬🇧', src: 'ecb' },
   { code: 'CNY', name: 'Chinese yuan', flag: '🇨🇳', src: 'ecb' },
   { code: 'CHF', name: 'Swiss franc', flag: '🇨🇭', src: 'ecb' },
   { code: 'CAD', name: 'Canadian dollar', flag: '🇨🇦', src: 'ecb' },
-  { code: 'AUD', name: 'Australian dollar', flag: '🇦🇺', src: 'ecb', inv: true },
+  { code: 'AUD', name: 'Australian dollar', flag: '🇦🇺', src: 'ecb' },
   { code: 'HKD', name: 'Hong Kong dollar', flag: '🇭🇰', src: 'ecb', pegged: true },
   { code: 'SGD', name: 'Singapore dollar', flag: '🇸🇬', src: 'ecb' },
   { code: 'SEK', name: 'Swedish krona', flag: '🇸🇪', src: 'ecb' },
   { code: 'KRW', name: 'South Korean won', flag: '🇰🇷', src: 'ecb' },
   { code: 'NOK', name: 'Norwegian krone', flag: '🇳🇴', src: 'ecb' },
-  { code: 'NZD', name: 'New Zealand dollar', flag: '🇳🇿', src: 'ecb', inv: true },
+  { code: 'NZD', name: 'New Zealand dollar', flag: '🇳🇿', src: 'ecb' },
   { code: 'INR', name: 'Indian rupee', flag: '🇮🇳', src: 'ecb' },
   { code: 'MXN', name: 'Mexican peso', flag: '🇲🇽', src: 'ecb' },
   { code: 'ZAR', name: 'South African rand', flag: '🇿🇦', src: 'ecb' },
@@ -163,7 +166,7 @@ export function toSnapshot(series, { now = Date.now(), params = null, fetched = 
     };
   });
   return {
-    v: 1, market: 'forex', generated: now, fetched, intervalMin: 10, params, marketSrc: 'ECB + exchange-api', marketStale: false,
+    v: 1, market: 'forex', quote: QUOTE, generated: now, fetched, intervalMin: 10, params, marketSrc: 'ECB + exchange-api', marketStale: false,
     rateDate: lastEcb ? isoDay(lastEcb) : prev?.rateDate ?? null,
     markets, cats: { t: now, stable: markets.filter(m => m.pegged).map(m => m.id), gold: [] }, hist,
   };
@@ -186,7 +189,7 @@ function extrasFromPrev(prev) {
 
 export async function build({ prev = null, params = null, log = console.log, now = Date.now() } = {}) {
   // rates change once a day: between hourly checks, republish the previous file with a fresh timestamp
-  if (prev?.v === 1 && prev.market === 'forex' && now - (prev.fetched || 0) < REFETCH) {
+  if (prev?.v === 1 && prev.market === 'forex' && prev.quote === QUOTE && now - (prev.fetched || 0) < REFETCH) {
     return { ...prev, generated: now, params: params ?? prev.params };
   }
   const to = isoDay(Math.floor(now / DAY)), from = isoDay(Math.floor(now / DAY) - HISTORY_DAYS);

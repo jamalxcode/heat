@@ -457,10 +457,10 @@ footer .about p { margin: 0; }
       <button data-v="7d" aria-pressed="false" title="Color by 7-day change">7d</button>
       <button data-v="30d" aria-pressed="false" title="Color by 30-day change">30d</button>
     </div>
-    <!-- forex only: quote pairs as the market does (EUR/USD, USD/JPY) or every currency against the dollar (JPY/USD) -->
+    <!-- forex only: every pair dollar first (USD/EUR, USD/JPY: blue = the dollar gained) or currency first (EUR/USD, JPY/USD: blue = that currency gained) -->
     <div class="seg" id="quote" role="group" aria-label="How pairs are quoted" hidden>
-      <button data-v="market" aria-pressed="true" title="As brokers quote them: EUR/USD, GBP/USD, USD/JPY, USD/CHF …">Market quote</button>
-      <button data-v="usd" aria-pressed="false" title="Every currency against the US dollar (EUR/USD, JPY/USD, CHF/USD …): a blue tile always means that currency gained">vs USD</button>
+      <button data-v="market" aria-pressed="true" title="Dollar first: USD/EUR, USD/GBP, USD/JPY … (a blue tile means the dollar gained)">USD/…</button>
+      <button data-v="usd" aria-pressed="false" title="Currency first: EUR/USD, GBP/USD, JPY/USD … (a blue tile means that currency gained)">…/USD</button>
     </div>
     <div class="seg" id="view" role="group" aria-label="View">
       <button data-v="grid" aria-pressed="true">Grid</button>
@@ -1190,7 +1190,7 @@ function renderScorecard() {
 
   box.innerHTML = `
     <div class="sc-card">
-      ${S.quote === 'usd' ? `<p class="sc-muted">ⓘ The scorecard is scored in <b>market quote</b> (EUR/USD, USD/JPY …), so its calls and moves refer to those pairs, not the "vs USD" view on the tiles.</p>` : ''}
+      ${S.quote === 'usd' ? `<p class="sc-muted">ⓘ The scorecard is scored on <b>USD/…</b> pairs (USD/EUR, USD/JPY …), so its calls and moves refer to those, not to the …/USD view on the tiles.</p>` : ''}
       <h2>Yesterday's calls <span class="sc-muted">signals at the ${sc.signalDay} ${M.live ? 'close' : 'rate'}, then how the ${M.noun} did by the ${sc.outcomeDay} ${M.live ? 'close (UTC)' : 'ECB rate'}</span></h2>
       <div class="sc-tiles">
         ${tile(`🚀 ${M.noun}`, ys.rockets.n ? `${Math.round(ys.rockets.upRate * ys.rockets.n)} of ${ys.rockets.n} went up` : 'none', ys.rockets.n ? [`average ${spc(ys.rockets.avgRet)}`, `vs market ${spc(ys.rockets.avgExc)}`] : [])}
@@ -1522,7 +1522,7 @@ function seg(id, key, after) {
 }
 seg('colorBy', 'colorBy', renderAll);
 seg('view', 'view', () => { hideDetail(true); renderAll(); });
-// Forex: Market quote | vs USD. Redraws everything from the same rates, flipped or not (see quoteView)
+// Forex: USD/… | …/USD. Redraws everything from the same rates, flipped or not (see quoteView)
 $('#quote').hidden = MARKET !== 'forex';
 seg('quote', 'quote', () => { hideDetail(true); if (S.raw) { S.coins = []; show(S.raw, S.mode === 'live'); } });
 // "How to read": the full legend opens below the one-line legend, and stays open or closed per browser
@@ -1663,9 +1663,9 @@ function done() {
   setStatus(`${ok}/${S.coins.length} ${M.noun} with indicators${via}`, S.stale ? '' : 'live');
 }
 
-// Forex "vs USD" view: every pair turned into XXX/USD, so a blue tile always means that currency gained on the dollar.
+// Forex "…/USD" view: every USD/XXX pair turned into XXX/USD, so a blue tile means that currency gained on the dollar.
 // Flipping a pair is just 1 / rate, done on the whole history before anything is computed, so tiles, charts, stops
-// and the 🚀/😢 all follow. Only the display changes: forex.json and the scorecard stay in market convention.
+// and the 🚀/😢 all follow. Only the display changes: forex.json and the scorecard stay USD/XXX.
 const flipPct = v => v == null ? null : (1 / (1 + v / 100) - 1) * 100;
 function quoteView(data) {
   if (MARKET !== 'forex' || S.quote !== 'usd') return data;

@@ -8,12 +8,13 @@ import { swap } from '../scripts/forex-page.mjs';
 
 const cur = code => CURRENCIES.find(c => c.code === code);
 
-test('currency list: market convention, pegs and warnings', () => {
-  assert.equal(pairOf(cur('EUR')), 'EUR/USD');
-  assert.equal(pairOf(cur('GBP')), 'GBP/USD');
+test('currency list: USD/XXX quotes, pegs and warnings', () => {
+  assert.equal(pairOf(cur('EUR')), 'USD/EUR', 'every pair dollar first, so all tiles read the same way');
+  assert.equal(pairOf(cur('GBP')), 'USD/GBP');
   assert.equal(pairOf(cur('JPY')), 'USD/JPY');
   assert.equal(pairOf(cur('SAR')), 'USD/SAR');
-  assert.equal(priceOf(cur('EUR'), 0.8), 1.25, 'EUR/USD = 1 / (euros per dollar)');
+  assert.equal(priceOf(cur('EUR'), 0.8), 0.8, 'USD/EUR = euros per dollar');
+  assert.equal(priceOf({ code: 'XXX', inv: true }, 0.8), 1.25, 'a currency marked inv would be stored XXX/USD');
   assert.equal(priceOf(cur('JPY'), 150), 150);
   for (const c of ['SAR', 'AED', 'QAR', 'BHD', 'OMR', 'JOD', 'HKD']) assert.ok(cur(c).pegged, c + ' is pegged');
   for (const c of ['IRR', 'SYP']) assert.ok(cur(c).warn && !scored(cur(c)), c + ' is shown with a warning and never scored');
@@ -29,7 +30,7 @@ test('assemble: business days only, ECB calendar for every currency, missing ext
   const s = assemble(ECB, X);
   assert.deepEqual(s.JPY.days, ['2026-09-25', '2026-09-28', '2026-09-29'].map(dayNum), 'no weekend days');
   assert.deepEqual(s.JPY.c, [150, 151.5, 151.5]);
-  assert.deepEqual(s.EUR.c, [1.25, 1.25, 1.28205]);
+  assert.deepEqual(s.EUR.c, [0.8, 0.8, 0.78]);
   assert.deepEqual(s.RUB.c, [80, 80, 84], 'the 28th carried forward from the 25th');
   assert.equal(s.RUB.filled, 1);
   assert.equal(s.SAR.c.length, 0, 'no data, no series');

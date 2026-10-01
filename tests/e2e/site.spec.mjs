@@ -273,11 +273,11 @@ test.describe('forex', () => {
     expect(external).toEqual([]);
   });
 
-  test('tiles: market-convention pairs, rates without $, ✓ for ECB and ? for the extra feed', async ({ page }) => {
+  test('tiles: every pair USD/…, rates without $, ✓ for ECB and ? for the extra feed', async ({ page }) => {
     const eur = tile(page, 'eur');
-    await expect(eur.locator('.sym')).toContainText('EUR/USD');
+    await expect(eur.locator('.sym')).toContainText('USD/EUR');
     await expect(tile(page, 'jpy').locator('.sym')).toContainText('USD/JPY');
-    expect(await eur.locator('.px').textContent()).toMatch(/^\d\.\d{4}$/);                   // e.g. 1.0842
+    expect(await eur.locator('.px').textContent()).toMatch(/^0\.\d{5}$/);                   // e.g. 0.88067 euros per dollar
     await expect(eur.locator('.vf.ok')).toHaveCount(1);
     await expect(tile(page, 'rub').locator('.vf.guess')).toHaveCount(1);
     await expect(tile(page, 'sar')).toHaveCount(0);                                         // pegged: hidden
@@ -292,12 +292,12 @@ test.describe('forex', () => {
     await expect(page.locator('#pegged')).not.toBeChecked();                                // crypto keeps its own choice
   });
 
-  test('quote switch: "vs USD" flips USD/XXX pairs (name, rate, change, color), is remembered, and flips back', async ({ page }) => {
+  test('quote switch: …/USD flips every pair (name, rate, change, color), is remembered, and flips back', async ({ page }) => {
     const jpy = tile(page, 'jpy');
     const read = async () => ({
       name: (await jpy.locator('.sym').textContent()).trim(), px: await jpy.locator('.px').textContent(),
       chg: await jpy.locator('.chg').textContent(), cls: (await jpy.getAttribute('class')).match(/\bh-?\d\b/)[0],
-      eur: (await tile(page, 'eur').locator('.px').textContent()),
+      eur: (await tile(page, 'eur').locator('.sym').textContent()).trim(),
     });
     const market = await read();
     expect(market.name).toContain('USD/JPY');
@@ -309,9 +309,10 @@ test.describe('forex', () => {
     const sign = s => s.startsWith('−') ? -1 : s.startsWith('+') ? 1 : 0;
     if (sign(market.chg)) expect(sign(usd.chg)).toBe(-sign(market.chg));        // the move flips
     if (market.cls !== 'h0') expect(usd.cls).toBe(market.cls.startsWith('h-') ? market.cls.slice(0, 1) + market.cls.slice(2) : 'h-' + market.cls.slice(1));
-    expect(usd.eur).toBe(market.eur);                                           // EUR/USD is already "vs USD"
+    expect(market.eur).toContain('USD/EUR');                                    // every pair flips, the euro too
+    expect(usd.eur).toContain('EUR/USD');
     await page.locator('#view button[data-v="score"]').click();
-    await expect(page.locator('#scorewrap')).toContainText('scored in market quote');
+    await expect(page.locator('#scorewrap')).toContainText('scored on USD/… pairs');
     await page.reload();
     await expect(page.locator('#status')).toContainText('currencies with indicators');
     await expect(page.locator('#quote [data-v="usd"]')).toHaveAttribute('aria-pressed', 'true');   // remembered
