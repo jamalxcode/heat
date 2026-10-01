@@ -607,6 +607,12 @@
   },
   "backpack": {
    "MEXC": "BP"
+  },
+  "bittorrent": {
+   "Gate.io": "BTT",
+   "Binance": "BTTC",
+   "MEXC": "BTT",
+   "KuCoin": "BTT"
   }
  }
 }
