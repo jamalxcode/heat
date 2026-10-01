@@ -135,7 +135,9 @@ test('autoBoxPct: snaps the average daily move to a clean box size', () => {
   const steady = Array.from({ length: 80 }, (_, i) => 100 * (i % 2 ? 1.02 : 1));   // alternating ±2% moves
   assert.equal(S.autoBoxPct(steady), 2);
   const calm = Array.from({ length: 80 }, (_, i) => 100 * (i % 2 ? 1.004 : 1));
-  assert.equal(S.autoBoxPct(calm), 0.5);
+  assert.equal(S.autoBoxPct(calm), 0.4, 'small steps exist for currencies (EUR/USD moves ~0.3% a day)');
+  const fx = Array.from({ length: 80 }, (_, i) => 1.1 * (i % 2 ? 1.001 : 1));
+  assert.equal(S.autoBoxPct(fx), 0.1);
 });
 
 test('withDefaults: ignores unknown weights and fills missing ones', () => {
