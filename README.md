@@ -73,7 +73,7 @@ The same heatmap for **48 currencies against the US dollar**. The **🪙 Crypto 
 
 - **It's the same page.** `/forex/` is made from `index.html` at deploy (`scripts/forex-page.mjs`), with only the search tags, the About/FAQ text and the source credits swapped in (`seo/forex-*.html`). The page picks its market from its address, and everything market-specific sits in one `MARKETS` settings block at the top of the page script. So any change to tiles, popups, filters, the scorecard or the engine shows on both pages.
 - **Rates:** official **ECB euro reference rates** (via the Frankfurter API) for 29 currencies, set once per business day around 14:15 Frankfurt time, with history back to 1999. Currencies the ECB doesn't publish (the ruble, the Gulf and other Arab currencies, the rial, the Syrian pound) come from the public-domain **exchange-api** feed and get the **?** mark. ECB rates get **✓**. Weekends have no rates, so charts and indicators use business days.
-- **Quoting:** market convention, as brokers show it: EUR/USD, GBP/USD, AUD/USD and NZD/USD as dollars per unit, every other currency as USD/XXX. A rising tile means the first currency of the pair got stronger.
+- **Quoting:** market convention by default, as brokers show it: EUR/USD, GBP/USD, AUD/USD and NZD/USD as dollars per unit, every other currency as USD/XXX. A rising tile means the first currency of the pair got stronger. The **Market quote | vs USD** switch flips every pair to XXX/USD (JPY/USD 0.006369), so a blue tile always means that currency gained on the dollar. Rates, charts, stops and 🚀/😢 are all recalculated from the flipped history. It only changes the display: `forex.json` and the Scorecard stay in market quote (the Scorecard says so in that mode).
 - **Pegged currencies** (SAR, AED, QAR, BHD, OMR, JOD, IQD, LBP and HKD) are hidden unless you tick **Pegged**, and they're never scored. This setting is separate from crypto's Stablecoins checkbox.
 - **IRR and SYP:** their official and street rates differ a lot, so they're shown with **⚠** and a note in the popup, and never scored.
 - **Forex-sized settings:** the color scale runs ±0.1% … ±1% for a day. Timeframes are **1d / 1w / 1m** (1, 5 and 21 business days). Momentum is a 21-business-day move above or below 3%. P&F boxes go down to 0.1%.
@@ -119,7 +119,7 @@ GitHub Actions: daily 00:20 UTC (via cron-job.org)
 - The deploy job publishes to Pages without committing. The daily scorecard commit keeps the repo active, since GitHub pauses scheduled workflows after 60 days without commits.
 - Each build reuses the previous `data.json`. Candles are refetched hourly (every 6 h for coins that come from CoinGecko). In between, the page updates today's candle with the latest price.
 - If `data.json` is missing or more than 45 minutes old, the page runs the **same build script** (`scripts/build-data.mjs`, published with the site) in the browser, without the slow CoinGecko candle fallback. It does this **at most once per 10 minutes per browser** and caches the result, so reloads and other tabs make no extra API calls.
-- Stablecoins, tokenized gold, wrapped/staked copies and fund tokens are excluded. A checkbox brings them back.
+- Stablecoins, tokenized gold, wrapped/staked copies and fund tokens are excluded. The checkbox next to **How to read** brings them back.
 
 ## Running it yourself
 

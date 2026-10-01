@@ -227,19 +227,19 @@ button.sc-chip:hover, button.sc-chip[aria-expanded="true"] { box-shadow: inset 0
 .btn:focus-visible, .chip:focus-visible, .seg button:focus-visible, .tile:focus-visible, th button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 
 /* ---------- controls (one filter row) ---------- */
-.controls { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 6px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; padding: 6px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 8px; }
 .ctl { display: flex; align-items: center; gap: 8px; }
 .ctl > .lab { color: var(--muted); font-size: 12px; }
 .seg { display: inline-flex; background: var(--neutral); border-radius: 8px; padding: 2px; }
 .seg button { border: 0; background: transparent; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--ink-2); }
 .seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); font-weight: 600; }
-.seg a { padding: 4px 10px; border-radius: 6px; font-size: 13px; color: var(--ink-2); text-decoration: none; white-space: nowrap; }
+.seg a { padding: 4px 8px; border-radius: 6px; font-size: 13px; color: var(--ink-2); text-decoration: none; white-space: nowrap; }
 .seg a[aria-current="page"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); font-weight: 600; }
 .seg a:hover { color: var(--ink); }
 /* forex tiles: a flag instead of a logo */
 .flag { flex: none; font-size: 15px; line-height: 1; }
-.chips { display: flex; flex-wrap: wrap; gap: 5px; }
-.chip { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 3px 8px; cursor: pointer; font-size: 12.5px; color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 3px 7px; cursor: pointer; font-size: 12.5px; color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; }
 .chip[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
 .chip .n { font-variant-numeric: tabular-nums; opacity: .7; }
 .check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); cursor: pointer; }
@@ -248,7 +248,8 @@ button.sc-chip:hover, button.sc-chip[aria-expanded="true"] { box-shadow: inset 0
 /* ---------- legend ---------- */
 .legend { margin: 0 2px 10px; font-size: 12px; color: var(--ink-2); }
 .leg-line { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; }
-.leg-line .leg-toggle { margin-left: auto; padding: 2px 10px; font-size: 12px; }
+.leg-line .leg-peg { margin-left: auto; font-size: 12px; }   /* the "show stablecoins / pegged" checkbox sits on the legend line, by How to read */
+.leg-line .leg-toggle { padding: 2px 10px; font-size: 12px; }
 .leg-more { display: flex; flex-wrap: wrap; gap: 8px 28px; align-items: center; margin-top: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
 .leg-more[hidden] { display: none; }
 .edge-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--ink-2); text-decoration: none; }
@@ -456,6 +457,11 @@ footer .about p { margin: 0; }
       <button data-v="7d" aria-pressed="false" title="Color by 7-day change">7d</button>
       <button data-v="30d" aria-pressed="false" title="Color by 30-day change">30d</button>
     </div>
+    <!-- forex only: quote pairs as the market does (EUR/USD, USD/JPY) or every currency against the dollar (JPY/USD) -->
+    <div class="seg" id="quote" role="group" aria-label="How pairs are quoted" hidden>
+      <button data-v="market" aria-pressed="true" title="As brokers quote them: EUR/USD, GBP/USD, USD/JPY, USD/CHF …">Market quote</button>
+      <button data-v="usd" aria-pressed="false" title="Every currency against the US dollar (EUR/USD, JPY/USD, CHF/USD …): a blue tile always means that currency gained">vs USD</button>
+    </div>
     <div class="seg" id="view" role="group" aria-label="View">
       <button data-v="grid" aria-pressed="true">Grid</button>
       <button data-v="table" aria-pressed="false">Table</button>
@@ -473,12 +479,12 @@ footer .about p { margin: 0; }
         <button class="chip" data-f="stop" aria-pressed="false" title="Coins whose last daily close finished past a recommended stop">🛑 Past stop <span class="n"></span></button>
       </div>
     </div>
-    <label class="check" title="Include stablecoins, tokenized gold and wrapped/staked copies"><input type="checkbox" id="pegged"> Stablecoins</label>
   </div>
 
   <!-- Legend: one line (color scale, track-record badge); "How to read" opens the rest (remembered per browser) -->
   <div class="legend" id="legend">
     <div class="leg-line"><span id="legendScale" class="leg-item"></span><span id="legendEdge"></span>
+      <label class="check leg-peg" title="Include stablecoins, tokenized gold and wrapped/staked copies"><input type="checkbox" id="pegged"> Stablecoins</label>
       <button class="btn leg-toggle" id="legendToggle" aria-expanded="false" aria-controls="legendMore">ⓘ How to read</button></div>
     <div class="leg-more" id="legendMore" hidden></div>
   </div>
@@ -585,7 +591,8 @@ const store = {
 function fmtPrice(p) {
   if (p == null || !isFinite(p)) return '—';
   if (MARKET === 'forex') {                       // exchange rates: no $, decimals as quoted (1.0842 · 148.21 · 0.30869)
-    const d = p >= 1000 ? 0 : p >= 100 ? 2 : p >= 10 ? 3 : p >= 1 ? 4 : 5;
+    // tiny rates (JPY/USD 0.006369, IRR/USD 0.0000005904) keep 4 significant digits
+    const d = p >= 1000 ? 0 : p >= 100 ? 2 : p >= 10 ? 3 : p >= 1 ? 4 : p >= 0.1 ? 5 : Math.min(12, 3 - Math.floor(Math.log10(p)));
     return p.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
   }
   if (p >= 1000) return '$' + p.toLocaleString('en-US', { maximumFractionDigits: 0 });
@@ -626,8 +633,8 @@ const S = {
 };
 const prefs = store.get('hm.prefs') || {};
 const PEG_PREF = MARKET === 'forex' ? 'peggedFx' : 'pegged';   // each market remembers its own 'show pegged' choice
-Object.assign(S, { colorBy: prefs.colorBy || '24h', view: prefs.view || 'grid', pegged: !!prefs[PEG_PREF], chart: prefs.chart === 'pnf' ? 'pnf' : 'price', legendOpen: !!prefs.legendOpen });
-const savePrefs = () => store.set('hm.prefs', { ...(store.get('hm.prefs') || {}), colorBy: S.colorBy, view: S.view, [PEG_PREF]: S.pegged, chart: S.chart, legendOpen: S.legendOpen, theme: document.documentElement.dataset.theme || '' });
+Object.assign(S, { quote: prefs.fxQuote === 'usd' && MARKET === 'forex' ? 'usd' : 'market', colorBy: prefs.colorBy || '24h', view: prefs.view || 'grid', pegged: !!prefs[PEG_PREF], chart: prefs.chart === 'pnf' ? 'pnf' : 'price', legendOpen: !!prefs.legendOpen });
+const savePrefs = () => store.set('hm.prefs', { ...(store.get('hm.prefs') || {}), ...(MARKET === 'forex' ? { fxQuote: S.quote } : {}), colorBy: S.colorBy, view: S.view, [PEG_PREF]: S.pegged, chart: S.chart, legendOpen: S.legendOpen, theme: document.documentElement.dataset.theme || '' });
 
 function setStatus(text, kind = '') { $('#status').innerHTML = `<span class="dot ${kind}"></span>${esc(text)}`; }
 
@@ -1183,6 +1190,7 @@ function renderScorecard() {
 
   box.innerHTML = `
     <div class="sc-card">
+      ${S.quote === 'usd' ? `<p class="sc-muted">ⓘ The scorecard is scored in <b>market quote</b> (EUR/USD, USD/JPY …), so its calls and moves refer to those pairs, not the "vs USD" view on the tiles.</p>` : ''}
       <h2>Yesterday's calls <span class="sc-muted">signals at the ${sc.signalDay} ${M.live ? 'close' : 'rate'}, then how the ${M.noun} did by the ${sc.outcomeDay} ${M.live ? 'close (UTC)' : 'ECB rate'}</span></h2>
       <div class="sc-tiles">
         ${tile(`🚀 ${M.noun}`, ys.rockets.n ? `${Math.round(ys.rockets.upRate * ys.rockets.n)} of ${ys.rockets.n} went up` : 'none', ys.rockets.n ? [`average ${spc(ys.rockets.avgRet)}`, `vs market ${spc(ys.rockets.avgExc)}`] : [])}
@@ -1514,6 +1522,9 @@ function seg(id, key, after) {
 }
 seg('colorBy', 'colorBy', renderAll);
 seg('view', 'view', () => { hideDetail(true); renderAll(); });
+// Forex: Market quote | vs USD. Redraws everything from the same rates, flipped or not (see quoteView)
+$('#quote').hidden = MARKET !== 'forex';
+seg('quote', 'quote', () => { hideDetail(true); if (S.raw) { S.coins = []; show(S.raw, S.mode === 'live'); } });
 // "How to read": the full legend opens below the one-line legend, and stays open or closed per browser
 const setLegend = open => { S.legendOpen = open; $('#legendMore').hidden = !open; $('#legendToggle').setAttribute('aria-expanded', open); $('#legendToggle').textContent = open ? '✕ Hide legend' : 'ⓘ How to read'; };
 setLegend(S.legendOpen);
@@ -1652,7 +1663,27 @@ function done() {
   setStatus(`${ok}/${S.coins.length} ${M.noun} with indicators${via}`, S.stale ? '' : 'live');
 }
 
-async function show(data, live) {
+// Forex "vs USD" view: every pair turned into XXX/USD, so a blue tile always means that currency gained on the dollar.
+// Flipping a pair is just 1 / rate, done on the whole history before anything is computed, so tiles, charts, stops
+// and the 🚀/😢 all follow. Only the display changes: forex.json and the scorecard stay in market convention.
+const flipPct = v => v == null ? null : (1 / (1 + v / 100) - 1) * 100;
+function quoteView(data) {
+  if (MARKET !== 'forex' || S.quote !== 'usd') return data;
+  const flip = id => data.markets.find(m => m.id === id)?.symbol.startsWith('USD/');
+  const markets = data.markets.map(m => !m.symbol.startsWith('USD/') ? m : {
+    ...m, symbol: m.symbol.slice(4) + '/USD', current_price: 1 / m.current_price,
+    price_change_percentage_24h_in_currency: flipPct(m.price_change_percentage_24h_in_currency),
+    price_change_percentage_7d_in_currency: flipPct(m.price_change_percentage_7d_in_currency),
+    price_change_percentage_30d_in_currency: flipPct(m.price_change_percentage_30d_in_currency),
+  });
+  const hist = Object.fromEntries(Object.entries(data.hist || {}).map(([id, h]) =>
+    [id, flip(id) ? { ...h, pair: h.pair.startsWith('USD/') ? h.pair.slice(4) + '/USD' : h.pair, c: h.c.map(v => 1 / v) } : h]));
+  return { ...data, markets, hist };
+}
+
+async function show(raw, live) {
+  S.raw = raw;                                // kept so the quote switch can redraw without refetching
+  const data = quoteView(raw);
   const isNew = data.generated !== S.updated;
   S.mode = live ? 'live' : 'snapshot';
   S.markets = data.markets; S.updated = data.generated; S.marketSrc = data.marketSrc; S.stale = !!data.marketStale; S.rateDate = data.rateDate;
