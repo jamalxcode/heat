@@ -60,8 +60,10 @@ test('buildScorecard: records costs, and scores point-in-time only the coins tha
 
 test('freshness check: each limit catches stale data and passes fresh data', () => {
   const now = Date.now(), H = 3600e3;
-  const fresh = { generated: now - 5 * 60e3, hist: { a: { t: now - H } }, rateDate: new Date(now - 864e5).toISOString().slice(0, 10) };
-  const stale = { generated: now - 5 * H, hist: { a: { t: now - 10 * H } }, rateDate: new Date(now - 9 * 864e5).toISOString().slice(0, 10) };
+  const fresh = { generated: now - 5 * 60e3, hist: { a: { t: now - H } }, rateDate: new Date(now - 864e5).toISOString().slice(0, 10),
+    metalsDate: new Date(now - 864e5).toISOString().slice(0, 10) };
+  const stale = { generated: now - 5 * H, hist: { a: { t: now - 10 * H } }, rateDate: new Date(now - 9 * 864e5).toISOString().slice(0, 10),
+    metalsDate: new Date(now - 9 * 864e5).toISOString().slice(0, 10) };
   for (const [file, age, limit, what] of CHECKS) {
     if (what.includes('scorecard')) continue;              // generated a day apart: covered by the 'generated' rule
     assert.ok(age(fresh) <= limit, `${file}: fresh data passes "${what}"`);
