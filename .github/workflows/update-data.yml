@@ -35,6 +35,16 @@ jobs:
       - id: pages
         uses: actions/configure-pages@v5
 
+      # Browsers may reuse each file for 10 minutes, so right after a release a page could run with some old cached
+      # scripts (e.g. new /metals/ page + old app/markets.mjs = crypto). Tag every script address with the commit, in
+      # this checkout only, so a page always loads the scripts of its own release.
+      - name: Version the script addresses
+        run: |
+          V=${GITHUB_SHA::8}
+          sed -i "s#src=\"/app/main.mjs\"#src=\"/app/main.mjs?v=$V\"#" index.html
+          sed -i "s#\(from '[^']*\.mjs\)'#\1?v=$V'#g; s#^\(import '[^']*\.mjs\)'#\1?v=$V'#; s#import('/scripts/build-data.mjs')#import('/scripts/build-data.mjs?v=$V')#" app/*.mjs
+          grep -q "main.mjs?v=$V" index.html && ! grep -hE "from '|^import '" app/*.mjs | grep -v "?v=$V'" | grep -q .
+
       - name: Fetch market data
         env:
           PREV_URL: ${{ steps.pages.outputs.base_url }}/data.json
