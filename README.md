@@ -76,9 +76,9 @@ Statistics cap moves at ±30% a day (wider for 3 and 7 days), so a bad price pri
 
 ## Forex: heat.sala.company/forex/
 
-The same heatmap for **48 currencies against the US dollar**. The **🪙 Crypto | 💱 Forex** switch at the start of the controls row moves between the two pages.
+The same heatmap for **48 currencies against the US dollar**. The **🪙 Crypto | 💱 Forex | 🥇 Metals** switch at the start of the controls row moves between the pages.
 
-- **It's the same page.** `/forex/` is made from `index.html` at deploy (`scripts/forex-page.mjs`), with only the search tags, the About/FAQ text and the source credits swapped in (`seo/forex-*.html`). The page picks its market from its address, and everything market-specific sits in one `MARKETS` settings block at the top of the page script. So any change to tiles, popups, filters, the scorecard or the engine shows on both pages.
+- **It's the same page.** `/forex/` (and `/metals/`) is made from `index.html` at deploy (`scripts/market-page.mjs`), with only the search tags, the About/FAQ text and the source credits swapped in (`seo/forex-*.html`, `seo/metals-*.html`). The page picks its market from its address, and everything market-specific sits in one `MARKETS` settings block at the top of the page script. So any change to tiles, popups, filters, the scorecard or the engine shows on every page.
 - **Rates:** official **ECB euro reference rates** (via the Frankfurter API) for 29 currencies, set once per business day around 14:15 Frankfurt time, with history back to 1999. Currencies the ECB doesn't publish (the ruble, the Gulf and other Arab currencies, the rial, the Syrian pound) come from the public-domain **exchange-api** feed and get the **?** mark. ECB rates get **✓**. Weekends have no rates, so charts and indicators use business days.
 - **Quoting:** every pair **dollar first** by default (USD/EUR, USD/GBP, USD/JPY…), so all tiles read the same way: blue means the dollar gained against that currency. The **USD/… | …/USD** switch flips every pair to **currency first** (EUR/USD, GBP/USD, JPY/USD…), where blue means that currency gained. Rates, charts, stops and 🚀/😢 are all recalculated from the flipped history. `forex.json` and the Scorecard are always USD/… (the Scorecard says so in the …/USD view). Note that brokers quote EUR, GBP, AUD and NZD currency first (EUR/USD) and most other currencies dollar first (USD/JPY).
 - **Flags:** real flag emoji on phones and Macs; on Windows, which has none, a small country-code badge (EU, JP …) instead.
@@ -87,6 +87,16 @@ The same heatmap for **48 currencies against the US dollar**. The **🪙 Crypto 
 - **IRR and SYP:** their official and street rates differ a lot, so they're shown with **⚠** and a note in the popup, and never scored.
 - **Forex-sized settings:** the color scale runs ±0.1% … ±1% for a day. Timeframes are **1d / 1w / 1m** (1, 5 and 21 business days). Momentum is a 21-business-day move above or below 3%. P&F boxes go down to 0.1%.
 - **Scorecard and tuner:** `scripts/score-forex.mjs` runs in the same nightly job (and tunes on Sundays), on ECB history since 2010 plus the extra feed since March 2024. It writes `data/forex-scorecard.json`, `params-forex.json` (when the tuner adopts new settings) and `data/forex-extras.json` (a cache of the extra feed, so each run only fetches new days). *First run (Oct 2026):* about 116,000 currency-days, with no reliable edge for any scored signal.
+
+## Metals: heat.sala.company/metals/
+
+The precious metals people buy as a **store of value**, in US dollars per troy ounce: **gold (Au), silver (Ag), platinum (Pt), palladium (Pd)**. Next to them, for comparison: **PAX Gold (PAXG)** and **Tether Gold (XAUT)**, tokens backed by one ounce of gold each (so they should track gold closely), and **Bitcoin**, often called digital gold.
+
+- **Same page again:** `/metals/` is `index.html` with `seo/metals-*.html` swapped in. Tiles, popups, charts, stops and signals work as on the crypto page, with the crypto signal settings.
+- **Prices:** the metals come from the public-domain **exchange-api** feed, one price per day (history kept for 400 days), so they get the **?** mark. Metals trade almost around the clock, so the charts use calendar days, like crypto. PAXG, XAUT and Bitcoin are copied from the freshly built `data.json` and refresh every 10 minutes.
+- **No scorecard and no tuner:** the scorecard ranks assets against each other each day and needs at least ten; there are four metals. No pegged checkbox either.
+- **Copper is left out:** it is an industrial metal rather than a store of value, and no free public-domain feed has it.
+- `scripts/build-metals.mjs` runs in the deploy job right after the crypto build and refetches the metals hourly. If it fails, the last good `metals.json` is republished.
 
 ## How it works
 
@@ -107,10 +117,11 @@ GitHub Actions: daily 00:20 UTC (via cron-job.org)
 |---|---|
 | `index.html` | The page: HTML, CSS, and its search and link-preview tags |
 | `app/` | The page script, as ES modules: `markets.mjs` (everything market-specific, one adapter per market), `core.mjs` (helpers and state), `data.mjs` (indicators per tile), `render.mjs` (tiles, legend, table), `scorecard.mjs`, `interact.mjs` (popup, hover, clicks, switches) and `main.mjs` (loading and refresh; it starts the page) |
-| `og-image.png`, `og-image-forex.png`, `robots.txt` | The link-preview images (crypto and forex) and the robots file, published with the site (the deploy job also writes `sitemap.xml`) |
+| `og-image.png`, `og-image-forex.png`, `og-image-metals.png`, `robots.txt` | The link-preview images (crypto, forex and metals) and the robots file, published with the site (the deploy job also writes `sitemap.xml`) |
 | `scripts/build-forex.mjs` | Builds `forex.json`: the currency list, both rate sources, business-day closes. Reuses the last file and refetches hourly |
 | `scripts/score-forex.mjs` | Daily forex scorecard and weekly tuning |
-| `scripts/forex-page.mjs`, `seo/` | Makes `/forex/` from `index.html`, swapping in the forex search tags, About/FAQ and source credits |
+| `scripts/build-metals.mjs` | Builds `metals.json` in the deploy job: gold, silver, platinum and palladium (refetched hourly) plus PAXG, XAUT and Bitcoin copied from `data.json` |
+| `scripts/market-page.mjs`, `seo/` | Makes `/forex/` and `/metals/` from `index.html`, swapping in each market's search tags, About/FAQ and source credits |
 | `params-forex.json`, `data/forex-scorecard.json`, `data/forex-extras.json` | Forex signal settings, the latest forex scorecard, and the cached extra-feed rates |
 | `signals.mjs` | The shared signal engine: indicators, 🚀/😢/⚡ rules, scoring stats, tuner. Used by the page, the scorer and the tuner, so they always agree. |
 | `tests/signals.test.mjs` | Unit tests: RSI against the StockCharts worked example, Bollinger/SMA against hand-computed values, scoring and tuning sanity checks |
@@ -122,7 +133,7 @@ GitHub Actions: daily 00:20 UTC (via cron-job.org)
 | `.github/workflows/update-data.yml` | Builds `data.json` and deploys the site to GitHub Pages every 10 minutes and on every push to `main` |
 | `.github/workflows/score-signals.yml` | Daily scoring (plus Sunday tuning). It commits the results, which also keeps the schedules from being paused for inactivity. |
 | `.github/workflows/test.yml` | Runs the unit tests on every push to any branch |
-| `.github/workflows/freshness.yml`, `scripts/check-fresh.mjs` | **Hourly freshness check** of the live site: fails (and GitHub emails you) if `data.json`, `forex.json` or a scorecard stops updating, even when every other job "succeeds" |
+| `.github/workflows/freshness.yml`, `scripts/check-fresh.mjs` | **Hourly freshness check** of the live site: fails (and GitHub emails you) if `data.json`, `forex.json`, `metals.json` or a scorecard stops updating, even when every other job "succeeds" |
 | `data/universe-history.json` | Each day's top-100 list, for the point-in-time scorecard |
 | `.github/workflows/e2e.yml` | **Browser tests** (Playwright, headless Chrome) on every push to any branch: no outside API calls, filters, both stop states, the popup (fits a 13-inch screen, opens only on a resting mouse, closes when moving away, stays put when moving onto it, pins and closes), the phone bottom sheet, and the Scorecard view |
 | `tests/e2e/` | The browser tests, deterministic test data (`fixtures.mjs`) and a local server (`serve.mjs`, also `npm run dev`) |

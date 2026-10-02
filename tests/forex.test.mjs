@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as S from '../signals.mjs';
 import { CURRENCIES, scored, pairOf, priceOf, assemble, toSnapshot, isoDay, dayNum, DAY, BACK } from '../scripts/build-forex.mjs';
-import { swap } from '../scripts/forex-page.mjs';
+import { swap } from '../scripts/market-page.mjs';
 
 const cur = code => CURRENCIES.find(c => c.code === code);
 

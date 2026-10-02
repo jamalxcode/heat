@@ -62,6 +62,7 @@ export const FLAG_EMOJI = (() => {
 const flagCode = f => [...f].map(ch => String.fromCharCode(ch.codePointAt(0) - 0x1F1E6 + 65)).join('');   // 🇪🇺 → EU
 export const logo = (c, px) => c.flag
   ? FLAG_EMOJI ? `<span class="flag" style="font-size:${px - 2}px" aria-hidden="true">${c.flag}</span>` : `<span class="flag-code" aria-hidden="true">${flagCode(c.flag)}</span>`
+  : c.badge ? `<span class="metal metal-${esc(c.id)}" style="width:${px}px;height:${px}px" aria-hidden="true">${esc(c.badge)}</span>`   // metals: their chemical symbol (Au, Ag …)
   : c.image ? `<img src="${esc(c.image)}" alt="" loading="lazy" width="${px}" height="${px}">`
   : `<span class="ph" style="width:${px}px;height:${px}px" aria-hidden="true">${esc(c.symbol.slice(0, 1).toUpperCase())}</span>`;
 
@@ -77,7 +78,8 @@ export const S = {
 export const prefs = store.get('hm.prefs') || {};
 export const PEG_PREF = M.pegPref;   // each market remembers its own 'show pegged' choice
 Object.assign(S, { quote: prefs.fxQuote === 'usd' && M.quoteSwitch ? 'usd' : 'market', colorBy: prefs.colorBy || '24h', view: prefs.view || 'grid', pegged: !!prefs[PEG_PREF], chart: prefs.chart === 'pnf' ? 'pnf' : 'price', legendOpen: !!prefs.legendOpen });
-export const savePrefs = () => store.set('hm.prefs', { ...(store.get('hm.prefs') || {}), ...(M.quoteSwitch ? { fxQuote: S.quote } : {}), colorBy: S.colorBy, view: S.view, [PEG_PREF]: S.pegged, chart: S.chart, legendOpen: S.legendOpen, theme: document.documentElement.dataset.theme || '' });
+if (!M.scorecard && S.view === 'score') S.view = 'grid';   // metals has no Scorecard view
+export const savePrefs = () => store.set('hm.prefs', { ...(store.get('hm.prefs') || {}), ...(M.quoteSwitch ? { fxQuote: S.quote } : {}), colorBy: S.colorBy, view: S.view, ...(PEG_PREF ? { [PEG_PREF]: S.pegged } : {}), chart: S.chart, legendOpen: S.legendOpen, theme: document.documentElement.dataset.theme || '' });
 
 export function setStatus(text, kind = '') { $('#status').innerHTML = `<span class="dot ${kind}"></span>${esc(text)}`; }
 

@@ -11,7 +11,7 @@ export function pickCoins() {
   S.excluded = [];
   const list = [];
   for (const c of S.markets) {
-    if (!S.pegged && SIG.isPegged(c, cats)) { S.excluded.push(c); continue; }
+    if (!S.pegged && M.pegLabel && SIG.isPegged(c, cats)) { S.excluded.push(c); continue; }   // metals: nothing is hidden (tokenized gold would count as pegged)
     if (list.length < TOP_N) list.push(c);
   }
   S.coins = list;

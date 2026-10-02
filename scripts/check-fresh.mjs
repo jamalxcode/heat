@@ -10,6 +10,8 @@ export const CHECKS = [
   ['data.json', d => Date.now() - Math.max(...Object.values(d.hist || {}).map(h => h.t || 0)), 3 * HOUR, 'newest crypto candles fetched'],
   ['forex.json', d => Date.now() - d.generated, HOUR, 'forex file last built'],
   ['forex.json', d => Date.now() - Date.parse(d.rateDate + 'T16:00:00Z'), 4 * DAY + 6 * HOUR, 'latest ECB rate date'],   // Fri rate → Tue, or a holiday
+  ['metals.json', d => Date.now() - d.generated, HOUR, 'metals file last built'],
+  ['metals.json', d => Date.now() - Date.parse(d.metalsDate + 'T00:00:00Z'), 3 * DAY, 'latest metal price date'],
   ['scorecard.json', d => Date.now() - d.generated, 30 * HOUR, 'crypto scorecard'],
   ['forex-scorecard.json', d => Date.now() - d.generated, 30 * HOUR, 'forex scorecard'],
 ];

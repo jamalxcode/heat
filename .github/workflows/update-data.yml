@@ -42,10 +42,10 @@ jobs:
         run: |
           mkdir -p _site
           mkdir -p _site/scripts
-          cp index.html signals.mjs robots.txt og-image.png og-image-forex.png _site/
+          cp index.html signals.mjs robots.txt og-image.png og-image-forex.png og-image-metals.png _site/
           cp -r app _site/   # the page script, in modules (app/main.mjs starts it)
-          # sitemap for search engines: the crypto and forex pages, whose data changes every day
-          printf '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>https://heat.sala.company/</loc><lastmod>%s</lastmod><changefreq>hourly</changefreq></url>\n  <url><loc>https://heat.sala.company/forex/</loc><lastmod>%s</lastmod><changefreq>daily</changefreq></url>\n</urlset>\n' "$(date -u +%F)" "$(date -u +%F)" > _site/sitemap.xml
+          # sitemap for search engines: the crypto, forex and metals pages, whose data changes every day
+          printf '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>https://heat.sala.company/</loc><lastmod>%s</lastmod><changefreq>hourly</changefreq></url>\n  <url><loc>https://heat.sala.company/forex/</loc><lastmod>%s</lastmod><changefreq>daily</changefreq></url>\n  <url><loc>https://heat.sala.company/metals/</loc><lastmod>%s</lastmod><changefreq>daily</changefreq></url>\n</urlset>\n' "$(date -u +%F)" "$(date -u +%F)" "$(date -u +%F)" > _site/sitemap.xml
           cp scripts/build-data.mjs _site/scripts/   # the page runs it itself if data.json ever goes stale
           [ -f data/scorecard.json ] && cp data/scorecard.json _site/ || true
           [ -f data/pairs.json ] && cp data/pairs.json _site/ || true
@@ -59,10 +59,22 @@ jobs:
           PREV_URL: ${{ steps.pages.outputs.base_url }}/forex.json
           BASE_URL: ${{ steps.pages.outputs.base_url }}
         run: |
-          node scripts/forex-page.mjs _site/forex/index.html
+          node scripts/market-page.mjs forex _site/forex/index.html
           [ -f data/forex-scorecard.json ] && cp data/forex-scorecard.json _site/ || true
           node scripts/build-forex.mjs _site/forex.json \
             || { echo "::warning::forex build failed, republishing the last forex.json"; curl -sf "$BASE_URL/forex.json" -o _site/forex.json || true; }
+
+      # Metals: /metals/ (same page, metals search tags) and metals.json: gold, silver, platinum, palladium from the
+      # public-domain feed (refetched hourly) plus PAXG, XAUT and Bitcoin copied from the data.json just built.
+      # A failure republishes the last good file and never blocks the rest of the deploy.
+      - name: Fetch metals prices
+        env:
+          PREV_URL: ${{ steps.pages.outputs.base_url }}/metals.json
+          BASE_URL: ${{ steps.pages.outputs.base_url }}
+        run: |
+          node scripts/market-page.mjs metals _site/metals/index.html
+          node scripts/build-metals.mjs _site/metals.json _site/data.json \
+            || { echo "::warning::metals build failed, republishing the last metals.json"; curl -sf "$BASE_URL/metals.json" -o _site/metals.json || true; }
 
       - uses: actions/upload-pages-artifact@v4
         with:

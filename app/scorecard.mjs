@@ -6,6 +6,7 @@ import { $, esc, fmtPct, heatClass, M, S } from './core.mjs';
 
 /* ================= scorecard (daily check of the 🚀 / 😢, built by scripts/score.mjs) ================= */
 export async function loadScorecard() {
+  if (!M.scorecard) { S.scorecard = null; return; }   // metals: no scorecard
   try {
     const r = await fetch(`${M.scorecard}?b=${Math.floor(Date.now() / 600e3)}`, { cache: 'no-store' });
     S.scorecard = r.ok ? await r.json() : null;

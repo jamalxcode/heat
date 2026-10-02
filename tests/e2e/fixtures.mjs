@@ -2,6 +2,7 @@
 // built from seeded random walks (no network). Includes coins set up to hit each recommended-stop state.
 import * as SIG from '../../signals.mjs';
 import { assemble, toSnapshot, CURRENCIES, scored, pairOf, isoDay } from '../../scripts/build-forex.mjs';
+import { metalSeries, toSnapshot as metalsSnapshot } from '../../scripts/build-metals.mjs';
 
 const DAY = 864e5, N = 260;
 
@@ -91,4 +92,19 @@ export function makeForexFixtures(now = Date.now()) {
     .map(cur => ({ id: cur.code.toLowerCase(), symbol: pairOf(cur), name: cur.name, t0: series[cur.code].days[0] * DAY, c: series[cur.code].c, days: series[cur.code].days }));
   const { card } = SIG.buildScorecard(coins, { momPct: 3, momDays: 21 }, { prev: { tuning: { lastRun: '2026-01-01T00:00:00Z', history: [] } }, tuneNow: false, now });
   return { data, scorecard: card };
+}
+
+// Metals: gold, silver, platinum, palladium from fake feed values (ounces per dollar, one per calendar day), plus a
+// "bitcoin" tile copied from the crypto test data (alpha-coin under Bitcoin's id), built by the real build-metals.mjs.
+export function makeMetalsFixtures(cryptoData, now = Date.now()) {
+  const today = Math.floor(now / DAY), days = {};
+  const base = { xau: 4000, xag: 60, xpt: 1700, xpd: 1200 };
+  const walks = Object.fromEntries(Object.keys(base).map((m, k) => [m, walk(31 + k, FX_N, 0.0005 * (k - 1), 0.012)]));
+  for (let i = 0; i < FX_N; i++) {
+    const date = isoDay(today - FX_N + 1 + i);
+    days[date] = Object.fromEntries(Object.keys(base).map(m => [m, 1 / (walks[m][i] / 100 * base[m])]));
+  }
+  const alpha = cryptoData.markets.find(m => m.id === 'alpha-coin');
+  const crypto = { markets: [{ ...alpha, id: 'bitcoin', symbol: 'btc', name: 'Bitcoin' }], hist: { bitcoin: cryptoData.hist['alpha-coin'] } };
+  return metalsSnapshot(metalSeries(days), crypto, { now });
 }

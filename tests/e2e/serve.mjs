@@ -1,12 +1,12 @@
 // Local server for the site: serves the repo, with data.json / scorecard.json and forex.json / forex-scorecard.json
-// from the test fixtures (always fresh), and /forex/ made from index.html like the deploy job does.
+// and metals.json from the test fixtures (always fresh), and /forex/ and /metals/ made from index.html like the deploy job.
 // Browser tests use it (playwright.config.mjs); it's also a handy local preview: node tests/e2e/serve.mjs
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { makeFixtures, makeForexFixtures } from './fixtures.mjs';
-import { forexPage } from '../../scripts/forex-page.mjs';
+import { makeFixtures, makeForexFixtures, makeMetalsFixtures } from './fixtures.mjs';
+import { marketPage, PAGES } from '../../scripts/market-page.mjs';
 
 const root = normalize(fileURLToPath(new URL('../../', import.meta.url)));
 const port = +process.env.PORT || 4173;
@@ -14,10 +14,10 @@ const TYPES = { '.png': 'image/png', '.txt': 'text/plain', '.html': 'text/html; 
 
 let cache = { at: 0 };
 const fixtures = () => {
-  if (Date.now() - cache.at > 60e3) { const fx = makeForexFixtures(); cache = { at: Date.now(), ...makeFixtures(), fxData: fx.data, fxScorecard: fx.scorecard }; }
+  if (Date.now() - cache.at > 60e3) { const fx = makeForexFixtures(), base = makeFixtures(); cache = { at: Date.now(), ...base, fxData: fx.data, fxScorecard: fx.scorecard, metals: makeMetalsFixtures(base.data) }; }
   return cache;
 };
-const JSON_ROUTES = { '/data.json': 'data', '/scorecard.json': 'scorecard', '/forex.json': 'fxData', '/forex-scorecard.json': 'fxScorecard' };
+const JSON_ROUTES = { '/data.json': 'data', '/scorecard.json': 'scorecard', '/forex.json': 'fxData', '/forex-scorecard.json': 'fxScorecard', '/metals.json': 'metals' };
 
 http.createServer(async (req, res) => {
   const path = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
@@ -25,10 +25,11 @@ http.createServer(async (req, res) => {
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
     return res.end(JSON.stringify(fixtures()[JSON_ROUTES[path]]));
   }
-  if (path === '/forex' || path === '/forex/') {             // made from index.html, exactly as the deploy job does
-    if (path === '/forex') { res.writeHead(301, { location: '/forex/' }); return res.end(); }
+  const page = PAGES.find(m => path === '/' + m || path === '/' + m + '/');   // /forex/, /metals/: made from index.html, as the deploy job does
+  if (page) {
+    if (!path.endsWith('/')) { res.writeHead(301, { location: path + '/' }); return res.end(); }
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
-    return res.end(await forexPage());
+    return res.end(await marketPage(page));
   }
   const file = normalize(join(root, path === '/' ? 'index.html' : path));
   if (!file.startsWith(root) || path.startsWith('/.git')) { res.writeHead(403); return res.end(); }

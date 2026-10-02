@@ -1,5 +1,5 @@
 // heat.sala.company: one adapter per market. The same page serves every market (/ is crypto, /forex/ is forex: a copy
-// of index.html with its own search tags, made at deploy by scripts/forex-page.mjs), and EVERYTHING market-specific
+// of index.html with its own search tags, made at deploy by scripts/market-page.mjs; /metals/ likewise), and EVERYTHING market-specific
 // lives here: data files, color ranges, timeframe names, number formats, wording, which columns and switches exist.
 // Tiles, popups, filters, the scorecard and the signal engine are shared and ask `M.…`, so a change to them shows on
 // every market. A new market (stocks, commodities) is mostly a new entry here plus its data script.
@@ -74,6 +74,24 @@ export const MARKETS = {
     },
   },
 };
-export const MARKET = location.pathname.startsWith('/forex') ? 'forex' : 'crypto';
+// Metals: precious metals per troy ounce from the public-domain feed, plus PAXG, XAUT and Bitcoin from the crypto data
+MARKETS.metals = {
+  ...MARKETS.crypto,
+  key: 'metals', data: '/metals.json', scorecard: null, top: 999, noun: 'assets', one: 'asset', nameCol: 'Asset',
+  live: true,                         // the crypto tiles move all day; the metals file has one value per day (today's is still forming)
+  ranked: false, quoteSwitch: false, pegPref: null, pegLabel: null,
+  bins: { '24h': [0.25, 0.75, 1.5, 3], '7d': [1, 2.5, 5, 8], '30d': [2, 5, 10, 15] },
+  noScorecard: 'There’s no scorecard here: with only a handful of assets there’s nothing to rank each day, so the 🚀/😢 can’t be tested the way they are on the crypto and forex pages. The tiles, charts and stops work as everywhere else.',
+  verify: (c, h) => c.src === 'crypto' ? MARKETS.crypto.verify(c, h)
+    : '<span class="vf guess" title="Price from the community exchange-api feed (public domain, sources not documented)" aria-label="community feed">?</span>',
+  sourceLine: (c, h, ind) => c.src === 'crypto' ? MARKETS.crypto.sourceLine(c, h, ind)
+    : `? Community exchange-api feed (public domain), US dollars per troy ounce · ${ind.n} daily closes`,
+  srcInfo: ({ marketSrc, stale }) => `Metals: exchange-api feed (public domain), US dollars per troy ounce. Tokenized gold and Bitcoin: the crypto page's data (${marketSrc.split(' + ').pop()})${stale ? ', saved copy' : ''}.`,
+  costWords: '', tuneHistory: '',
+  fresh: ({ tm, ago, next, late, refreshMin, metalsDate }) => `<span>🕒 <b>Last refreshed ${tm}</b> (${ago}) · ${next} · <b>not real-time</b>: metal prices once a day${metalsDate ? ` (latest ${metalsDate})` : ''}, crypto every ${refreshMin} min`
+    + (late ? ' · <b>⚠ this update is running late</b>' : '') + '</span>' + linkCG,
+};
+
+export const MARKET = location.pathname.startsWith('/forex') ? 'forex' : location.pathname.startsWith('/metals') ? 'metals' : 'crypto';
 export const M = MARKETS[MARKET];
 export const TF = tf => M.label[tf];                       // what a timeframe is called on this market (24h / 1d …)

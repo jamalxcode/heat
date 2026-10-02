@@ -47,7 +47,7 @@ export function renderFresh(now) {
   const late = age > REFRESH_MIN * 2.5 * 60e3;
   const next = S.busy ? 'refreshing now' : S.nextAuto > now ? `next in ~${Math.max(1, Math.ceil((S.nextAuto - now) / 60e3))} min` : 'checking for new prices';
   el.classList.toggle('late', late);
-  const html = M.fresh({ tm, ago, next, late, refreshMin: REFRESH_MIN, rateDate: S.rateDate });   // includes the data credit
+  const html = M.fresh({ tm, ago, next, late, refreshMin: REFRESH_MIN, rateDate: S.rateDate, metalsDate: S.metalsDate });   // includes the data credit
   if (el.innerHTML !== html) el.innerHTML = html;
 }
 
@@ -93,7 +93,7 @@ export async function show(raw, live) {
   const data = quoteView(raw);
   const isNew = data.generated !== S.updated;
   S.mode = live ? 'live' : 'snapshot';
-  S.markets = data.markets; S.updated = data.generated; S.marketSrc = data.marketSrc; S.stale = !!data.marketStale; S.rateDate = data.rateDate;
+  S.markets = data.markets; S.updated = data.generated; S.marketSrc = data.marketSrc; S.stale = !!data.marketStale; S.rateDate = data.rateDate; S.metalsDate = data.metalsDate;
   S.stable = new Set(data.cats?.stable || []); S.gold = new Set(data.cats?.gold || []);
   S.hist = {};
   for (const [id, h] of Object.entries(data.hist || {})) S.hist[id] = unpack(h);

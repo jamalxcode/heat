@@ -393,6 +393,49 @@ test.describe('forex', () => {
   });
 });
 
+// Metals: the same page at /metals/, with metals.json (tests/e2e/fixtures.mjs: 4 metals plus a "bitcoin" tile)
+test.describe('metals', () => {
+  const N = 5;
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/metals/');
+    await expect(page.locator('#status')).toContainText(`${N}/${N} assets with indicators`);
+  });
+
+  test('loads its own data and search tags; no scorecard, no pegged checkbox; the switch links all three pages', async ({ page }) => {
+    await expect(tiles(page)).toHaveCount(N);
+    await expect(page).toHaveTitle(/Precious Metals Heatmap/);
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://heat.sala.company/metals/');
+    await expect(page.locator('#market a[aria-current="page"]')).toHaveText(/Metals/);
+    await expect(page.locator('#market a')).toHaveCount(3);
+    await expect(page.locator('#market a[data-m="forex"]')).toHaveAttribute('href', '/forex/');
+    await expect(page.locator('#view [data-v="score"]')).toBeHidden();
+    await expect(page.locator('#pegged')).toBeHidden();
+    await expect(page.locator('#fresh')).toContainText('not real-time');
+    const ld = JSON.parse(await page.locator('script[type="application/ld+json"]').textContent());
+    const faq = ld['@graph'].find(x => x['@type'] === 'FAQPage').mainEntity.map(q => q.name);
+    expect(await page.locator('footer .about h3').allTextContents()).toEqual(faq);
+    expect(external).toEqual([]);
+  });
+
+  test('tiles: metal badges, dollar prices per ounce, ? for the community feed; Bitcoin alongside', async ({ page }) => {
+    const gold = tile(page, 'xau');
+    await expect(gold.locator('.metal')).toHaveText('Au');
+    await expect(gold).toContainText('Gold');
+    expect(await gold.locator('.px').textContent()).toMatch(/^\$[\d,]+$/);
+    await expect(gold.locator('.vf.guess')).toHaveCount(1);
+    await expect(page.locator('#grid .metal')).toHaveCount(4);
+    await expect(tile(page, 'bitcoin')).toHaveCount(1);
+    await gold.click();
+    await expect(page.locator('#detail')).toHaveClass(/pinned/);
+    await expect(page.locator('#detail .d-head b')).toHaveText('Gold');
+  });
+
+  test('the crypto page keeps its scorecard after visiting metals', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#view [data-v="score"]')).toBeVisible();
+  });
+});
+
 test.describe('phone', () => {
   test.use({ viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true });
 
@@ -405,5 +448,13 @@ test.describe('phone', () => {
     expect(Math.round(pb.width)).toBe(375);
     await page.locator('#scrim').tap({ position: { x: 20, y: 20 } });
     await expect(popup).not.toHaveClass(/show/);
+  });
+
+  test('every page fits the screen with the three-way market switch', async ({ page }) => {
+    for (const url of ['/', '/forex/', '/metals/']) {
+      await page.goto(url);
+      await expect(tiles(page).first()).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), url).toBe(true);
+    }
   });
 });

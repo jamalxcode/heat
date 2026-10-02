@@ -348,8 +348,13 @@ document.addEventListener('click', e => {
 $$('#market a').forEach(a => { if (a.dataset.m === MARKET) a.setAttribute('aria-current', 'page'); });
 $$('#colorBy button').forEach(b => { b.textContent = TF(b.dataset.v); b.title = `Color by ${TF(b.dataset.v)} change`; });
 $('#filters .chip[data-f="all"]').textContent = `All ${M.noun}`;
-$('#pegged').parentElement.lastChild.textContent = ' ' + M.pegLabel;
-$('#pegged').parentElement.title = M.pegTitle;
+if (M.pegLabel) {
+  $('#pegged').parentElement.lastChild.textContent = ' ' + M.pegLabel;
+  $('#pegged').parentElement.title = M.pegTitle;
+} else $('#pegged').parentElement.hidden = true;     // metals: no pegged assets to hide
+if (!M.scorecard) {                                  // metals: too few assets to score, so no Scorecard view
+  $('#view button[data-v="score"]').hidden = true;
+}
 $('#pegged').checked = S.pegged;
 $('#pegged').addEventListener('change', e => { S.pegged = e.target.checked; savePrefs(); pickCoins(); renderAll(); applyHist(); done(); });
 
