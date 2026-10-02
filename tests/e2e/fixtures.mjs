@@ -108,3 +108,14 @@ export function makeMetalsFixtures(cryptoData, now = Date.now()) {
   const crypto = { markets: [{ ...alpha, id: 'bitcoin', symbol: 'btc', name: 'Bitcoin' }], hist: { bitcoin: cryptoData.hist['alpha-coin'] } };
   return metalsSnapshot(metalSeries(days), crypto, { now });
 }
+
+// tv.json: which TradingView symbols exist. Alpha's exchange pair and both directions of JPY exist; Beta's ticker
+// exists only under a different coin's name (so it must not be linked); gold exists; nothing else was found.
+export function makeTvFixture(now = Date.now()) {
+  return { v: 1, t: now, sym: {
+    'BINANCE:ALPUSDT': [1, now, 'Alpha Coin / TetherUS'],
+    'BINANCE:BETUSDT': [0, now, ''], 'CRYPTO:BETUSD': [1, now, 'Betting Token'], 'COINBASE:BETUSD': [0, now, ''],
+    'FX_IDC:USDJPY': [1, now, 'U.S. DOLLAR / JAPANESE YEN'], 'FX_IDC:JPYUSD': [1, now, 'JAPANESE YEN / U.S. DOLLAR'],
+    'TVC:GOLD': [1, now, 'Gold'],
+  } };
+}

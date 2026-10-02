@@ -98,6 +98,15 @@ The precious metals people buy as a **store of value**, in US dollars per troy o
 - **Copper is left out:** it is an industrial metal rather than a store of value, and no free public-domain feed has it.
 - `scripts/build-metals.mjs` runs in the deploy job right after the crypto build and refetches the metals hourly. If it fails, the last good `metals.json` is republished.
 
+## TradingView chart links
+
+In the popup, the logo and name (and a small **TradingView ↗**) open that asset's TradingView chart in a new tab: the exchange pair its candles came from for coins (e.g. `BINANCE:ETHUSDT`), `FX_IDC:USDJPY` or `FX_IDC:JPYUSD` for currencies (following the quote switch), and `TVC:GOLD`, `SILVER`, `PLATINUM`, `PALLADIUM` for metals.
+
+- **No dead links:** `scripts/tradingview.mjs` checks every candidate symbol against TradingView's public symbol lookup in the deploy job and saves the results in `tv.json`. The popup only links a symbol TradingView confirmed; otherwise there's no link.
+- **Right coin:** a coin without a known exchange pair falls back to TradingView's generic `CRYPTO:XYZUSD`, used only when TradingView's description contains every word of the coin's name, so another coin with the same ticker can't slip in.
+- **Gentle:** results are cached (found symbols re-checked every 2 weeks, missing ones every 3 days), at most 80 lookups per deploy, 0.25 s apart. TradingView rate-limits; a failed or limited lookup stops the run and is never recorded as missing.
+- Visitors' browsers never contact TradingView unless they click the link.
+
 ## How it works
 
 ```
@@ -121,6 +130,7 @@ GitHub Actions: daily 00:20 UTC (via cron-job.org)
 | `scripts/build-forex.mjs` | Builds `forex.json`: the currency list, both rate sources, business-day closes. Reuses the last file and refetches hourly |
 | `scripts/score-forex.mjs` | Daily forex scorecard and weekly tuning |
 | `scripts/build-metals.mjs` | Builds `metals.json` in the deploy job: gold, silver, platinum and palladium (refetched hourly) plus PAXG, XAUT and Bitcoin copied from `data.json` |
+| `scripts/tradingview.mjs` | TradingView chart links: candidate symbols per asset, checked in the deploy job and cached in `tv.json`; the page imports it to pick the link |
 | `scripts/market-page.mjs`, `seo/` | Makes `/forex/` and `/metals/` from `index.html`, swapping in each market's search tags, About/FAQ and source credits |
 | `params-forex.json`, `data/forex-scorecard.json`, `data/forex-extras.json` | Forex signal settings, the latest forex scorecard, and the cached extra-feed rates |
 | `signals.mjs` | The shared signal engine: indicators, 🚀/😢/⚡ rules, scoring stats, tuner. Used by the page, the scorer and the tuner, so they always agree. |

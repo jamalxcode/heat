@@ -5,6 +5,7 @@ import { renderScorecard } from './scorecard.mjs';
 import { $, $$, chgOf, DAY, esc, fmtBig, fmtPct, fmtPrice, logo, M, MARKET, prefs, S, savePrefs, store, TF } from './core.mjs';
 import { done, run, show } from './main.mjs';
 import { BB_LABEL, renderAll, renderTable, signals } from './render.mjs';
+import { chartUrl, pick } from '/scripts/tradingview.mjs';
 
 /* ================= detail popover ================= */
 export function linePath(vals, x, y) {
@@ -98,7 +99,10 @@ export function showDetail(id, anchor, keepPos) {
   const box = $('#detail');
   if (!c) return hideDetail(true);
   const ind = S.ind[id], h = S.hist[id];
-  let body = `<div class="d-head">${logo(c, 22)}<b>${esc(c.name)}</b><span style="color:var(--ink-2)">${esc(c.symbol.toUpperCase())}${M.ranked ? ` · #${c.market_cap_rank}` : ''}</span></div>
+  // the logo and name link to the TradingView chart, only when that symbol is known to exist there
+  const tv = pick(c, S.raw?.hist?.[id], MARKET, S.tv, S.quote === 'usd');
+  const tvA = inner => tv ? `<a class="tv" href="${chartUrl(tv)}" target="_blank" rel="noopener noreferrer" title="Open the ${esc(tv)} chart on TradingView">${inner}</a>` : inner;
+  let body = `<div class="d-head">${tvA(`${logo(c, 22)}<b>${esc(c.name)}</b>`)}<span style="color:var(--ink-2)">${esc(c.symbol.toUpperCase())}${M.ranked ? ` · #${c.market_cap_rank}` : ''}</span>${tv ? tvA('<span class="tv-go">TradingView ↗</span>') : ''}</div>
     <div class="d-price">${fmtPrice(c.current_price)}</div>
     <div class="d-chg"><span>${TF('24h')} ${fmtPct(chgOf(c, '24h'))}</span><span>${TF('7d')} ${fmtPct(chgOf(c, '7d'))}</span><span>${TF('30d')} ${fmtPct(chgOf(c, '30d'))}</span>${M.ranked ? `<span>Cap ${fmtBig(c.market_cap)}</span>` : ''}</div>
     ${c.warn ? `<div class="d-src">⚠ <b>${esc(c.name)}: the official rate and the street (market) rate differ a lot.</b> This rate comes from a community feed whose sources aren't documented, so it may not match what you'd actually get. It is left out of the scorecard.</div>` : ''}

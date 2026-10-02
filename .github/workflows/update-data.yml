@@ -86,6 +86,17 @@ jobs:
           node scripts/build-metals.mjs _site/metals.json _site/data.json \
             || { echo "::warning::metals build failed, republishing the last metals.json"; curl -sf "$BASE_URL/metals.json" -o _site/metals.json || true; }
 
+      # TradingView chart links: check which symbols exist there (cached in tv.json, so only new or expired ones are
+      # looked up), so the popup never links to a "symbol not found" page. A failure keeps the last tv.json.
+      - name: Check TradingView symbols
+        env:
+          PREV_URL: ${{ steps.pages.outputs.base_url }}/tv.json
+          BASE_URL: ${{ steps.pages.outputs.base_url }}
+        run: |
+          cp scripts/tradingview.mjs _site/scripts/   # the page imports it for the link
+          timeout 90 node scripts/tradingview.mjs _site/tv.json _site/data.json _site/forex.json _site/metals.json \
+            || { echo "::warning::TradingView check failed, republishing the last tv.json"; curl -sf "$BASE_URL/tv.json" -o _site/tv.json || true; }
+
       - uses: actions/upload-pages-artifact@v4
         with:
           path: _site

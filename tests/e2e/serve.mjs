@@ -5,7 +5,7 @@ import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { makeFixtures, makeForexFixtures, makeMetalsFixtures } from './fixtures.mjs';
+import { makeFixtures, makeForexFixtures, makeMetalsFixtures, makeTvFixture } from './fixtures.mjs';
 import { marketPage, PAGES } from '../../scripts/market-page.mjs';
 
 const root = normalize(fileURLToPath(new URL('../../', import.meta.url)));
@@ -14,10 +14,10 @@ const TYPES = { '.png': 'image/png', '.txt': 'text/plain', '.html': 'text/html; 
 
 let cache = { at: 0 };
 const fixtures = () => {
-  if (Date.now() - cache.at > 60e3) { const fx = makeForexFixtures(), base = makeFixtures(); cache = { at: Date.now(), ...base, fxData: fx.data, fxScorecard: fx.scorecard, metals: makeMetalsFixtures(base.data) }; }
+  if (Date.now() - cache.at > 60e3) { const fx = makeForexFixtures(), base = makeFixtures(); cache = { at: Date.now(), ...base, fxData: fx.data, fxScorecard: fx.scorecard, metals: makeMetalsFixtures(base.data), tv: makeTvFixture() }; }
   return cache;
 };
-const JSON_ROUTES = { '/data.json': 'data', '/scorecard.json': 'scorecard', '/forex.json': 'fxData', '/forex-scorecard.json': 'fxScorecard', '/metals.json': 'metals' };
+const JSON_ROUTES = { '/data.json': 'data', '/scorecard.json': 'scorecard', '/forex.json': 'fxData', '/forex-scorecard.json': 'fxScorecard', '/metals.json': 'metals', '/tv.json': 'tv' };
 
 http.createServer(async (req, res) => {
   const path = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);

@@ -393,6 +393,46 @@ test.describe('forex', () => {
   });
 });
 
+// TradingView links (tests/e2e/fixtures.mjs makeTvFixture: which symbols "exist")
+test.describe('TradingView link', () => {
+  const tvLinks = page => page.locator('#detail .d-head a.tv');
+  const open = async (page, id) => { await tile(page, id).click(); await expect(page.locator('#detail')).toHaveClass(/pinned/); };
+
+  test('crypto: links the exchange pair, in a new tab; no link when the symbol is missing or another coin', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#status')).toContainText('with indicators');
+    await open(page, 'alpha-coin');
+    await expect(tvLinks(page)).toHaveCount(2);                                             // logo + name, and "TradingView ↗"
+    await expect(tvLinks(page).first()).toHaveAttribute('href', 'https://www.tradingview.com/chart/?symbol=BINANCE%3AALPUSDT');
+    await expect(tvLinks(page).first()).toHaveAttribute('target', '_blank');
+    await expect(tvLinks(page).first()).toHaveAttribute('rel', /noopener/);
+    await expect(page.locator('#detail .d-head')).toContainText('TradingView ↗');
+    await page.locator('#detail .x').click();
+    await open(page, 'beta-coin');                                                          // CRYPTO:BETUSD is "Betting Token"
+    await expect(page.locator('#detail .d-head b')).toHaveText('Beta Coin');
+    await expect(tvLinks(page)).toHaveCount(0);
+    expect(external).toEqual([]);                                                           // checked at deploy, not by the page
+  });
+
+  test('forex: follows the quote switch; metals: spot symbol', async ({ page }) => {
+    await page.goto('/forex/');
+    await expect(page.locator('#status')).toContainText('with indicators');
+    await open(page, 'jpy');
+    await expect(tvLinks(page).first()).toHaveAttribute('href', /symbol=FX_IDC%3AUSDJPY$/);
+    await page.locator('#detail .x').click();
+    await page.locator('#quote [data-v="usd"]').click();
+    await open(page, 'jpy');
+    await expect(tvLinks(page).first()).toHaveAttribute('href', /symbol=FX_IDC%3AJPYUSD$/);
+    await page.locator('#detail .x').click();
+    await open(page, 'eur');
+    await expect(tvLinks(page)).toHaveCount(0);                                             // not in tv.json: no link
+    await page.goto('/metals/');
+    await expect(page.locator('#status')).toContainText('with indicators');
+    await open(page, 'xau');
+    await expect(tvLinks(page).first()).toHaveAttribute('href', /symbol=TVC%3AGOLD$/);
+  });
+});
+
 // Metals: the same page at /metals/, with metals.json (tests/e2e/fixtures.mjs: 4 metals plus a "bitcoin" tile)
 test.describe('metals', () => {
   const N = 5;
