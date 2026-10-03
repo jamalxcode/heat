@@ -97,6 +97,10 @@ jobs:
           timeout 90 node scripts/tradingview.mjs _site/tv.json _site/data.json _site/forex.json _site/metals.json \
             || { echo "::warning::TradingView check failed, republishing the last tv.json"; curl -sf "$BASE_URL/tv.json" -o _site/tv.json || true; }
 
+      # Sources health: one footer line on every page saying which data sources are working (from the files just built)
+      - name: Sources health
+        run: node scripts/health.mjs _site/health.json _site/data.json _site/forex.json _site/metals.json _site/tv.json || echo "::warning::sources health line not built"
+
       - uses: actions/upload-pages-artifact@v5
         with:
           path: _site

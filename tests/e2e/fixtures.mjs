@@ -108,7 +108,11 @@ export function makeMetalsFixtures(cryptoData, now = Date.now()) {
   }
   const alpha = cryptoData.markets.find(m => m.id === 'alpha-coin');
   const crypto = { markets: [{ ...alpha, id: 'bitcoin', symbol: 'btc', name: 'Bitcoin' }], hist: { bitcoin: cryptoData.hist['alpha-coin'] } };
-  return metalsSnapshot(metalSeries(days), crypto, { now });
+  // cross-check: gold confirmed by the second source, silver 2.4% apart (⚠), the others not checked yet
+  const day = isoDay(today - 1);
+  const check = { xau: { day, diff: 0.12, ok: true }, xag: { day, diff: -2.4, ok: false } };
+  const sources = { primary: { name: 'exchange-api', latest: day, ok: true }, second: { name: 'Swissquote', ok: true, at: now }, agree: false };
+  return metalsSnapshot(metalSeries(days), crypto, { now, check, sources });
 }
 
 // tv.json: which TradingView symbols exist. Alpha's exchange pair and both directions of JPY exist; Beta's ticker
@@ -120,4 +124,13 @@ export function makeTvFixture(now = Date.now()) {
     'FX_IDC:USDJPY': [1, now, 'U.S. DOLLAR / JAPANESE YEN'], 'FX_IDC:JPYUSD': [1, now, 'JAPANESE YEN / U.S. DOLLAR'],
     'TVC:GOLD': [1, now, 'Gold'],
   } };
+}
+
+// health.json: every source fine except Swissquote's cross-check (silver disagrees)
+export function makeHealthFixture(now = Date.now()) {
+  return { v: 1, t: now, sources: [
+    { key: 'rankings', name: 'CoinGecko', what: 'crypto prices and rankings', state: 'ok', note: 'live' },
+    { key: 'ecb', name: 'ECB', what: 'official currency rates', state: 'ok', note: 'rates of today' },
+    { key: 'swissquote', name: 'Swissquote', what: 'current metal prices, cross-check', state: 'warn', note: 'live · disagrees: Silver 2.4%' },
+  ] };
 }

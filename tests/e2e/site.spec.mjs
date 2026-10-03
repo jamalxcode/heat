@@ -591,17 +591,34 @@ test.describe('metals', () => {
     expect(external).toEqual([]);
   });
 
-  test('tiles: metal badges, dollar prices per ounce, ? for the community feed; Bitcoin alongside', async ({ page }) => {
+  test('tiles: metal badges, dollar prices per ounce; ✓ when two sources agree, ⚠ when not, ? until checked', async ({ page }) => {
     const gold = tile(page, 'xau');
     await expect(gold.locator('.metal')).toHaveText('Au');
     await expect(gold).toContainText('Gold');
     expect(await gold.locator('.px').textContent()).toMatch(/^\$[\d,]+$/);
-    await expect(gold.locator('.vf.guess')).toHaveCount(1);
+    await expect(gold.locator('.vf.ok')).toHaveCount(1);                                    // confirmed by Swissquote
+    await expect(gold.locator('.vf.ok')).toHaveAttribute('title', /Swissquote.*within 0\.12%/);
+    await expect(tile(page, 'xag').locator('.vf.guess')).toHaveCount(1);                    // 2.4% apart
+    await expect(tile(page, 'xag').locator('.caution')).toHaveAttribute('title', /disagree by 2\.4%/);
+    await expect(tile(page, 'xpt').locator('.vf.guess')).toHaveAttribute('title', /Not cross-checked yet/);
+    await expect(tile(page, 'xpt').locator('.caution')).toHaveCount(0);
     await expect(page.locator('#grid .metal')).toHaveCount(4);
     await expect(tile(page, 'bitcoin')).toHaveCount(1);
     await gold.click();
     await expect(page.locator('#detail')).toHaveClass(/pinned/);
     await expect(page.locator('#detail .d-head b')).toHaveText('Gold');
+    await expect(page.locator('#detail .d-src')).toContainText('exchange-api and Swissquote agree');
+  });
+
+  test('footer: the sources health line on every page, with details on hover', async ({ page }) => {
+    for (const url of ['/', '/forex/', '/metals/']) {
+      await page.goto(url);
+      const line = page.locator('#health');
+      await expect(line).toBeVisible();
+      await expect(line).toContainText('Sources: CoinGecko ✓ · ECB ✓ · Swissquote ⚠');
+      await expect(line.locator('[data-src="swissquote"]')).toHaveClass(/hs-warn/);
+      await expect(line.locator('[data-src="swissquote"]')).toHaveAttribute('title', /disagrees: Silver 2\.4%/);
+    }
   });
 
   test('the crypto page keeps its scorecard after visiting metals', async ({ page }) => {

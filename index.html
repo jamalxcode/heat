@@ -464,6 +464,9 @@ td .cell-heat { display: inline-block; padding: 1px 6px; border-radius: 4px; bac
 }
 footer { margin-top: 28px; color: var(--muted); font-size: 12px; display: grid; gap: 6px; }
 footer details summary { cursor: pointer; }
+.health .hs { white-space: nowrap; cursor: help; }
+.health .hs-warn { color: #b7791f; font-weight: 600; }
+.health .hs-down { color: var(--red); font-weight: 600; }
 footer .about { max-width: 820px; margin: 8px 0; color: var(--ink-2); font-size: 13px; line-height: 1.5; }
 footer .about h2 { font-size: 16px; margin: 0 0 6px; color: var(--ink); }
 footer .about h3 { font-size: 13.5px; margin: 12px 0 2px; color: var(--ink); }
@@ -570,6 +573,7 @@ footer .about p { margin: 0; }
     </section>
     <!-- ABOUT:end -->
     <div id="srcinfo"></div>
+    <div id="health" class="health" hidden></div>   <!-- sources health: health.json, built by scripts/health.mjs in the deploy job -->
     <details id="excluded"><summary>Excluded tokens</summary><div></div></details>
     <!-- SOURCES:start -->
     <div class="cg-foot">Market data <a href="https://www.coingecko.com/" target="_blank" rel="noopener"><b>Powered by CoinGecko</b></a>.</div>

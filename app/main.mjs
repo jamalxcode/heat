@@ -1,6 +1,6 @@
 // heat.sala.company page script: main (split from index.html; see app/main.mjs for the order things start in)
 import * as SIG from '/signals.mjs';
-import { applyEdge, applyParams, renderAll, renderCounts, renderFooter } from './render.mjs';
+import { applyEdge, applyParams, renderAll, renderCounts, renderFooter, renderHealth } from './render.mjs';
 import { $, DAY, fmtWait, linkedCoin, LIVE_EVERY, M, MARKETS_TTL, REFRESH_MIN, S, setStatus, SNAPSHOT_GRACE, SNAPSHOT_MAX_AGE, SNAPSHOT_RETRY, store } from './core.mjs';
 import { loadScorecard } from './scorecard.mjs';
 import { applyHist, buildBench, pickCoins } from './data.mjs';
@@ -65,6 +65,7 @@ export function tick() {
 let linkedOpened = false;
 export function done() {
   renderFooter();
+  fetch('/health.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).then(renderHealth).catch(() => {});   // sources health line
   renderCounts();   // right away: the deferred refresh is paused in background tabs
   const ok = S.coins.filter(c => S.ind[c.id] && !S.ind[c.id].error).length;
   const via = S.mode === 'live' ? ` · built in your browser from ${S.marketSrc}` : '';

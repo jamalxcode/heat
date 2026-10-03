@@ -86,13 +86,15 @@ MARKETS.metals = {
   bins: { '24h': [0.25, 0.75, 1.5, 3], '7d': [1, 2.5, 5, 8], '30d': [2, 5, 10, 15] },
   bench: 'xau', benchLabel: 'gold', volume: false,     // the metal prices come without volume
   noScorecard: 'There’s no scorecard here: with only a handful of assets there’s nothing to rank each day, so the 🚀/😢 can’t be tested the way they are on the crypto and forex pages. The tiles, charts and stops work as everywhere else.',
+  // ✓ once Swissquote's price matched exchange-api's close for the same day (scripts/build-metals.mjs crossCheck)
   verify: (c, h) => c.src === 'crypto' ? MARKETS.crypto.verify(c, h)
-    : '<span class="vf guess" title="Price from the community exchange-api feed (public domain, sources not documented)" aria-label="community feed">?</span>',
+    : c.check?.ok ? `<span class="vf ok" title="Confirmed by a second source: Swissquote's price matched the exchange-api close within ${Math.abs(c.check.diff)}% on ${c.check.day}" aria-label="confirmed by two sources">✓</span>`
+    : `<span class="vf guess" title="${c.check ? `The two price sources disagree by ${Math.abs(c.check.diff)}% (${c.check.day}): check another source` : 'Not cross-checked yet: price from the community exchange-api feed (public domain, sources not documented)'}" aria-label="not confirmed">?</span>`,
   sourceLine: (c, h, ind) => c.src === 'crypto' ? MARKETS.crypto.sourceLine(c, h, ind)
-    : `? Community exchange-api feed (public domain), US dollars per troy ounce · ${ind.n} daily closes`,
-  srcInfo: ({ marketSrc, stale }) => `Metals: exchange-api feed (public domain), US dollars per troy ounce. Tokenized gold and Bitcoin: the crypto page's data (${marketSrc.split(' + ').pop()})${stale ? ', saved copy' : ''}.`,
+    : `${c.check?.ok ? `✓ exchange-api and Swissquote agree within ${Math.abs(c.check.diff)}% (${c.check.day})` : c.check ? `⚠ exchange-api and Swissquote differ by ${Math.abs(c.check.diff)}% (${c.check.day})` : '? exchange-api history, not cross-checked yet'} · US dollars per troy ounce · ${ind.n} daily closes`,
+  srcInfo: ({ marketSrc, stale }) => `Metals: daily history from the exchange-api feed (public domain), current prices from Swissquote's public quotes, which also cross-check each day's close; US dollars per troy ounce. Tokenized gold and Bitcoin: the crypto page's data (${marketSrc.split(' + ').pop()})${stale ? ', saved copy' : ''}.`,
   costWords: '', tuneHistory: '',
-  fresh: ({ tm, ago, next, late, refreshMin, metalsDate }) => `<span>🕒 <b>Last refreshed ${tm}</b> (${ago}) · ${next} · <b>not real-time</b>: metal prices once a day${metalsDate ? ` (latest ${metalsDate})` : ''}, crypto every ${refreshMin} min`
+  fresh: ({ tm, ago, next, late, refreshMin, metalsDate }) => `<span>🕒 <b>Last refreshed ${tm}</b> (${ago}) · ${next} · <b>not real-time</b>: every ${refreshMin} min while markets are open${metalsDate ? ` (latest ${metalsDate})` : ''}`
     + (late ? ' · <b>⚠ this update is running late</b>' : '') + '</span>' + linkCG,
 };
 

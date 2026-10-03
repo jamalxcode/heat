@@ -130,6 +130,7 @@ export function verifyMark(c) {
 // findSpikes in scripts/build-forex.mjs)
 export const cautionNotes = c => [
   c.warn && 'Official and market rates differ a lot for this currency',
+  c.check && !c.check.ok && `The two price sources (exchange-api, Swissquote) disagree by ${Math.abs(c.check.diff)}% on ${c.check.day}: check another source`,
   c.spike && `Unusual jump of ${fmtPct(c.spike.pct, 1)} on ${c.spike.date}${c.src === 'x' ? ': a data glitch or a real devaluation, so check another source. Days around it are left out of the scorecard' : ': an official ECB rate, so a real market move'}`,
 ].filter(Boolean);
 export function cautionMark(c) {
@@ -330,3 +331,12 @@ export function renderAll() {
   syncURL();                                  // the address bar always shares what's on screen
 }
 
+
+// Footer: which data sources are working (health.json, made by scripts/health.mjs in every deploy). Hover for details.
+const HEALTH_MARK = { ok: '✓', warn: '⚠', down: '✕' };
+export function renderHealth(h) {
+  const el = $('#health');
+  if (!h?.sources?.length) { el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = 'Sources: ' + h.sources.map(s => `<span class="hs hs-${esc(s.state)}" data-src="${esc(s.key)}" title="${esc(`${s.name}: ${s.what}. ${s.note}`)}">${esc(s.name)} ${HEALTH_MARK[s.state] || '?'}</span>`).join(' · ');
+}
