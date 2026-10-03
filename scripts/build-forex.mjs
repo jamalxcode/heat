@@ -12,7 +12,11 @@
 
 export const DAY = 864e5;
 const FRANKFURTER = 'https://api.frankfurter.dev/v1';
-const XAPI = [
+// exchange-api files are made just after midnight UTC. The file dated D is paired with the ECB rate of day D (set at
+// 14:15 Frankfurt time): measured over 46 ECB days × 29 currencies (Oct 2026) it is the closest match, 0.16% off on
+// average, vs 0.21% for the file dated D+1 and 0.29% for D−1. (Metals are different: their day is a close, so the
+// file dated D is filed under D−1 there; see build-metals.mjs.)
+&
   d => `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${d}/v1/currencies/usd.min.json`,
   d => `https://${d}.currency-api.pages.dev/v1/currencies/usd.min.json`,
 ];
