@@ -346,6 +346,7 @@ body.proven-trendUp [data-k="trendUp"], body.proven-trendDown [data-k="trendDown
 body.proven-momUp [data-k="momUp"], body.proven-momDown [data-k="momDown"],
 body.proven-pnfUp [data-k="pnfUp"], body.proven-pnfDown [data-k="pnfDown"] { font-size: 17px; opacity: 1; filter: none; }
 .leg-item.edge { flex-basis: 100%; }
+.controls .reset { flex: none; }
 .leg-item.edge.weak { color: var(--ink-2); }
 .leg-item.edge a { color: inherit; }
 .tile .px { font-size: 12px; opacity: .85; text-align: right; white-space: nowrap; }
@@ -497,6 +498,8 @@ footer .about p { margin: 0; }
   </header>
 
   <div class="controls" role="toolbar" aria-label="Heatmap controls">
+    <!-- Reset: back to the default view (filters, timeframe, view, tile size, quote, pegged); the theme is kept -->
+    <button class="chip reset" id="reset" title="Back to the default view: all coins, 24h, grid, detailed tiles">↺ Reset</button>
     <!-- Market: each is its own page (/ and /forex/), built from this same file -->
     <nav class="seg market" id="market" aria-label="Market">
       <a href="/" data-m="crypto">🪙 Crypto</a>

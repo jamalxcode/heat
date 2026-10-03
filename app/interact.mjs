@@ -303,6 +303,20 @@ seg('density', 'density', () => { hideDetail(true); renderAll(); });   // Detail
 // Forex: USD/… | …/USD. Redraws everything from the same rates, flipped or not (see quoteView)
 $('#quote').hidden = !M.quoteSwitch;
 seg('quote', 'quote', () => { hideDetail(true); if (S.raw) { S.coins = []; show(S.raw, S.mode === 'live'); } });
+// ↺ Reset: everything back to the default view in one click (the theme and "How to read" stay as they are)
+$('#reset').addEventListener('click', () => {
+  hideDetail(true);
+  const quoteChanged = M.quoteSwitch && S.quote !== 'market';
+  Object.assign(S, { filter: 'all', heat: null, colorBy: '24h', view: 'grid', density: 'detailed', quote: 'market', pegged: false,
+    chart: 'price', sort: { key: 'rank', dir: 1 }, scoreWin: 'd30', scoreH: 1, scoreSet: null });
+  for (const [id, key] of [['colorBy', 'colorBy'], ['view', 'view'], ['density', 'density'], ['quote', 'quote']])
+    $$(`#${id} button`).forEach(b => b.setAttribute('aria-pressed', b.dataset.v === S[key]));
+  $('#pegged').checked = false;
+  markFilter();
+  savePrefs();
+  if (quoteChanged && S.raw) { S.coins = []; show(S.raw, S.mode === 'live'); }   // flipped pairs: redraw from the rates
+  else { pickCoins(); renderAll(); applyHist(); done(); }
+});
 // "How to read": the full legend opens below the one-line legend, and stays open or closed per browser
 export const setLegend = open => { S.legendOpen = open; $('#legendMore').hidden = !open; $('#legendToggle').setAttribute('aria-expanded', open); $('#legendToggle').textContent = open ? '✕ Hide legend' : 'ⓘ How to read'; };
 setLegend(S.legendOpen);

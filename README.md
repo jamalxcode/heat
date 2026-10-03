@@ -53,7 +53,9 @@ Click the popup (or the tile) to pin it open, and click outside it to close it. 
 
 **Detailed | Compact.** In grid view, **Compact** shrinks each tile to its symbol, change and price, so 3–4× as many coins fit on screen (3 columns on a phone, about 11 on a laptop); the ⚠ mark and the red "closed past stop" outline stay, and hover or tap still opens the chart card. The choice is remembered, and links carry it as `d=compact`.
 
-**Shareable links.** The address bar always matches what is on screen: the filter (`f`), colour range (`heat`), timeframe (`tf`), view (`view`), tile size (`d=compact`), forex quote direction (`q=usd`) and an open coin (`coin`), e.g. `heat.sala.company/?f=vol&tf=7d&coin=solana`. **🔗 Link** in the header copies it, and the 🔗 in a chart card copies a link to that coin, whose card opens on arrival. A link applies for that visit only: it never overwrites the visitor's own saved settings, and a filter the page doesn't have (Volume surge on forex) is ignored.
+**↺ Reset**, at the start of the controls row, puts everything back to the default view in one click: all coins, no colour range, 24h, grid, detailed tiles, USD/… on forex, pegged coins hidden, chart cards closed (the theme stays).
+
+&: the filter (`f`), colour range (`heat`), timeframe (`tf`), view (`view`), tile size (`d=compact`), forex quote direction (`q=usd`) and an open coin (`coin`), e.g. `heat.sala.company/?f=vol&tf=7d&coin=solana`. **🔗 Link** in the header copies it, and the 🔗 in a chart card copies a link to that coin, whose card opens on arrival. A link applies for that visit only: it never overwrites the visitor's own saved settings, and a filter the page doesn't have (Volume surge on forex) is ignored.
 
 The **Table** view sorts by any column, including the recommended stops. The **Scorecard** view shows how the signals have actually performed.
 

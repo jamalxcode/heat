@@ -421,6 +421,29 @@ test('Compact tiles: symbol, change and price only, many more per row; remembere
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('hm.prefs')).density)).toBe('detailed');
 });
 
+test('↺ Reset, right before the market switch, puts every control back to the default view and remembers it', async ({ page }) => {
+  await page.goto('/?tf=7d');
+  await expect(page.locator('#status')).toContainText('with indicators');
+  const reset = page.locator('#reset');
+  expect(await reset.evaluate(el => el.nextElementSibling?.id)).toBe('market');
+  await page.locator('#pegged').check();
+  await page.locator('#density [data-v="compact"]').click();
+  await page.locator('#filters .chip[data-f="up"]').click();
+  await tiles(page).first().click();                                                        // and a chart card open
+  await expect(page.locator('#detail')).toHaveClass(/pinned/);
+  await reset.dispatchEvent('click');                                                       // the open card may cover it
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator('#detail')).not.toHaveClass(/show/);
+  await expect(page.locator('#filters .chip[data-f="all"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#colorBy [data-v="24h"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#density [data-v="detailed"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#grid')).not.toHaveClass(/compact/);
+  await expect(page.locator('#pegged')).not.toBeChecked();
+  await expect(tiles(page)).toHaveCount(N);
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('hm.prefs')));
+  expect([saved.colorBy, saved.view, saved.density, saved.pegged]).toEqual(['24h', 'grid', 'detailed', false]);
+});
+
 test.describe('shareable links', () => {
   test('a link opens that view (filter, timeframe, coin) without changing the visitor\'s saved settings', async ({ page }) => {
     await page.goto('/?f=up&tf=7d&coin=alpha-coin');
