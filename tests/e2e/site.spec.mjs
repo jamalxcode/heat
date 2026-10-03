@@ -607,7 +607,7 @@ test.describe('metals', () => {
     await gold.click();
     await expect(page.locator('#detail')).toHaveClass(/pinned/);
     await expect(page.locator('#detail .d-head b')).toHaveText('Gold');
-    await expect(page.locator('#detail .d-src')).toContainText('exchange-api and Swissquote agree');
+    await expect(page.locator('#detail .d-src', { hasText: 'exchange-api and Swissquote agree' })).toHaveCount(1);
   });
 
   test('footer: the sources health line on every page, with details on hover', async ({ page }) => {
