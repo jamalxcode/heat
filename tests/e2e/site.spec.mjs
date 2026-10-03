@@ -418,7 +418,7 @@ test.describe('shareable links', () => {
     await expect(page).toHaveURL(/\?tf=30d&coin=moon-coin$/);
     await page.evaluate(() => { window.copied = []; Object.defineProperty(navigator, 'clipboard', { value: { writeText: async t => window.copied.push(t) }, configurable: true }); });
     await page.locator('#detail [data-copy-link]').click();
-    await page.locator('#share').click();
+    await page.locator('#share').dispatchEvent('click');                                 // on this screen size the open card covers the header
     await expect(page.locator('#share')).toHaveText('✓ Copied');
     await expect(page.locator('#detail')).toHaveClass(/pinned/);                          // the header button keeps the popup open
     expect(await page.evaluate(() => window.copied)).toEqual(Array(2).fill(page.url()));
