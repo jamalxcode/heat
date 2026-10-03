@@ -138,12 +138,21 @@ export function cautionMark(c) {
   return notes.length ? `<span class="rk caution" title="${esc(notes.join('. '))}" aria-label="caution: ${esc(notes.join('. '))}">⚠</span>` : '';
 }
 
+// A price that changed since the last refresh: the tile blinks once in its direction (kept for 1.5 s, since a tile
+// can be redrawn a moment later when its candles arrive)
+const LAST_PX = new Map();
+function flashCls(c) {
+  const p = LAST_PX.get(c.id), now = Date.now();
+  if (!p) { LAST_PX.set(c.id, { px: c.current_price, at: 0, dir: "" }); return ""; }
+  if (c.current_price > 0 && p.px !== c.current_price) Object.assign(p, { dir: c.current_price > p.px ? "up" : "down", at: now, px: c.current_price });
+  return now - p.at < 1500 ? ` flash-${p.dir}` : "";
+}
 export function tileHTML(c) {
   const ind = S.ind[c.id], ch = chgOf(c, S.colorBy);
   const sg = signals(ind);
   const label = `${c.name}, ${fmtPrice(c.current_price)}, ${TF(S.colorBy)} ${fmtPct(ch)}, ${sg.good.length} rockets, ${sg.bad.length} cry faces`;
   const stopCls = !ind?.stop ? '' : [ind.stop.longState, ind.stop.shortState].includes('closed') ? ' stop-closed' : [ind.stop.longState, ind.stop.shortState].includes('intraday') ? ' stop-intraday' : '';
-  return `<button class="tile ${heatClass(ch, S.colorBy)}${stopCls}" data-id="${esc(c.id)}" aria-label="${esc(label)}">
+  return `<button class="tile ${heatClass(ch, S.colorBy)}${stopCls}${flashCls(c)}" data-id="${esc(c.id)}" aria-label="${esc(label)}">
     <div class="top">
       <div class="sym">${logo(c, 18)}<span>${esc(c.symbol.toUpperCase())}</span>${verifyMark(c)}${cautionMark(c)}${M.ranked ? `<span class="rk">#${c.market_cap_rank}</span>` : ''}</div>
       <div class="chg">${fmtPct(ch, ch != null && Math.abs(ch) >= 10 ? 1 : 2)}</div>
@@ -323,7 +332,7 @@ export function renderAll() {
   $('#grid').hidden = S.view !== 'grid';
   $('#tablewrap').hidden = S.view !== 'table';
   $('#scorewrap').hidden = S.view !== 'score';
-  $('#grid').classList.toggle('compact', S.density === 'compact');   // small tiles: symbol, change, price
+  $('#grid').classList.toggle('heatmap', S.density === 'heatmap');   // heatmap tiles: colour, symbol, change, price
   $('#density').hidden = S.view !== 'grid';
   if (S.view === 'grid') renderGrid(); else if (S.view === 'table') renderTable(); else renderScorecard();
   renderCounts();

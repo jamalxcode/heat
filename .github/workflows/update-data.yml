@@ -54,6 +54,7 @@ jobs:
           mkdir -p _site/scripts
           cp index.html signals.mjs robots.txt og-image.png og-image-forex.png og-image-metals.png _site/
           cp -r app _site/   # the page script, in modules (app/main.mjs starts it)
+          cp -r fonts _site/   # Inter, self-hosted (no calls to Google)
           # sitemap for search engines: the crypto, forex and metals pages, whose data changes every day
           printf '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>https://heat.sala.company/</loc><lastmod>%s</lastmod><changefreq>hourly</changefreq></url>\n  <url><loc>https://heat.sala.company/forex/</loc><lastmod>%s</lastmod><changefreq>daily</changefreq></url>\n  <url><loc>https://heat.sala.company/metals/</loc><lastmod>%s</lastmod><changefreq>daily</changefreq></url>\n</urlset>\n' "$(date -u +%F)" "$(date -u +%F)" "$(date -u +%F)" > _site/sitemap.xml
           cp scripts/build-data.mjs _site/scripts/   # the page runs it itself if data.json ever goes stale

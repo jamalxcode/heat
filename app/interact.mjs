@@ -299,7 +299,7 @@ export function seg(id, key, after) {
 }
 seg('colorBy', 'colorBy', renderAll);
 seg('view', 'view', () => { hideDetail(true); renderAll(); });
-seg('density', 'density', () => { hideDetail(true); renderAll(); });   // Detailed | Compact tiles (grid view only)
+seg('density', 'density', () => { hideDetail(true); renderAll(); });   // Heatmap | Detailed tiles (grid view only)
 // Forex: USD/… | …/USD. Redraws everything from the same rates, flipped or not (see quoteView)
 $('#quote').hidden = !M.quoteSwitch;
 seg('quote', 'quote', () => { hideDetail(true); if (S.raw) { S.coins = []; show(S.raw, S.mode === 'live'); } });
@@ -307,7 +307,7 @@ seg('quote', 'quote', () => { hideDetail(true); if (S.raw) { S.coins = []; show(
 $('#reset').addEventListener('click', () => {
   hideDetail(true);
   const quoteChanged = M.quoteSwitch && S.quote !== 'market';
-  Object.assign(S, { filter: 'all', heat: null, colorBy: '24h', view: 'grid', density: 'detailed', quote: 'market', pegged: false,
+  Object.assign(S, { filter: 'all', heat: null, colorBy: '24h', view: 'grid', density: 'heatmap', quote: 'market', pegged: false,
     chart: 'price', sort: { key: 'rank', dir: 1 }, scoreWin: 'd30', scoreH: 1, scoreSet: null });
   for (const [id, key] of [['colorBy', 'colorBy'], ['view', 'view'], ['density', 'density'], ['quote', 'quote']])
     $$(`#${id} button`).forEach(b => b.setAttribute('aria-pressed', b.dataset.v === S[key]));

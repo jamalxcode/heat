@@ -14,9 +14,11 @@ test.beforeEach(async ({ page }) => {
   });
   await page.addInitScript(() => {
     localStorage.setItem('hm.wip', String(Date.now()));                       // skip the work-in-progress popup
-    // start on the grid, but keep anything a test saved before a reload (e.g. the chart type)
+    // start on the grid with detailed tiles (most tests read the tile rows), but keep anything a test saved before a
+    // reload (e.g. the chart type); hm.realDefaults: a test of the page's own defaults
     const saved = JSON.parse(localStorage.getItem('hm.prefs') || '{}');
-    localStorage.setItem('hm.prefs', JSON.stringify({ ...saved, view: 'grid', colorBy: '24h' }));
+    const base = localStorage.getItem('hm.realDefaults') ? {} : { tiles: 'detailed', view: 'grid', colorBy: '24h' };
+    localStorage.setItem('hm.prefs', JSON.stringify({ ...base, ...saved, ...(localStorage.getItem('hm.realDefaults') ? {} : { view: 'grid', colorBy: '24h' }) }));
   });
   await page.goto('/');
   await expect(page.locator('#status')).toContainText(`${N}/${N} coins with indicators`);
@@ -393,32 +395,37 @@ test.describe('forex', () => {
   });
 });
 
-test('Compact tiles: symbol, change and price only, many more per row; remembered, linkable, grid view only', async ({ page }) => {
+test('Heatmap tiles are the default: whole tile in its colour, symbol, change, price; Detailed switches back, remembered and linkable', async ({ page }) => {
+  await page.evaluate(() => { localStorage.setItem('hm.realDefaults', '1'); localStorage.removeItem('hm.prefs'); });
   await page.goto('/');
   await expect(page.locator('#status')).toContainText('with indicators');
   const cols = () => page.locator('#grid').evaluate(g => getComputedStyle(g).gridTemplateColumns.split(' ').length);
-  const detailedCols = await cols();
-  await page.locator('#density [data-v="compact"]').click();
-  await expect(page.locator('#grid')).toHaveClass(/compact/);
-  await expect(page).toHaveURL(/\?d=compact$/);
-  expect(await cols()).toBeGreaterThan(detailedCols);
+  await expect(page.locator('#density [data-v="heatmap"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#grid')).toHaveClass(/heatmap/);
+  await expect(page).toHaveURL(/\/$/);
   const t = tile(page, 'alpha-coin');
   await expect(t.locator('.ind')).toBeHidden();
   await expect(t.locator('.name')).toBeHidden();
   await expect(t.locator('.chg')).toBeVisible();
   await expect(t.locator('.px')).toBeVisible();
-  await t.click();                                                                          // the chart card still opens
+  const bg = await t.evaluate(el => [getComputedStyle(el).backgroundColor, getComputedStyle(el).getPropertyValue('--tint').trim()]);
+  expect(bg[1]).not.toBe('');                                                               // filled with its heat colour
+  await t.click();                                                                          // the chart card has the details
   await expect(page.locator('#detail .d-head b')).toHaveText('Alpha Coin');
   await page.locator('#detail .x').click();
+  const heatCols = await cols();
+  await page.locator('#density [data-v="detailed"]').click();
+  await expect(page.locator('#grid')).not.toHaveClass(/heatmap/);
+  await expect(page).toHaveURL(/\?d=detailed$/);
+  expect(await cols()).toBeLessThan(heatCols);
+  await expect(t.locator('.ind')).toBeVisible();
   await page.locator('#view [data-v="table"]').click();
   await expect(page.locator('#density')).toBeHidden();
   await page.goto('/');                                                                     // remembered
-  await expect(page.locator('#grid')).toHaveClass(/compact/);
-  await page.locator('#density [data-v="detailed"]').click();
-  await expect(page.locator('#grid')).not.toHaveClass(/compact/);
-  await page.goto('/?d=compact');                                                           // a link applies for that visit
-  await expect(page.locator('#grid')).toHaveClass(/compact/);
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('hm.prefs')).density)).toBe('detailed');
+  await expect(page.locator('#grid')).not.toHaveClass(/heatmap/);
+  await page.goto('/?d=heatmap');                                                           // a link applies for that visit
+  await expect(page.locator('#grid')).toHaveClass(/heatmap/);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('hm.prefs')).tiles)).toBe('detailed');
 });
 
 test('↺ Reset, right before the market switch, puts every control back to the default view and remembers it', async ({ page }) => {
@@ -427,7 +434,7 @@ test('↺ Reset, right before the market switch, puts every control back to the 
   const reset = page.locator('#reset');
   expect(await reset.evaluate(el => el.nextElementSibling?.id)).toBe('market');
   await page.locator('#pegged').check();
-  await page.locator('#density [data-v="compact"]').click();
+  await page.locator('#density [data-v="detailed"]').click();   // (tests start on detailed; Reset brings heatmap back)
   await page.locator('#filters .chip[data-f="up"]').click();
   await tiles(page).first().click();                                                        // and a chart card open
   await expect(page.locator('#detail')).toHaveClass(/pinned/);
@@ -436,12 +443,12 @@ test('↺ Reset, right before the market switch, puts every control back to the 
   await expect(page.locator('#detail')).not.toHaveClass(/show/);
   await expect(page.locator('#filters .chip[data-f="all"]')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('#colorBy [data-v="24h"]')).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('#density [data-v="detailed"]')).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('#grid')).not.toHaveClass(/compact/);
+  await expect(page.locator('#density [data-v="heatmap"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#grid')).toHaveClass(/heatmap/);
   await expect(page.locator('#pegged')).not.toBeChecked();
   await expect(tiles(page)).toHaveCount(N);
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('hm.prefs')));
-  expect([saved.colorBy, saved.view, saved.density, saved.pegged]).toEqual(['24h', 'grid', 'detailed', false]);
+  expect([saved.colorBy, saved.view, saved.tiles, saved.pegged]).toEqual(['24h', 'grid', 'heatmap', false]);
 });
 
 test.describe('shareable links', () => {
