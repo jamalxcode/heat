@@ -393,6 +393,27 @@ test.describe('forex', () => {
   });
 });
 
+test('emoji size follows each signal\'s Scorecard record: small and grey until proven, full size once it is', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('#status')).toContainText('with indicators');
+  const mark = page.locator('#grid .emo[data-k], #grid .pnf-mark[data-k]').first();
+  await expect(mark).toBeVisible();
+  const k = await mark.getAttribute('data-k');
+  // the page's classes match the rule in signals.mjs, applied to the scorecard it loaded
+  const expected = await page.evaluate(async () => {
+    const SIG = await import('/signals.mjs');
+    const card = await (await fetch('/scorecard.json')).json();
+    return [...SIG.provenSignals(card, SIG.withDefaults(card.params))].sort();
+  });
+  const classes = await page.evaluate(() => [...document.body.classList].filter(c => c.startsWith('proven-')).map(c => c.slice(7)).sort());
+  expect(classes).toEqual(expected);
+  const size = () => mark.evaluate(el => parseFloat(getComputedStyle(el).fontSize));
+  await page.evaluate(k => document.body.classList.remove(`proven-${k}`), k);
+  expect(await size()).toBe(10);
+  await page.evaluate(k => document.body.classList.add(`proven-${k}`), k);
+  expect(await size()).toBe(17);
+});
+
 // Relative strength and volume rows (Bollinger width is gone from the tiles; the bands stay in the chart)
 test.describe('relative strength and volume', () => {
   const row = (page, id, k) => tile(page, id).locator('.row', { has: page.locator(`.k:text-is("${k}")`) });

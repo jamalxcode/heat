@@ -168,6 +168,23 @@ export function scoreOf(active, p) {
   return { good, bad, score: good.length - bad.length };
 }
 
+// Which scored signals have earned a full-size emoji: over all scored history, the signal's move vs the market, in the
+// direction of its role (🚀 up, 😢 down), averaged over the 1/3/7-day horizons, reaches t ≥ minT ("consistent" on the
+// Scorecard). Anything else is shown small and grey. card: a scorecard; p: the settings the page uses.
+export const PROVEN_T = 2;
+export function provenSignals(card, p, minT = PROVEN_T) {
+  const P = withDefaults(p), out = new Set(), w = card?.windows?.all;
+  if (!w) return out;
+  for (const k of SCORED) {
+    const sign = Math.sign(P.weights[k] || 0);
+    if (!sign) continue;
+    const cs = HORIZONS.map(h => w[h]?.components?.[k]);
+    if (cs.some(c => !(c?.n >= 20) || c.t == null)) continue;
+    if (cs.reduce((s, c) => s + c.t * sign, 0) / cs.length >= minT) out.add(k);
+  }
+  return out;
+}
+
 /* ---------- benchmarks for relative strength ---------- */
 // The benchmark's close on each of an asset's days (ascending UTC day numbers), from a Map(day → close), carried
 // forward over the benchmark's gaps; null before its first close

@@ -101,11 +101,11 @@ export function emojiHTML(ind) {
   const fired = [...(ind?.sig?.good || []), ...(ind?.sig?.bad || [])].filter(k => NAME_SIGNALS.includes(k));
   const trend = fired.filter(k => k.startsWith('trend')), mom = fired.filter(k => MOM_EMO[k]);
   const trendTitle = trend.map(k => `${roleOf(k)} ${SIG.COMPONENTS[k]}`).join(' · ');
-  const trendHTML = trend.length ? `<span class="emo" title="${esc(trendTitle)}" aria-label="${esc(trendTitle)}">${trend.map(roleOf).join('')}</span>` : '';
+  const trendHTML = trend.length ? `<span class="emo" data-k="${trend[0]}" title="${esc(trendTitle)}" aria-label="${esc(trendTitle)}">${trend.map(roleOf).join('')}</span>` : '';
   const m30 = ind?.chg?.['30d'];
   const momHTML = mom.map(k => {
     const t = `${MOM_EMO[k]} ${SIG.COMPONENTS[k]}${m30 != null ? ` (${fmtPct(m30, 1)} in ${M.days(P().momDays)})` : ''}: counts as a ${call(k)}`;
-    return `<span class="emo mom" title="${esc(t)}" aria-label="${esc(t)}">${MOM_EMO[k]}</span>`;
+    return `<span class="emo mom" data-k="${k}" title="${esc(t)}" aria-label="${esc(t)}">${MOM_EMO[k]}</span>`;
   }).join('');
   return trendHTML + pnfMark(ind) + momHTML;
 }
@@ -118,7 +118,7 @@ export function pnfMark(ind) {
   const title = `Point & figure: ${f.dir === 'X' ? 'rising (X)' : 'falling (O)'} column, ${f.boxes} boxes since ${new Date(ind.t[f.since]).toISOString().slice(0, 10)}: counts as a ${call(k)}. `
     + `Next ${f.dir} at a close ${f.dir === 'X' ? 'above' : 'below'} ${fmtPrice(f.next)}; flips to ${f.dir === 'X' ? 'O below' : 'X above'} ${fmtPrice(f.reverse)}.`
     + (s ? ` Latest signal: ${s.type === 'buy' ? 'double-top buy' : 'double-bottom sell'}.` : '');
-  return `<span class="pnf-mark pnf-${f.dir}" title="${esc(title)}" aria-label="${esc(title)}">${PNF_EMO[f.dir]}</span>`;
+  return `<span class="pnf-mark pnf-${f.dir}" data-k="${k}" title="${esc(title)}" aria-label="${esc(title)}">${PNF_EMO[f.dir]}</span>`;
 }
 
 // ✓ = price history comes from a trading pair confirmed by the coin's CoinGecko ID; ? = matched by ticker only
@@ -176,8 +176,9 @@ export function edgeLegend() {
   return `<span class="leg-item edge ${e.proven ? 'ok' : 'weak'}">Track record, last 90 days: 🚀 coins went up next day ${pc(e.rocketsUp)} of the time vs ${pc(e.baseUp)} for all coins. Verdict: ${verdict} <a href="#" data-goto-score>(Scorecard)</a></span>`;
 }
 export function applyEdge() {
-  const e = signalEdge();
-  document.body.classList.toggle('signals-unproven', !!e && !e.proven);
+  // each emoji's size follows its own record: full size once the Scorecard shows it works, small and grey until then
+  S.proven = SIG.provenSignals(S.scorecard, P());
+  for (const k of SIG.SCORED) document.body.classList.toggle(`proven-${k}`, S.proven.has(k));
 }
 
 export function renderLegend() {
@@ -191,7 +192,7 @@ export function renderLegend() {
   $('#legendEdge').innerHTML = edgeBadge();
   // The one place that explains the page: what a tile shows, then the current rules and track record
   $('#legendMore').innerHTML = `
-    <p class="leg-read"><b>What the emoji mean.</b> 🚀/😢, X📈/O📉 and 🔥/🧊 describe a ${M.one}'s <b>current conditions</b> (its trend, point &amp; figure column and momentum), <b>not predictions</b>. The <a href="#" data-goto-score>Scorecard</a> checks every day whether they would have predicted the next moves; so far they haven't reliably, so read them as a quick summary of the chart, not as advice.</p>
+    <p class="leg-read"><b>What the emoji mean.</b> 🚀/😢, X📈/O📉 and 🔥/🧊 describe a ${M.one}'s <b>current conditions</b> (its trend, point &amp; figure column and momentum), <b>not predictions</b>. The <a href="#" data-goto-score>Scorecard</a> checks every day whether they would have predicted the next moves. <b>Size shows the record:</b> a mark is full size and in colour only once the Scorecard shows it works; small and grey means not proven, so read it as a quick summary of the chart, not as advice.</p>
     <p class="leg-read"><b>Reading a tile.</b> <b>RSI</b>: the marker shows where RSI sits on 0–100; below the lower line is <i>oversold</i>, above the upper line <i>overbought</i>.
       <b>MA</b>: the fast moving average above the slow one is an uptrend, below is a downtrend; "strong" means the price agrees, "pullback" or "bounce" that it doesn't; ✦ marks a golden or death cross in the last 14 days.
       <b>RS</b>: relative strength, the ${M.one}'s move over ${P().momDays === 30 ? 'the last 30 days' : 'about a month'} minus ${M.bench ? `${M.benchLabel}'s` : 'the average of every pair'} ("beating" / "trailing" past ±${P().rsPct}%).

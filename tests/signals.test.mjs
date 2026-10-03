@@ -296,3 +296,21 @@ test('pickUniverse: drops stablecoins and wrapped copies', () => {
   ];
   assert.deepEqual(S.pickUniverse(m, { stable: [], gold: [] }).map(c => c.id), ['bitcoin']);
 });
+
+test('provenSignals: full-size emoji only for a signal right in its own direction, t ≥ 2 on average over 1/3/7 days', () => {
+  const comp = t => ({ n: 500, t });
+  const card = ts => ({ windows: { all: Object.fromEntries([1, 3, 7].map((h, i) => [h, { components: Object.fromEntries(Object.entries(ts).map(([k, v]) => [k, comp(v[i])])) }])) } });
+  const p = S.withDefaults({ weights: { trendUp: 1, trendDown: -1, momUp: 1, momDown: -1, pnfUp: 0, oversold: 1 } });
+  const got = S.provenSignals(card({
+    trendUp: [2.5, 2.2, 1.6],     // 🚀, average 2.1: proven
+    trendDown: [-3, -2.5, -2],    // 😢 and price did fall: proven
+    momUp: [3, 1, 1],             // average 1.67: not yet
+    momDown: [3, 3, 3],           // a 😢 that kept rising: pointing the wrong way, not proven
+    pnfUp: [5, 5, 5],             // switched off: no emoji at all
+    oversold: [9, 9, 9],          // not a scored signal: never
+  }), p);
+  assert.deepEqual([...got].sort(), ['trendDown', 'trendUp']);
+  assert.equal(S.provenSignals(null, p).size, 0, 'no scorecard (metals): nothing proven');
+  const few = card({ trendUp: [5, 5, 5] }); few.windows.all[7].components.trendUp.n = 5;
+  assert.equal(S.provenSignals(few, p).size, 0, 'too few cases on one horizon');
+});
