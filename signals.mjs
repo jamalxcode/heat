@@ -611,7 +611,7 @@ const isoDay = d => new Date(d * DAY).toISOString().slice(0, 10);
 //   shown after costs; it doesn't change the rank-based verdicts.
 // universe: { 'YYYY-MM-DD': [ids] }, the coins that were in the list on each day. Rows for days with a snapshot are
 //   also scored point-in-time (only coins that were in that day's list), which removes survivorship bias.
-export function buildScorecard(coins, current, { prev = null, tuneNow = false, now = Date.now(), momPcts, costPct = 0, universe = null } = {}) {
+export function buildScorecard(coins, current, { prev = null, tuneNow = false, now = Date.now(), momPcts, costPct = 0, universe = null, extra = null, backfill = null } = {}) {
   const params = withDefaults(current);
   const rows = signalRows(coins, params);
   const lastDay = Math.max(...rows.filter(r => r.ret[1] != null).map(r => r.day)); // latest close whose next day is complete
@@ -658,14 +658,34 @@ export function buildScorecard(coins, current, { prev = null, tuneNow = false, n
     windows: { d30: perH(since(30)), d90: perH(since(90)), all: perH(rows) },
     daily, tuning, costs: { roundTrip: costPct },
   };
-  // Point-in-time: only coin-days where the coin was in that day's list (snapshots start when recording began)
+  // Point-in-time: each day judged on the coins that were in that day's list, including those that have since left
+  // the top 100 (`extra`), and compared only with each other. Lists before recording began may be rebuilt
+  // (`backfill`: scripts/backfill-universe.mjs).
   if (universe) {
     const inList = new Map(Object.entries(universe).map(([d, ids]) => [d, new Set(ids)]));
-    const pit = rows.filter(r => inList.get(isoDay(r.day))?.has(r.id));
-    const pitDays = new Set(pit.map(r => r.day));
-    card.pit = { days: pitDays.size, from: pitDays.size ? isoDay(Math.min(...pitDays)) : null, windows: pit.length ? { all: perH(pit) } : null };
+    const all = extra?.length ? signalRows([...coins, ...extra], params) : rows;
+    const pit = rebaseExcess(all.filter(r => inList.get(isoDay(r.day))?.has(r.id)));
+    const pitDays = new Set(pit.map(r => r.day)), inTopNow = new Set(coins.map(c => c.id));
+    card.pit = {
+      days: pitDays.size, from: pitDays.size ? isoDay(Math.min(...pitDays)) : null,
+      left: new Set(pit.filter(r => !inTopNow.has(r.id)).map(r => r.id)).size,   // coins scored here that are no longer in the top 100
+      backfill: backfill || null,
+      windows: pit.length ? { all: perH(pit) } : null,
+    };
   }
   return { card, newParams };
+}
+
+// The move vs the market recomputed against only these rows (e.g. the coins in each day's list), on copies
+function rebaseExcess(rows) {
+  const out = rows.map(r => ({ ...r, mkt: {}, exc: {} }));
+  for (const list of byDay(out).values()) {
+    for (const h of HORIZONS) {
+      const g = list.filter(r => r.ret[h] != null), m = g.length ? mean(g.map(r => r.ret[h])) : null;
+      for (const r of list) { r.mkt[h] = m; r.exc[h] = r.ret[h] == null ? null : r.ret[h] - m; }
+    }
+  }
+  return out;
 }
 
 /* ---------- universe (same exclusions as the page) ---------- */

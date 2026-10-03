@@ -10,6 +10,7 @@ import * as SIG from '../signals.mjs';
 const SITE = process.env.SITE_URL || 'https://heat.sala.company';
 const HISTORY = 1000;                       // ~2.7 years of daily candles for scoring and tuning
 const DAY = 864e5;
+const isoDay = d => new Date(d * DAY).toISOString().slice(0, 10);
 const root = new URL('../', import.meta.url);
 const readJSON = async (path, fallback) => { try { return JSON.parse(await readFile(new URL(path, root), 'utf8')); } catch { return fallback; } };
 
@@ -34,15 +35,13 @@ if (pairIds.length) {
   console.log(`Pairs by ID: fetched ${Object.keys(fresh).length}/${pairIds.length}, ${Object.values(fresh).filter(p => Object.keys(p).length).length} with at least one exchange`);
 }
 
-// 3. Long daily history, complete days only (today's candle is still forming), gaps forward-filled
-const coins = [], missing = [];
-let verified = 0;
-await pool(universe, 5, async c => {
+// 3. Long daily history, complete days only (today's candle is still forming), gaps forward-filled.
+// allowCG: fall back to CoinGecko's candles (today's list only, to keep within its free plan)
+async function history(c, allowCG) {
   let h = await fromExchanges(c, snap.hist?.[c.id]?.src, HISTORY, pairsFile.pairs);
-  if (!h) { try { h = await fromCoinGecko(c, HISTORY); } catch { h = null; } }
+  if (!h && allowCG) { try { h = await fromCoinGecko(c, HISTORY); } catch { h = null; } }
   const closes = (h?.closes || []).filter(([t]) => Math.floor(t / DAY) < today);
-  if (closes.length < 260) { missing.push(c.symbol.toUpperCase()); return; }
-  if (h.verified) verified++;
+  if (closes.length < 260) return null;
   const byDay = new Map(closes.map(([t, v, vol]) => [Math.floor(t / DAY), [v, vol]]));
   const days = [...byDay.keys()].sort((a, b) => a - b), filled = [], vols = [];
   let last = byDay.get(days[0])[0];
@@ -52,24 +51,50 @@ await pool(universe, 5, async c => {
     filled.push(last);
     vols.push(x?.[1] > 0 ? x[1] : null);   // a gap has no volume (the close is carried forward, the volume isn't)
   }
-  coins.push({ id: c.id, symbol: c.symbol.toUpperCase(), name: c.name, t0: days[0] * DAY, c: filled, v: vols });
+  return { id: c.id, symbol: c.symbol.toUpperCase(), name: c.name, t0: days[0] * DAY, c: filled, v: vols, verified: h.verified };
+}
+const coins = [], missing = [];
+await pool(universe, 5, async c => { const h = await history(c, true); if (h) coins.push(h); else missing.push(c.symbol.toUpperCase()); });
+const verified = coins.filter(c => c.verified).length;
+
+// 4. Point-in-time lists: record today's top 100, so the scorecard can also judge each day using only the coins that
+// were in the list on that day (scoring today's list alone flatters the signals: coins are there because they rose).
+// Every coin in a recorded list is scored, not only today's: a coin that later fell out of the top 100 must still
+// count on the days it was in it, or the losers quietly disappear from the check.
+const isoToday = new Date(today * DAY).toISOString().slice(0, 10);
+const uniHist = await readJSON('data/universe-history.json', { v: 1, days: {} });
+uniHist.days[isoToday] = universe.map(c => c.id);
+uniHist.coins ||= {};
+for (const c of universe) uniHist.coins[c.id] = { symbol: c.symbol, name: c.name };
+const since = isoDay(today - HISTORY);
+const inToday = new Set(universe.map(c => c.id));
+const extraIds = [...new Set(Object.entries(uniHist.days).filter(([d]) => d >= since).flatMap(([, ids]) => ids))].filter(id => !inToday.has(id));
+// their current price (the candle sources are checked against it): today's markets list, else one CoinGecko request
+const live = new Map(snap.markets.map(c => [c.id, c]));
+const priceless = extraIds.filter(id => !live.get(id)?.current_price);
+const prices = {};
+for (let i = 0; i < priceless.length; i += 200) {
+  try { Object.assign(prices, await getJSON(`https://api.coingecko.com/api/v3/simple/price?vs_currencies=usd&ids=${priceless.slice(i, i + 200).map(encodeURIComponent).join(',')}`, { tries: 1 })); }
+  catch (e) { console.log('Prices for past-list coins failed: ' + e.message); }
+}
+const extra = [], extraMissing = [];
+await pool(extraIds, 5, async id => {
+  const meta = live.get(id) || { id, ...uniHist.coins[id], current_price: prices[id]?.usd };
+  if (!meta.symbol || !(meta.current_price > 0)) { extraMissing.push(id); return; }
+  const h = await history(meta, false);
+  if (h) extra.push(h); else extraMissing.push(id);
 });
 // Relative strength is measured against Bitcoin
 const btc = coins.find(c => c.id === 'bitcoin');
 if (btc) {
   const b0 = btc.t0 / DAY, byDayBtc = new Map(btc.c.map((v, i) => [b0 + i, v]));
-  for (const c of coins) c.bench = SIG.alignBench(c.c.map((_, i) => c.t0 / DAY + i), byDayBtc);
+  for (const c of [...coins, ...extra]) c.bench = SIG.alignBench(c.c.map((_, i) => c.t0 / DAY + i), byDayBtc);
 }
 console.log(`History for ${coins.length}/${universe.length} coins (${verified} on pairs verified by ID, ${coins.filter(c => c.v.some(Boolean)).length} with volume)${btc ? '' : ' · no Bitcoin history: relative strength not measured'}${missing.length ? ' · none for ' + missing.join(', ') : ''}`);
-
-// 4. Point-in-time list: record today's top 100, so the scorecard can also judge each day using only the coins that
-// were in the list on that day (scoring today's list alone flatters the signals: coins are there because they rose)
-const isoToday = new Date(today * DAY).toISOString().slice(0, 10);
-const uniHist = await readJSON('data/universe-history.json', { v: 1, days: {} });
-uniHist.days[isoToday] = universe.map(c => c.id);
+console.log(`Past-list coins no longer in the top 100: ${extra.length}/${extraIds.length} with history${extraMissing.length ? ` (none for ${extraMissing.length})` : ''}`);
 
 // 5. Score, and tune on Sundays (or when asked, or the first time). Costs: ~0.1% per side on a large exchange.
-const { card, newParams } = SIG.buildScorecard(coins, params, { prev, tuneNow, costPct: 0.002, universe: uniHist.days });
+const { card, newParams } = SIG.buildScorecard(coins, params, { prev, tuneNow, costPct: 0.002, universe: uniHist.days, extra, backfill: uniHist.backfill });
 
 await mkdir(new URL('data/', root), { recursive: true });
 await writeFile(new URL('data/scorecard.json', root), JSON.stringify(card));

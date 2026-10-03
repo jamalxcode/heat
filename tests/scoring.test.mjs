@@ -70,3 +70,18 @@ test('freshness check: each limit catches stale data and passes fresh data', () 
     assert.ok(age(stale) > limit, `${file}: stale data fails "${what}"`);
   }
 });
+
+test('point-in-time: a coin that left the top 100 still counts on the days it was in the list; moves compared within the list', () => {
+  const iso = d => new Date(d * 864e5).toISOString().slice(0, 10);
+  const mk = (id, drift, k) => ({ id, symbol: id.toUpperCase(), t0: 0, c: Array.from({ length: 320 }, (_, i) => 100 * (1 + drift) ** i * (1 + 0.02 * Math.sin(i / k))) });
+  const coins = [mk('a', 0.003, 3), mk('b', 0.001, 5)], extra = [mk('gone', -0.004, 4)];
+  const universe = {};
+  for (let d = 250; d < 320; d++) universe[iso(d)] = ['a', 'gone'];          // 'b' joined only today; 'gone' has left
+  const { card } = S.buildScorecard(coins, null, { prev: { tuning: { lastRun: '2026-01-01T00:00:00Z', history: [] } }, universe, extra, backfill: { to: iso(300), limit: 300 } });
+  assert.equal(card.pit.left, 1, "'gone' is scored on its list days");
+  assert.ok(card.pit.days >= 60 && card.pit.days <= 70, `${card.pit.days} list days scored`);
+  assert.equal(card.pit.backfill.limit, 300);
+  assert.equal(card.windows.all[1].rows < 2 * 120, true, "the main figures still use today's list only");
+  const without = S.buildScorecard(coins, null, { prev: { tuning: { lastRun: '2026-01-01T00:00:00Z', history: [] } }, universe });
+  assert.equal(without.card.pit.left, 0, 'before the fix: the coin that left was silently missing');
+});

@@ -133,7 +133,11 @@ export function renderScorecard() {
   const cost = sc.costs?.roundTrip ?? null;
   const pit = sc.pit;
   const pitW = pit?.windows?.all?.[h];
-  const pitHTML = !pit ? '' : `<p class="sc-muted"><b>Point-in-time check:</b> ${pit.days} day${pit.days === 1 ? '' : 's'} scored so far using only the ${M.noun} that were in the list on each day (recording since ${pit.from ?? 'today'}). ${pit.days >= 60 && pitW ? `Verdict on those days: <b>${icVerdict(pitW.ic)}</b> (t = ${pitW.ic.t?.toFixed(1) ?? '—'}).` : 'A verdict needs about 60 days; until then the figures above use today’s list, which flatters the 🚀 (coins are in it because they rose).'}</p>`;
+  // which days are rebuilt (scripts/backfill-universe.mjs) and which recorded each night
+  const pitSrc = !pit ? '' : pit.backfill
+    ? `lists up to ${pit.backfill.to} rebuilt from CoinGecko market caps (coins that have since collapsed out of today’s top ${pit.backfill.limit} may be missing, so a small flattering bias remains), recorded each night after that`
+    : `recording since ${pit.from ?? 'today'}`;
+  const pitHTML = !pit ? '' : `<p class="sc-muted"><b>Point-in-time check:</b> ${pit.days} day${pit.days === 1 ? '' : 's'} scored using only the ${M.noun} that were in the list on each day${pit.left ? `, including ${pit.left} that have since left the top 100` : ''} (${pitSrc}). ${pit.days >= 60 && pitW ? `Verdict on those days: <b>${icVerdict(pitW.ic)}</b> (t = ${pitW.ic.t?.toFixed(1) ?? '—'}).` : 'A verdict needs about 60 days; until then the figures above use today’s list, which flatters the 🚀 (coins are in it because they rose).'}</p>`;
   const t = sc.tuning || {}, last = t.last;
   const foldsHTML = last?.folds ? `<ul>${last.folds.map(f => `<li>${f.from} → ${f.to}: current ${f.before?.toFixed(3) ?? '—'} vs candidate ${f.after?.toFixed(3) ?? '—'} ${f.won ? '✅' : '❌'}</li>`).join('')}</ul>` : '';
   const tuneHTML = !t.lastRun || !last ? '<p class="sc-muted">The tuner hasn\'t run yet. It runs every Sunday.</p>' : `

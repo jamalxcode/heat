@@ -1,0 +1,54 @@
+# One-off, started by hand: rebuild the daily top-100 lists before recording began (scripts/backfill-universe.mjs),
+# so the Scorecard's point-in-time check doesn't have to wait ~60 days. Run it with "dry run" first (5 coins, writes
+# no lists), then for real. Gentle on CoinGecko's free plan: 10 requests a minute, a hard cap, stops at the first
+# "too many requests", and saves progress after every coin, so running it again resumes.
+name: Backfill daily lists (one-off)
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Dry run (5 coins, no lists written)
+        type: boolean
+        default: true
+      limit:
+        description: How many of today's top coins to use as candidates
+        default: '300'
+      days:
+        description: How many days back
+        default: '90'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: score            # never at the same time as the nightly scorer, which writes the same file
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Rebuild the daily lists
+        env:
+          COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
+        run: node scripts/backfill-universe.mjs ${{ inputs.dry_run && '--dry-run' || '' }} --limit "${{ inputs.limit }}" --days "${{ inputs.days }}"
+
+      # saved even when the run stopped early, so the next run resumes instead of asking CoinGecko again
+      - name: Commit progress and lists
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for f in data/backfill-cache.json data/universe-history.json; do [ -f "$f" ] && git add "$f"; done
+          if git diff --cached --quiet; then echo "Nothing changed"; exit 0; fi
+          git commit -m "chore: backfill daily lists ($([ '${{ inputs.dry_run }}' = 'true' ] && echo 'dry run' || echo 'full'))"
+          git pull --rebase --quiet
+          git push

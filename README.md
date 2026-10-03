@@ -80,7 +80,7 @@ Statistics cap moves at ±30% a day (wider for 3 and 7 days), so a bad price pri
 - **Conditions, not predictions:** the emoji describe a coin's current trend, point & figure column and momentum. The Scorecard tests whether they would have predicted anything, and the page says so (**ⓘ How to read**).
 - **Costs:** results are also shown after an estimated round-trip trading cost: about 0.2% for crypto (0.1% each way on a large exchange) and about 0.05% for forex (the spread). A small edge can disappear after costs.
 - **Untouched holdout:** the tuner never sees the newest 90 days (see Self-tuning).
-- **Point-in-time list:** scoring today's top 100 flatters the 🚀, because coins make the list *by* rising. From Oct 2026 the scorer records each day's list (`data/universe-history.json`) and scores those coin-days separately. A verdict needs about 60 days of records.
+- **Point-in-time list:** scoring today's top 100 flatters the 🚀, because coins make the list *by* rising. Since 1 Oct 2026 the scorer records each day's list (`data/universe-history.json`), and the days before that are rebuilt once from CoinGecko's daily market caps of the top 300 coins (`scripts/backfill-universe.mjs`, run by hand through the *Backfill daily lists* workflow; a coin that has since collapsed out of the top 300 may be missing, so a small bias remains). The check judges each day on the coins in that day's list, **including coins that have since left the top 100** (their history comes from the exchanges), compared only with each other. A verdict needs about 60 days.
 - **Unusual jumps** in currency rates are flagged; those in the community feed are left out of the scoring (see Forex).
 
 ## Forex: heat.sala.company/forex/
@@ -140,6 +140,7 @@ GitHub Actions: daily 00:20 UTC (via cron-job.org)
 | `scripts/score-forex.mjs` | Daily forex scorecard and weekly tuning |
 | `scripts/build-metals.mjs` | Builds `metals.json` in the deploy job: gold, silver, platinum and palladium (exchange-api history refetched hourly, Swissquote current prices and a daily cross-check every build) plus PAXG, XAUT and Bitcoin copied from `data.json` |
 | `scripts/health.mjs` | Builds `health.json`, the sources health line in every page's footer |
+| `scripts/backfill-universe.mjs`, `data/backfill-cache.json` | One-off: rebuilds the daily top-100 lists before recording began, gently (10 CoinGecko requests a minute, capped, resumable) |
 | `scripts/tradingview.mjs` | TradingView chart links: candidate symbols per asset, checked in the deploy job and cached in `tv.json`; the page imports it to pick the link |
 | `scripts/market-page.mjs`, `seo/` | Makes `/forex/` and `/metals/` from `index.html`, swapping in each market's search tags, About/FAQ and source credits |
 | `params-forex.json`, `data/forex-scorecard.json`, `data/forex-extras.json` | Forex signal settings, the latest forex scorecard, and the cached extra-feed rates |
