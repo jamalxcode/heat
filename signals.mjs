@@ -4,7 +4,13 @@
 export const DEFAULT_PARAMS = {
   rsiPeriod: 14, rsiLow: 30, rsiHigh: 70,
   maFast: 50, maSlow: 200,
-  bbPeriod: 20, bbK: 2, bbLookback: 180, bbTightPct: 10, bbWidePct: 80,
+  bbPeriod: 20, bbK: 2,          // Bollinger Bands: drawn in the price chart only, not a signal
+  // Relative strength: over the same momDays window, the asset's move beat (rsUp) or trailed (rsDown) its benchmark's
+  // by rsPct% or more. Benchmark: Bitcoin for crypto, an equal-weight basket of every pair for forex, gold for metals.
+  rsPct: 10,
+  // Volume surge: the average volume of the last volShort days is at least volRatio × that of the volLong days before,
+  // while price rose (volUp) or fell (volDown) over those volShort days. Crypto only: forex has no central volume.
+  volShort: 7, volLong: 30, volRatio: 1.5,
   // Recommended stop-loss: stopMult × the coin's average daily move over the last stopLookback days
   stopMult: 2, stopLookback: 20,
   // Momentum: the move over the last momDays candles is above +momPct% (momUp) or below −momPct% (momDown).
@@ -12,12 +18,15 @@ export const DEFAULT_PARAMS = {
   momPct: 20, momDays: 30,
   // +1 = counts as a 🚀, -1 = counts as a 😢, 0 = switched off. The tuner may flip or disable a signal.
   // Only what's shown next to the name is scored: the moving-average trend (🚀 / 😢), the point & figure trend
-  // (X📈 / O📉) and 30-day momentum (🔥 / 🧊). RSI and Bollinger width stay in the tiles as information: the tuner
-  // still measures them and logs what it would do, but keeps them off.
-  weights: { trendUp: 1, oversold: 0, trendDown: -1, overbought: 0, bbWide: 0, momUp: 1, momDown: -1, pnfUp: 1, pnfDown: -1 },
+  // (X📈 / O📉) and 30-day momentum (🔥 / 🧊). RSI stays in the tiles as information, and relative strength and
+  // volume are being tested: the tuner measures them and logs what it would do, but keeps them off.
+  weights: { trendUp: 1, oversold: 0, trendDown: -1, overbought: 0, momUp: 1, momDown: -1, pnfUp: 1, pnfDown: -1, rsUp: 0, rsDown: 0, volUp: 0, volDown: 0 },
 };
 // The signals that may count as a 🚀 / 😢 call (the tuner can flip or disable them, but never switch on the others)
 export const SCORED = ['trendUp', 'trendDown', 'momUp', 'momDown', 'pnfUp', 'pnfDown'];
+// New signals on trial: scored on the Scorecard every night, never counted as 🚀 / 😢. They may be missing (no
+// benchmark, no volume data) without the rest of that day being left out of the scoring.
+export const TESTING = ['rsUp', 'rsDown', 'volUp', 'volDown'];
 
 // Directional signals: each one adds a 🚀 or a 😢 (or nothing while its weight is 0)
 export const COMPONENTS = {
@@ -25,17 +34,18 @@ export const COMPONENTS = {
   oversold:   'RSI oversold',
   trendDown:  'strong downtrend',
   overbought: 'RSI overbought',
-  bbWide:     'wide Bollinger band',
   momUp:      'strong 1-month momentum',
   momDown:    'weak 1-month momentum',
   pnfUp:      'point & figure rising (X column)',
   pnfDown:    'point & figure falling (O column)',
+  rsUp:       'beating its benchmark',
+  rsDown:     'trailing its benchmark',
+  volUp:      'rising on growing volume',
+  volDown:    'falling on growing volume',
 };
 
 // Stop distances the tuner compares (× the average daily move)
 export const STOP_MULTS = [1.5, 2, 2.5];
-// Non-directional: a Bollinger squeeze says a big move is likely, not which way, so it's ⚡ rather than 🚀 or 😢
-export const SQUEEZE_LABEL = 'tight Bollinger band (big move likely, direction unknown)';
 
 // How far ahead each signal is judged, in days
 export const HORIZONS = [1, 3, 7];
@@ -88,38 +98,49 @@ export function bollinger(a, n = 20, k = 2) {
   return { mid, up, lo, w };
 }
 
-// Percentile rank (0-100) of each width within its trailing `lookback` window, current value included
-export function rollingPct(w, lookback) {
-  const out = new Array(w.length).fill(null);
-  for (let i = 0; i < w.length; i++) {
-    if (w[i] == null) continue;
-    let n = 0, below = 0;
-    for (let j = Math.max(0, i - lookback + 1); j <= i; j++) if (w[j] != null) { n++; if (w[j] <= w[i]) below++; }
-    if (n >= 20) out[i] = below / n * 100;
-  }
-  return out;
-}
-
-export function series(closes, p) {
+// extra.bench: the benchmark's close on each of these candles (alignBench); extra.vol: each candle's volume
+// (null where unknown, e.g. today's candle, still forming)
+export function series(closes, p, { bench = null, vol = null } = {}) {
   const P = withDefaults(p);
-  const bb = bollinger(closes, P.bbPeriod, P.bbK);
   return {
     c: closes,
     rsi: rsi(closes, P.rsiPeriod),
     maF: sma(closes, P.maFast),
     maS: sma(closes, P.maSlow),
-    bb,
-    bbPct: rollingPct(bb.w, P.bbLookback),
+    bb: bollinger(closes, P.bbPeriod, P.bbK),
+    b: bench,
+    v: vol,
   };
+}
+
+// Relative strength and volume surge at candle i:
+//   rs  = how much more (or less) the asset moved than its benchmark over momDays, in % (null without a benchmark)
+//   vol = { ratio: recent average volume ÷ the volLong days before, move: % price move over the recent days }
+//         (null without enough volume data: at least half the days in each window must have a volume)
+export function extrasAt(s, i, p) {
+  const P = withDefaults(p), d = P.momDays, b = s.b, v = s.v;
+  const rs = b && i >= d && b[i] > 0 && b[i - d] > 0 ? ((s.c[i] / s.c[i - d]) / (b[i] / b[i - d]) - 1) * 100 : null;
+  let vol = null;
+  if (v && i >= P.volShort + P.volLong) {
+    const avg = (from, to) => {
+      let sum = 0, n = 0;
+      for (let k = from; k <= to; k++) if (v[k] > 0) { sum += v[k]; n++; }
+      return n * 2 >= to - from + 1 ? sum / n : null;
+    };
+    const recent = avg(i - P.volShort + 1, i), before = avg(i - P.volShort - P.volLong + 1, i - P.volShort);
+    if (recent != null && before) vol = { ratio: recent / before, move: (s.c[i] / s.c[i - P.volShort] - 1) * 100 };
+  }
+  return { rs, vol };
 }
 
 // Which signals are on at candle i (null = not enough history for that signal)
 export function componentsAt(s, i, p) {
   const P = withDefaults(p);
-  const c = s.c[i], r = s.rsi[i], f = s.maF[i], sl = s.maS[i], q = s.bbPct[i];
+  const c = s.c[i], r = s.rsi[i], f = s.maF[i], sl = s.maS[i];
   const trend = f != null && sl != null;
   const md = P.momDays, m30 = i >= md ? (c / s.c[i - md] - 1) * 100 : null;
   const pf = pnfDirAt(s.c, i);
+  const { rs, vol } = extrasAt(s, i, P);
   return {
     pnfUp:      pf ? pf === 'X' : null,
     pnfDown:    pf ? pf === 'O' : null,
@@ -129,8 +150,10 @@ export function componentsAt(s, i, p) {
     trendDown:  trend ? f < sl && c < f : null,
     oversold:   r != null ? r < P.rsiLow : null,
     overbought: r != null ? r > P.rsiHigh : null,
-    bbWide:     q != null ? q >= P.bbWidePct : null,
-    squeeze:    q != null ? q <= P.bbTightPct : null,
+    rsUp:       rs != null ? rs >= P.rsPct : null,
+    rsDown:     rs != null ? rs <= -P.rsPct : null,
+    volUp:      vol ? vol.ratio >= P.volRatio && vol.move > 0 : null,
+    volDown:    vol ? vol.ratio >= P.volRatio && vol.move < 0 : null,
   };
 }
 
@@ -138,11 +161,44 @@ export function scoreOf(active, p) {
   const P = withDefaults(p);
   const good = [], bad = [];
   for (const k of Object.keys(COMPONENTS)) {
-    if (!active[k]) continue;
+    if (!active[k] || TESTING.includes(k)) continue;   // signals on trial never count
     const wgt = P.weights[k] || 0;
     if (wgt > 0) good.push(k); else if (wgt < 0) bad.push(k);
   }
-  return { good, bad, score: good.length - bad.length, squeeze: !!active.squeeze };
+  return { good, bad, score: good.length - bad.length };
+}
+
+/* ---------- benchmarks for relative strength ---------- */
+// The benchmark's close on each of an asset's days (ascending UTC day numbers), from a Map(day → close), carried
+// forward over the benchmark's gaps; null before its first close
+export function alignBench(days, benchByDay) {
+  const keys = [...benchByDay.keys()].sort((a, b) => a - b), out = [];
+  let j = -1, last = null;
+  for (const d of days) {
+    while (j + 1 < keys.length && keys[j + 1] <= d) last = benchByDay.get(keys[++j]);
+    out.push(last);
+  }
+  return out;
+}
+// Equal-weight basket: each day the index moves by the average % change of every series that closed that day and on
+// its previous close. list: [{ days, c }] → Map(day → index level, starting at 100)
+export function basketIndex(list) {
+  const chg = new Map();
+  for (const { days, c } of list) {
+    for (let i = 1; i < c.length; i++) {
+      if (!(c[i] > 0 && c[i - 1] > 0)) continue;
+      if (!chg.has(days[i])) chg.set(days[i], []);
+      chg.get(days[i]).push(c[i] / c[i - 1]);
+    }
+  }
+  const out = new Map();
+  let level = 100;
+  for (const d of [...chg.keys()].sort((a, b) => a - b)) {
+    const g = chg.get(d);
+    level *= g.reduce((s, x) => s + x, 0) / g.length;
+    out.set(d, level);
+  }
+  return out;
 }
 
 /* ---------- recommended stop-loss ---------- */
@@ -240,20 +296,23 @@ const cap = h => 0.3 * Math.sqrt(h);   // ±30% a day, wider for longer horizons
 // Without it the closes are one per calendar day from t0 (crypto). Horizons count closes, so for forex the
 // "next 1 / 3 / 7 days" are trading days.
 // `skip` (optional): a Set of close indices to leave out, e.g. the days around an unusual jump in a currency feed.
+// `bench` / `v` (optional): the benchmark's close and the volume on each day, for the relative-strength and volume
+// signals (alignBench; null where unknown). Without them those signals are simply never on.
 // One row per coin per day: the signals at that close and the move over the following 1 / 3 / 7 days.
 export function signalRows(coins, p) {
   const P = withDefaults(p);
-  const warm = Math.max(P.maSlow, P.bbPeriod + 20, P.rsiPeriod + 1);
+  const warm = Math.max(P.maSlow, P.rsiPeriod + 1);
+  const core = Object.keys(COMPONENTS).filter(k => !TESTING.includes(k));
   const rows = [];
   for (const coin of coins) {
-    const s = series(coin.c, P);
+    const s = series(coin.c, P, { bench: coin.bench, vol: coin.v });
     const d0 = Math.floor(coin.t0 / DAY), n = coin.c.length;
     const dayOf = coin.days ? i => coin.days[i] : i => d0 + i;
     for (let i = warm; i < n - 1; i++) {
       if (coin.skip?.has(i)) continue;   // days around an unusual jump (possible data glitch) are left out of the scoring
       const a = componentsAt(s, i, P);
-      if (Object.values(a).some(v => v == null)) continue;
-      const { good, bad, score, squeeze } = scoreOf(a, P);
+      if (core.some(k => a[k] == null)) continue;
+      const { good, bad, score } = scoreOf(a, P);
       const raw = {}, ret = {};
       for (const h of HORIZONS) {
         if (i + h >= n) { raw[h] = ret[h] = null; continue; }
@@ -278,7 +337,7 @@ export function signalRows(coins, p) {
           stop[h] = { longHit: jL >= 0, longGood: after(jL, -1), longSaved: saved(jL, -1), shortHit: jS >= 0, shortGood: after(jS, 1), shortSaved: saved(jS, 1) };
         }
       }
-      rows.push({ day: dayOf(i), next: dayOf(i + 1), id: coin.id, sym: coin.symbol, a, good, bad, score, squeeze, raw, ret, mkt: {}, exc: {}, stopD, stop });
+      rows.push({ day: dayOf(i), next: dayOf(i + 1), id: coin.id, sym: coin.symbol, a, good, bad, score, raw, ret, mkt: {}, exc: {}, stopD, stop });
     }
   }
   // excess = coin's move minus the average of every coin over the same days (removes the market's move)
@@ -359,11 +418,6 @@ export function stats(rows, h = 1) {
   };
   out.stops = { n: st.length, avgDist: mean(st.map(r => r.stopD)), long: side('long'), short: side('short') };
 
-  // ⚡ squeeze: are the following moves really bigger than usual?
-  const sq = rows.filter(r => r.squeeze);
-  const absAll = mean(rows.map(r => Math.abs(r.ret[h]))), absSq = mean(sq.map(r => Math.abs(r.ret[h])));
-  out.squeeze = { n: sq.length, avgAbs: absSq, baseAbs: absAll, ratio: absSq != null && absAll ? absSq / absAll : null, upRate: up(sq) };
-
   // headline hit rates
   const pos = rows.filter(r => r.score > 0), neg = rows.filter(r => r.score < 0);
   out.rockets = { n: pos.length, upRate: up(pos), beatRate: beat(pos), avgRet: mean(pos.map(r => r.ret[h])), avgExc: mean(pos.map(r => r.exc[h])) };
@@ -434,10 +488,6 @@ function selectParams(cur, rowsFor, until, minT, momPcts = [10, 20, 30]) {
   }
   if (bestPair) { Object.assign(next, bestPair.v); setSign('trendUp', bestPair.u); setSign('trendDown', bestPair.d); }
 
-  // Wide Bollinger band threshold (the ⚡ squeeze threshold stays fixed: it isn't a direction call)
-  const wide = best([75, 80, 85, 90, 95].map(bbWidePct => ({ bbWidePct })), 'bbWide');
-  if (wide) { next.bbWidePct = wide.v.bbWidePct; setSign('bbWide', wide.e); }
-
   // Momentum (🔥 / 🧊 on the tiles): which threshold, and whether strong/weak momentum should be a 🚀, a 😢 or off
   let bestMom = null;
   for (const momPct of momPcts) {
@@ -452,6 +502,9 @@ function selectParams(cur, rowsFor, until, minT, momPcts = [10, 20, 30]) {
   const pfRows = rowsFor(next), pu = effect(pfRows, 'pnfUp'), pd = effect(pfRows, 'pnfDown');
   if (pu.n >= 20) setSign('pnfUp', pu);
   if (pd.n >= 20) setSign('pnfDown', pd);
+
+  // Signals on trial (relative strength, volume): measured at their current settings and reported, never switched on
+  for (const k of TESTING) { const e = effect(pfRows, k); if (e.n >= 20) setSign(k, e); }
   return { params: next, notes };
 }
 
@@ -582,7 +635,7 @@ export function buildScorecard(coins, current, { prev = null, tuneNow = false, n
     yesterday: {
       market: y[0]?.mkt[1] ?? null,
       // real move shown per coin; the averages use the capped one
-      coins: y.map(r => ({ id: r.id, sym: r.sym, score: r.score, squeeze: r.squeeze, good: r.good, bad: r.bad, ret: r.raw[1], exc: r.exc[1] })),
+      coins: y.map(r => ({ id: r.id, sym: r.sym, score: r.score, good: r.good, bad: r.bad, ret: r.raw[1], exc: r.exc[1] })),
       stats: stats(y, 1),
     },
     windows: { d30: perH(since(30)), d90: perH(since(90)), all: perH(rows) },

@@ -1,7 +1,7 @@
 // heat.sala.company page script: render (split from index.html; see app/main.mjs for the order things start in)
 import * as SIG from '/signals.mjs';
 import { $, $$, BINS, chgOf, esc, fmtBig, fmtPct, fmtPrice, heatClass, logo, M, S, TF, TOP_N } from './core.mjs';
-import { compute, match, P, withLive } from './data.mjs';
+import { computeFor, match, P } from './data.mjs';
 import { emo, pc, renderScorecard } from './scorecard.mjs';
 import { showDetail } from './interact.mjs';
 
@@ -9,11 +9,24 @@ import { showDetail } from './interact.mjs';
 export const ICON = {
   up: '<svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 11l5-6 5 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   down: '<svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 5l5 6 5-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  squeeze: '<svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h3l3 4-3 4H2M14 4h-3L8 8l3 4h3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
-  expanded: '<svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 4H5L2 8l3 4h3M8 4h3l3 4-3 4H8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
-  normal: '<svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5h12M2 11h12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
 };
-export const BB_LABEL = { tight: 'Tight squeeze', squeeze: 'Squeeze', normal: 'Normal', expanded: 'Expanded' };
+// window of the relative-strength comparison, as shown: 30 days (crypto, metals) or 21 business days ≈ a month (forex)
+export const rsWindow = () => P().momDays === 30 ? '30d' : '1m';
+export function rsHTML(ind) {
+  if (ind.isBench) return `<span class="s">the benchmark</span>`;
+  if (ind.rs == null) return '<span class="s">n/a</span>';
+  const cls = ind.rsState === 'up' ? 'up-t' : ind.rsState === 'down' ? 'dn-t' : '';
+  const tag = ind.rsState === 'up' ? `<span class="tag rs-up">beating ${esc(M.benchLabel)}</span>` : ind.rsState === 'down' ? `<span class="tag rs-dn">trailing ${esc(M.benchLabel)}</span>` : `<span class="s">vs ${esc(M.benchLabel)}</span>`;
+  return `${tag}<span class="v ${cls}">${fmtPct(ind.rs, 1)}</span><span class="s">${rsWindow()}</span>`;
+}
+export function volHTML(ind) {
+  const v = ind.vol;
+  if (!v) return '<span class="s">n/a</span>';
+  const ratio = `${v.ratio.toFixed(1)}×`;
+  if (v.state === 'up') return `${ICON.up}<span class="tag vol-up" title="Volume over the last ${P().volShort} days is ${ratio} the ${P().volLong} days before, while price rose: buyers piling in">${ratio} on a climb</span>`;
+  if (v.state === 'down') return `${ICON.down}<span class="tag vol-dn" title="Volume over the last ${P().volShort} days is ${ratio} the ${P().volLong} days before, while price fell: selling pressure">${ratio} on a drop</span>`;
+  return `<span class="v">${ratio}</span><span class="s">usual volume</span>`;
+}
 
 export function indHTML(ind) {
   if (!ind) return '<div class="loading">Loading candles…</div>';
@@ -32,13 +45,10 @@ export function indHTML(ind) {
   } else {
     rows.push(`<div class="row"><span class="k">MA</span><span class="s">${ind.partial ? (ind.partial === 'above' ? `Above ${P().maFast}MA · ` : `Below ${P().maFast}MA · `) : ''}${P().maSlow}MA n/a</span></div>`);
   }
-  // BB width
-  if (ind.bbw != null) {
-    const sq = ind.bbState === 'tight' || ind.bbState === 'squeeze';
-    const icon = sq ? ICON.squeeze : ind.bbState === 'expanded' ? ICON.expanded : ICON.normal;
-    const label = sq ? `<span class="tag sq">${BB_LABEL[ind.bbState]}</span>` : `<span class="v">${BB_LABEL[ind.bbState]}</span>`;
-    rows.push(`<div class="row"><span class="k">BBW</span>${icon}${label}<span class="s">${ind.bbw.toFixed(1)}%<span class="pp"> · p${ind.bbPct.toFixed(0)}</span></span></div>`);
-  } else rows.push('<div class="row"><span class="k">BBW</span><span class="s">n/a</span></div>');
+  // Relative strength: the move over the momentum window vs the benchmark's (Bitcoin / the basket / gold)
+  rows.push(`<div class="row"><span class="k">RS</span>${rsHTML(ind)}</div>`);
+  // Volume surge (crypto): recent volume vs before, and which way price went on it
+  if (M.volume) rows.push(`<div class="row"><span class="k">VOL</span>${volHTML(ind)}</div>`);
   // Recommended stop-loss for long and short positions
   const st = ind.stop;
   if (st) {
@@ -64,7 +74,8 @@ export function legendName(k) {
   return {
     trendUp: `strong uptrend (${p.maFast}/${p.maSlow} MA)`, trendDown: `strong downtrend (${p.maFast}/${p.maSlow} MA)`,
     oversold: `RSI(${p.rsiPeriod}) under ${p.rsiLow}`, overbought: `RSI(${p.rsiPeriod}) over ${p.rsiHigh}`,
-    bbTight: `BB width in bottom ${p.bbTightPct}%`, bbWide: `BB width in top ${100 - p.bbWidePct}%`,
+    rsUp: `${rsWindow()} move beats ${M.benchLabel} by ${p.rsPct}%+`, rsDown: `${rsWindow()} move trails ${M.benchLabel} by ${p.rsPct}%+`,
+    volUp: `rising on ${p.volRatio}×+ usual volume (${p.volShort}d vs ${p.volLong}d)`, volDown: `falling on ${p.volRatio}×+ usual volume (${p.volShort}d vs ${p.volLong}d)`,
     momUp: `${p.momDays === 30 ? '30-day' : `${p.momDays}-business-day`} move above +${p.momPct}%`, momDown: `${p.momDays === 30 ? '30-day' : `${p.momDays}-business-day`} move below −${p.momPct}%`,
     pnfUp: `point & figure rising (X column)`, pnfDown: `point & figure falling (O column)`,
   }[k];
@@ -76,7 +87,7 @@ export function applyParams(p) {
   S.params = next;
   document.documentElement.style.setProperty('--rsi-lo', next.rsiLow + '%');
   document.documentElement.style.setProperty('--rsi-hi', next.rsiHigh + '%');
-  if (changed) for (const c of S.coins) if (S.hist[c.id]) S.ind[c.id] = compute(withLive(S.hist[c.id].closes, c.current_price));
+  if (changed) for (const c of S.coins) if (S.hist[c.id]) S.ind[c.id] = computeFor(c);
   return changed;
 }
 // Next to the name: the 50/200 MA trend (🚀 / 😢), the point & figure trend (X📈 / O📉) and 30-day momentum (🔥 / 🧊).
@@ -129,7 +140,7 @@ export function cautionMark(c) {
 export function tileHTML(c) {
   const ind = S.ind[c.id], ch = chgOf(c, S.colorBy);
   const sg = signals(ind);
-  const label = `${c.name}, ${fmtPrice(c.current_price)}, ${TF(S.colorBy)} ${fmtPct(ch)}, ${sg.good.length} rockets, ${sg.bad.length} cry faces${S.ind[c.id]?.sig?.squeeze ? ", squeeze: big move likely" : ""}`;
+  const label = `${c.name}, ${fmtPrice(c.current_price)}, ${TF(S.colorBy)} ${fmtPct(ch)}, ${sg.good.length} rockets, ${sg.bad.length} cry faces`;
   const stopCls = !ind?.stop ? '' : [ind.stop.longState, ind.stop.shortState].includes('closed') ? ' stop-closed' : [ind.stop.longState, ind.stop.shortState].includes('intraday') ? ' stop-intraday' : '';
   return `<button class="tile ${heatClass(ch, S.colorBy)}${stopCls}" data-id="${esc(c.id)}" aria-label="${esc(label)}">
     <div class="top">
@@ -183,7 +194,9 @@ export function renderLegend() {
     <p class="leg-read"><b>What the emoji mean.</b> 🚀/😢, X📈/O📉 and 🔥/🧊 describe a ${M.one}'s <b>current conditions</b> (its trend, point &amp; figure column and momentum), <b>not predictions</b>. The <a href="#" data-goto-score>Scorecard</a> checks every day whether they would have predicted the next moves; so far they haven't reliably, so read them as a quick summary of the chart, not as advice.</p>
     <p class="leg-read"><b>Reading a tile.</b> <b>RSI</b>: the marker shows where RSI sits on 0–100; below the lower line is <i>oversold</i>, above the upper line <i>overbought</i>.
       <b>MA</b>: the fast moving average above the slow one is an uptrend, below is a downtrend; "strong" means the price agrees, "pullback" or "bounce" that it doesn't; ✦ marks a golden or death cross in the last 14 days.
-      <b>BBW</b>: Bollinger Band width, ranked against the last 180 days; the bottom 25% is a <i>squeeze</i> (quiet price, a big move often follows, either way), the top 20% <i>expanded</i>.
+      <b>RS</b>: relative strength, the ${M.one}'s move over ${P().momDays === 30 ? 'the last 30 days' : 'about a month'} minus ${M.bench ? `${M.benchLabel}'s` : 'the average of every pair'} ("beating" / "trailing" past ±${P().rsPct}%).
+      ${M.volume ? `<b>VOL</b>: the last ${P().volShort} days' volume vs the ${P().volLong} days before; ${P().volRatio}× or more while price climbs means buyers piling in, while it drops, selling pressure.` : ''}
+      RS${M.volume ? ' and VOL' : ''} are on trial: the Scorecard tests them every night, but they don't count toward 🚀/😢 yet. The Bollinger Bands are drawn in the price chart.
       <b>✓ / ?</b>: how reliable the price source is (hover it). <b>⚠</b>: a caution about this ${M.one}'s data (hover it). <b>ⓘ</b>: point at it to open the chart card at once.</p>
     <span class="leg-item"><span class="gauge" style="width:60px;flex:none"><i style="left:50%"></i></span> RSI 0–100 (under ${P().rsiLow} oversold · over ${P().rsiHigh} overbought)</span>
     <span class="leg-item"><span class="up-t" style="display:inline-flex">${ICON.up}</span>/<span class="dn-t" style="display:inline-flex">${ICON.down}</span> ${P().maFast}MA vs ${P().maSlow}MA</span>
@@ -196,7 +209,7 @@ export function renderLegend() {
 }
 
 // Highlight buttons filter the coins: non-matching ones are left out entirely ("All coins" brings them back)
-export const FILTER_WORDS = { os: 'oversold', ob: 'overbought', up: 'in an uptrend', down: 'in a downtrend', sq: 'in a squeeze', cross: 'showing a recent moving-average cross', stop: 'past a recommended stop' };
+export const FILTER_WORDS = { os: 'oversold', ob: 'overbought', up: 'in an uptrend', down: 'in a downtrend', rs: `beating ${M.benchLabel}`, vol: 'moving on a volume surge', cross: 'showing a recent moving-average cross', stop: 'past a recommended stop' };
 // A range on the color scale (S.heat, e.g. 'h-3') narrows it further to coins in that color band
 export const inHeat = c => !S.heat || heatClass(chgOf(c, S.colorBy), S.colorBy) === S.heat;
 export const visibleCoins = () => S.coins.filter(c => (S.filter === 'all' || match(S.ind[c.id], S.filter)) && inHeat(c));
@@ -262,8 +275,8 @@ export const COLS = [
   ['trend', 'Trend', c => { const i = S.ind[c.id]; return i?.trend ? (i.trend === 'up' ? 2 : 0) + (i.strong ? (i.trend === 'up' ? 1 : -0.5) : 0) : null; }],
   ['dF', 'vs fast MA', c => { const i = S.ind[c.id]; return i?.mF ? (i.last / i.mF - 1) * 100 : null; }],
   ['dS', 'vs slow MA', c => { const i = S.ind[c.id]; return i?.mS ? (i.last / i.mS - 1) * 100 : null; }],
-  ['bbw', 'BBW %', c => S.ind[c.id]?.bbw],
-  ['bbp', 'BBW pctl', c => S.ind[c.id]?.bbPct],
+  ['rs', `vs ${M.benchLabel}`, c => S.ind[c.id]?.rs],
+  ...(M.volume ? [['vol', 'Volume ×', c => S.ind[c.id]?.vol?.ratio]] : []),
   ['stopL', 'Recommended stop (long)', c => S.ind[c.id]?.stop?.longPct],
   ['stopS', 'Recommended stop (short)', c => S.ind[c.id]?.stop?.shortPct],
 ];
@@ -280,11 +293,12 @@ export function renderTable() {
     const heat = tf => `<span class="cell-heat ${heatClass(chgOf(c, tf), tf)}">${fmtPct(chgOf(c, tf))}</span>`;
     const rsi = i.rsiNow != null ? `${i.rsiNow.toFixed(0)}${i.rsiState === 'os' ? ' · Oversold' : i.rsiState === 'ob' ? ' · Overbought' : ''}` : '—';
     const trend = i.trend ? `<span class="${i.trend === 'up' ? 'up-t' : 'dn-t'}">${i.trend === 'up' ? '▲ Up' : '▼ Down'}</span>${i.cross ? ' ✦' : ''}` : '—';
-    const bbp = i.bbPct != null ? `${i.bbPct.toFixed(0)}${i.bbState === 'tight' || i.bbState === 'squeeze' ? ' · Squeeze' : ''}` : '—';
+    const rs = i.isBench ? 'benchmark' : i.rs != null ? `<span class="${i.rsState === 'up' ? 'up-t' : i.rsState === 'down' ? 'dn-t' : ''}">${fmtPct(i.rs, 1)}</span>` : '—';
+    const vol = i.vol ? `${i.vol.ratio.toFixed(1)}×${i.vol.state === 'up' ? ' ▲ climb' : i.vol.state === 'down' ? ' ▼ drop' : ''}` : '—';
     return `<tr data-id="${esc(c.id)}"><td>${c.market_cap_rank}</td><td><b>${esc(c.symbol.toUpperCase())}</b> <span style="color:var(--ink-2)">${esc(c.name)}</span></td><td style="text-align:left">${emojiHTML(S.ind[c.id]) || ''}</td>
       <td>${fmtPrice(c.current_price)}</td><td>${heat('24h')}</td><td>${heat('7d')}</td><td>${heat('30d')}</td>${M.ranked ? `<td>${fmtBig(c.market_cap)}</td>` : ''}
       <td>${rsi}</td><td>${trend}</td><td>${fmtPct(i.mF ? (i.last / i.mF - 1) * 100 : null, 1)}</td><td>${fmtPct(i.mS ? (i.last / i.mS - 1) * 100 : null, 1)}</td>
-      <td>${i.bbw != null ? i.bbw.toFixed(1) + '%' : '—'}</td><td>${bbp}</td>
+      <td>${rs}</td>${M.volume ? `<td>${vol}</td>` : ''}
       <td>${stopCell(i.stop, 'long')}</td><td>${stopCell(i.stop, 'short')}</td></tr>`;
   }).join('');
   $('#tablewrap').innerHTML = `<table><caption class="sr">${M.tableCaption(TOP_N)} with indicators</caption><thead><tr>${head}</tr></thead><tbody>${body || `<tr><td colspan="${COLS.length}" style="text-align:left">${emptyHTML()}</td></tr>`}</tbody></table>`;

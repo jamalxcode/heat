@@ -48,7 +48,9 @@ export function makeFixtures(now = Date.now()) {
       current_price: price, market_cap: 1e9 * (SPEC.length - k),
       price_change_percentage_24h_in_currency: pct(1), price_change_percentage_7d_in_currency: pct(7), price_change_percentage_30d_in_currency: pct(30),
     });
-    hist[id] = { src: 'Binance', pair: `${sym}/USDT`, ok: id === 'beta-coin' ? 0 : 1, t: now, t0, c };
+    // volume for the last 60 days: steady, except Moon, whose volume tripled over the last week while it climbed
+    const v = Array.from({ length: 60 }, (_, i) => id === 'moon-coin' && i >= 52 ? 3e6 : 1e6);
+    hist[id] = { src: 'Binance', pair: `${sym}/USDT`, ok: id === 'beta-coin' ? 0 : 1, t: now, t0, c, v };
     complete.push({ id, symbol: sym, t0, c: c.slice(0, N - 1) });            // the scorer only sees complete days
   });
   const data = { v: 1, generated: now, intervalMin: 10, params: null, marketSrc: 'Fixture', marketStale: false, markets, cats: { t: 0, stable: [], gold: [] }, hist };

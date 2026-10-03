@@ -16,6 +16,8 @@ export const MARKETS = {
     quoteSwitch: false,               // no USD/… | …/USD switch
     pegPref: 'pegged',                // localStorage key for "show stablecoins"
     bins: { '24h': [1, 3, 6, 10], '7d': [2.5, 7, 15, 25], '30d': [5, 15, 30, 50] },
+    // relative strength: measured against this asset (or, without one, an equal-weight basket of every pair); volume: shown when the data has it
+    bench: 'bitcoin', benchLabel: 'BTC', volume: true,
     back: { '24h': 1, '7d': 7, '30d': 30 },          // candles back for each change (one candle per day)
     label: { '24h': '24h', '7d': '7d', '30d': '30d' },
     pegLabel: 'Stablecoins', pegTitle: 'Include stablecoins, tokenized gold and wrapped/staked copies',
@@ -46,6 +48,7 @@ export const MARKETS = {
     live: false,                      // one official rate per business day: nothing forms in between
     ranked: false, quoteSwitch: true, pegPref: 'peggedFx',
     bins: { '24h': [0.1, 0.3, 0.6, 1], '7d': [0.25, 0.75, 1.5, 3], '30d': [0.5, 1.5, 3, 6] },
+    bench: null, benchLabel: 'basket', volume: false,   // vs the average of every pair shown; forex has no central volume
     back: { '24h': 1, '7d': 5, '30d': 21 },          // business days: 5 ≈ a week, 21 ≈ a month
     label: { '24h': '1d', '7d': '1w', '30d': '1m' },
     pegLabel: 'Pegged', pegTitle: 'Include currencies pegged to the US dollar (Gulf currencies, HKD, JOD, IQD, LBP)',
@@ -81,6 +84,7 @@ MARKETS.metals = {
   live: true,                         // the crypto tiles move all day; the metals file has one value per day (today's is still forming)
   ranked: false, quoteSwitch: false, pegPref: null, pegLabel: null,
   bins: { '24h': [0.25, 0.75, 1.5, 3], '7d': [1, 2.5, 5, 8], '30d': [2, 5, 10, 15] },
+  bench: 'xau', benchLabel: 'gold', volume: false,     // the metal prices come without volume
   noScorecard: 'There’s no scorecard here: with only a handful of assets there’s nothing to rank each day, so the 🚀/😢 can’t be tested the way they are on the crypto and forex pages. The tiles, charts and stops work as everywhere else.',
   verify: (c, h) => c.src === 'crypto' ? MARKETS.crypto.verify(c, h)
     : '<span class="vf guess" title="Price from the community exchange-api feed (public domain, sources not documented)" aria-label="community feed">?</span>',

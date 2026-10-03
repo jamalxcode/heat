@@ -4,7 +4,7 @@ import { applyHist, match, P, pickCoins } from './data.mjs';
 import { renderScorecard } from './scorecard.mjs';
 import { $, $$, chgOf, DAY, esc, fmtBig, fmtPct, fmtPrice, logo, M, MARKET, prefs, S, savePrefs, store, TF } from './core.mjs';
 import { done, run, show } from './main.mjs';
-import { BB_LABEL, renderAll, renderTable, signals } from './render.mjs';
+import { renderAll, renderTable, rsWindow, signals } from './render.mjs';
 import { chartUrl, pick } from '/scripts/tradingview.mjs';
 
 /* ================= detail popover ================= */
@@ -116,7 +116,8 @@ export function showDetail(id, anchor, keepPos) {
       <dt>${P().maSlow}-day MA</dt><dd>${fmtPrice(ind.mS)} (${fmtPct(ind.mS ? (ind.last / ind.mS - 1) * 100 : null, 1)})</dd>
       <dt>Trend</dt><dd>${trendTxt}</dd>
       ${ind.cross ? `<dt>MA cross</dt><dd>✦ ${ind.cross.type === 'golden' ? 'Golden' : 'Death'} cross ${ind.cross.ago === 0 ? 'today' : ind.cross.ago + ' day' + (ind.cross.ago > 1 ? 's' : '') + ' ago'}</dd>` : ''}
-      <dt>BB width</dt><dd>${ind.bbw != null ? `${ind.bbw.toFixed(2)}% · ${ordinal(Math.round(ind.bbPct))} pctl · ${BB_LABEL[ind.bbState]}` : '—'}</dd>
+      <dt>vs ${esc(M.benchLabel)} (${rsWindow()})</dt><dd>${ind.isBench ? 'the benchmark' : ind.rs != null ? `${fmtPct(ind.rs, 1)}${ind.rsState === 'up' ? ' · beating' : ind.rsState === 'down' ? ' · trailing' : ''}` : '—'}</dd>
+      ${M.volume ? `<dt>Volume (${P().volShort}d vs ${P().volLong}d)</dt><dd>${ind.vol ? `${ind.vol.ratio.toFixed(2)}×${ind.vol.state === 'up' ? ' · rising on a climb' : ind.vol.state === 'down' ? ' · rising on a drop' : ' · usual'}` : '—'}</dd>` : ''}
     </dl>
     ${ind.stop ? `<div class="d-stops">
       ${['long', 'short'].map(side => {
@@ -129,7 +130,7 @@ export function showDetail(id, anchor, keepPos) {
       }).join('')}
     </div>
     <div class="d-src">Stops = ${P().stopMult}× the average daily move (${(ind.stop.dist / P().stopMult * 100).toFixed(M.stopDecimals)}%) from the ${new Date(ind.t[ind.stop.anchorIdx ?? ind.n - 2] ?? Date.now()).toISOString().slice(0, 10)} ${M.closeShort}. Suggested levels, not advice: set them with ${M.stopWhere}, as this page isn't real-time.</div>` : ''}
-    <div class="d-src">${h ? M.sourceLine(c, h, ind) : ''}${ind.bbShort ? ' · BBW percentile uses under 90 days' : ''}</div>`;
+    <div class="d-src">${h ? M.sourceLine(c, h, ind) : ''}</div>`;
     body += '</div></div>';
   } else body += `<div class="d-src">${ind?.error ? M.noHistory : 'Loading candles…'}</div>`;
   box.querySelector('.body').innerHTML = body;
@@ -352,6 +353,8 @@ document.addEventListener('click', e => {
 $$('#market a').forEach(a => { if (a.dataset.m === MARKET) a.setAttribute('aria-current', 'page'); });
 $$('#colorBy button').forEach(b => { b.textContent = TF(b.dataset.v); b.title = `Color by ${TF(b.dataset.v)} change`; });
 $('#filters .chip[data-f="all"]').textContent = `All ${M.noun}`;
+$('#filters .chip[data-f="rs"] .bl').textContent = M.benchLabel;
+if (!M.volume) $('#filters .chip[data-f="vol"]').hidden = true;   // forex and metals: no volume data
 if (M.pegLabel) {
   $('#pegged').parentElement.lastChild.textContent = ' ' + M.pegLabel;
   $('#pegged').parentElement.title = M.pegTitle;

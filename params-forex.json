@@ -13,6 +13,7 @@
   "stopLookback": 20,
   "momPct": 3,
   "momDays": 21,
+  "rsPct": 1.5,
   "weights": {
     "trendUp": 1,
     "oversold": 0,

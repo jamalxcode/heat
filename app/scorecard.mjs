@@ -110,7 +110,7 @@ export function renderScorecard() {
   const h = S.scoreH, hw = H_WORD[h];
   const w = byH(sc.windows[S.scoreWin] || sc.windows.d30)[h];
   const winName = { d30: 'last 30 days', d90: 'last 90 days', all: 'all history' }[S.scoreWin];
-  const moved = y.coins.filter(c => c.score !== 0 || c.squeeze);
+  const moved = y.coins.filter(c => c.score !== 0);
   const tile = (title, big, lines) => `<div class="sc-tile"><div class="sc-t">${title}</div><div class="sc-big">${big}</div>${lines.map(l => `<div class="sc-l">${l}</div>`).join('')}</div>`;
   const segBtns = (id, attr, cur, opts) => `<div class="seg" id="${id}">${opts.map(([v, l]) => `<button data-${attr}="${v}" aria-pressed="${String(cur) === String(v)}">${l}</button>`).join('')}</div>`;
 
@@ -123,13 +123,11 @@ export function renderScorecard() {
   }).join('');
 
   const compRows = Object.keys(SIG.COMPONENTS).map(k => {
-    const c = w.components[k] || {}, role = roleOf(k);
+    const c = w.components[k] || {}, testing = SIG.TESTING.includes(k), role = testing ? '🧪 testing' : roleOf(k);
     const wrong = c.n >= 20 && Math.abs(c.t) >= 1 && ((role === '🚀' && c.avgExc < 0) || (role === '😢' && c.avgExc > 0));
     return `<tr><td>${esc(legendName(k))}</td><td class="sc-emo">${role}</td><td>${(c.n || 0).toLocaleString()}</td><td>${pc(c.upRate)}</td>
       <td>${spc(c.avgExc)}</td><td>${edgeWord(c.t, c.n)}${wrong ? ' · <b class="sc-warn">⚠ pointing the wrong way</b>' : ''}</td></tr>`;
   }).join('');
-  const sq = w.squeeze;
-  const sqLine = sq?.n ? `${sq.ratio >= 1.1 ? 'Yes' : sq.ratio <= 0.9 ? 'No, smaller' : 'About the same'}: moves over ${hw} were <b>${sq.ratio.toFixed(2)}×</b> the usual size (${spc(sq.avgAbs, 1)} vs ${spc(sq.baseAbs, 1)}), and ${pc(sq.upRate)} went up.` : 'No squeezes in this period.';
 
   // costs (a round trip, as a fraction) and the point-in-time check, when the scorer recorded them
   const cost = sc.costs?.roundTrip ?? null;
@@ -185,7 +183,6 @@ export function renderScorecard() {
       ${cost != null ? `<p class="sc-muted">Costs: about ${pc(cost, 2)} per round trip (${M.costWords}), taken off once per holding period. A small edge can disappear after costs.</p>` : ''}
       ${pitHTML}
       <p class="sc-verdict">Verdict: <b>${icVerdict(w.ic)}</b>. <span class="sc-muted">(Daily rank correlation between score and the move over ${hw}: ${w.ic.mean?.toFixed(3) ?? '—'}, t = ${w.ic.t?.toFixed(1) ?? '—'}. Around 0 means no link; t above 2 means it's unlikely to be luck.${h > 1 ? ' Multi-day moves overlap, so t is scaled down to stay honest.' : ''})</span></p>
-      <p><b>⚡ Did a squeeze lead to bigger moves?</b> ${sqLine}${sq?.n ? ` <span class="sc-muted">${sq.n.toLocaleString()} squeezes.</span>` : ''}</p>
       ${stopsHTML(w.stops, h, hw)}
       <h3>More 🚀 → bigger move?</h3>
       <div class="tablewrap"><table class="sc-table"><thead><tr><th>Signals</th><th>Coin-days</th><th>Up</th><th>Avg move</th><th>vs market</th></tr></thead><tbody>${scoreRows}</tbody></table></div>
@@ -196,7 +193,7 @@ export function renderScorecard() {
     <div class="sc-card">
       <h2>Self-tuning <span class="sc-muted">weekly, on ${M.tuneHistory}</span></h2>
       ${tuneHTML}
-      <p class="sc-muted">How it works: each Sunday the tuner tries other RSI levels, moving-average pairs and wide-band thresholds. For each signal it decides whether it should count as a 🚀, a 😢, or be switched off, and it judges them over the next 1, 3 and 7 days. The newest half of history is cut into three check periods. For each one, settings are chosen using only earlier days, then compared with the current settings on that period. New settings are adopted only if they win at least 2 of the 3 and do better on average. A signal also needs a stronger-than-usual result (t ≥ 2.5) to be switched on, because trying many variants makes some look good by luck. The newest 90 days are never used for tuning at all: they are the untouched check shown above. ⚡ squeezes are never counted as 🚀 or 😢.</p>
+      <p class="sc-muted">How it works: each Sunday the tuner tries other RSI levels, moving-average pairs and momentum thresholds. For each signal it decides whether it should count as a 🚀, a 😢, or be switched off, and it judges them over the next 1, 3 and 7 days. The newest half of history is cut into three check periods. For each one, settings are chosen using only earlier days, then compared with the current settings on that period. New settings are adopted only if they win at least 2 of the 3 and do better on average. A signal also needs a stronger-than-usual result (t ≥ 2.5) to be switched on, because trying many variants makes some look good by luck. The newest 90 days are never used for tuning at all: they are the untouched check shown above. Signals marked 🧪 testing (relative strength and volume) are measured the same way but never counted as 🚀 or 😢: they get an emoji only if they prove themselves over several weeks.</p>
     </div>`;
   wireChart();
 }

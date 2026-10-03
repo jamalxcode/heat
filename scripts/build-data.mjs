@@ -91,13 +91,13 @@ const symbolsFor = c => [...new Set([...(ALIASES[c.id] || []), c.symbol.toUpperC
 const sane = (closes, price) => closes.length >= 20 && price > 0 && Math.abs(closes[closes.length - 1][1] / price - 1) < 0.15;
 
 const EXCHANGES = [
-  ['Binance', (s, n) => `https://data-api.binance.vision/api/v3/klines?symbol=${s}USDT&interval=1d&limit=${n}`, d => d.map(r => [r[0], +r[4]])],
-  ['Gate.io', (s, n) => `https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair=${s}_USDT&interval=1d&limit=${n}`, d => d.map(r => [+r[0] * 1000, +r[2]])],
-  ['OKX', (s, n) => `https://www.okx.com/api/v5/market/candles?instId=${s}-USDT&bar=1Dutc&limit=${Math.min(n, 300)}`, d => (d.data || []).map(r => [+r[0], +r[4]])],
+  ['Binance', (s, n) => `https://data-api.binance.vision/api/v3/klines?symbol=${s}USDT&interval=1d&limit=${n}`, d => d.map(r => [r[0], +r[4], +r[7]])],
+  ['Gate.io', (s, n) => `https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair=${s}_USDT&interval=1d&limit=${n}`, d => d.map(r => [+r[0] * 1000, +r[2], +r[1]])],
+  ['OKX', (s, n) => `https://www.okx.com/api/v5/market/candles?instId=${s}-USDT&bar=1Dutc&limit=${Math.min(n, 300)}`, d => (d.data || []).map(r => [+r[0], +r[4], +r[7]])],
   // No CORS on these two, so only the server-side job can use them
   ...(IS_NODE ? [
-    ['MEXC', (s, n) => `https://api.mexc.com/api/v3/klines?symbol=${s}USDT&interval=1d&limit=${n}`, d => d.map(r => [r[0], +r[4]])],
-    ['KuCoin', (s, n) => `https://api.kucoin.com/api/v1/market/candles?type=1day&symbol=${s}-USDT`, d => (d.data || []).map(r => [+r[0] * 1000, +r[2]])],
+    ['MEXC', (s, n) => `https://api.mexc.com/api/v3/klines?symbol=${s}USDT&interval=1d&limit=${n}`, d => d.map(r => [r[0], +r[4], +r[7]])],
+    ['KuCoin', (s, n) => `https://api.kucoin.com/api/v1/market/candles?type=1day&symbol=${s}-USDT`, d => (d.data || []).map(r => [+r[0] * 1000, +r[2], +r[6]])],
   ] : []),
 ];
 
@@ -165,18 +165,29 @@ export async function fromExchanges(c, preferred, n = CANDLES, pairs = null) {
 export async function fromCoinGecko(c, n = CANDLES) {
   if (c.id.startsWith('cl-')) return null;
   const d = await getJSON(`${CG}/coins/${encodeURIComponent(c.id)}/market_chart?vs_currency=usd&days=${n - 1}&interval=daily`);
-  const closes = (d.prices || []).map(p => [p[0], p[1]]);
+  const vol = new Map((d.total_volumes || []).map(([t, v]) => [Math.floor(t / DAY), v]));
+  const closes = (d.prices || []).map(p => [p[0], p[1], vol.get(Math.floor(p[0] / DAY))]);
   return closes.length >= 20 ? { src: 'CoinGecko', pair: c.symbol.toUpperCase() + '/USD', closes, verified: true } : null;
 }
 
-// Compact form: one close per UTC day starting at day t0 (gaps forward-filled), 7 significant digits
+// Compact form: one close per UTC day starting at day t0 (gaps forward-filled), 7 significant digits.
+// Closes are [time, close, volume in dollars]. `v` keeps the volume of the last VOL_DAYS days only (3 significant
+// digits, null for a gap), lined up with the end of `c`: enough for the volume signal, without doubling the file.
+const VOL_DAYS = 60;
 export function pack(h, n = CANDLES) {
-  const byDay = new Map(h.closes.map(([t, v]) => [Math.floor(t / DAY), v]));
+  const byDay = new Map(h.closes.map(([t, v, vol]) => [Math.floor(t / DAY), [v, vol]]));
   const days = [...byDay.keys()].sort((a, b) => a - b);
-  const c = [];
-  let last = byDay.get(days[0]);
-  for (let d = days[0]; d <= days[days.length - 1]; d++) { if (byDay.has(d)) last = byDay.get(d); c.push(+last.toPrecision(7)); }
-  return { src: h.src, pair: h.pair, ok: h.verified ? 1 : 0, t: h.t, t0: days[0] * DAY, c: c.slice(-n) };
+  const c = [], v = [];
+  let last = byDay.get(days[0])[0];
+  for (let d = days[0]; d <= days[days.length - 1]; d++) {
+    const x = byDay.get(d);
+    if (x) last = x[0];
+    c.push(+last.toPrecision(7));
+    v.push(x?.[1] > 0 ? +x[1].toPrecision(3) : null);
+  }
+  const out = { src: h.src, pair: h.pair, ok: h.verified ? 1 : 0, t: h.t, t0: days[0] * DAY, c: c.slice(-n) };
+  if (v.some(x => x != null)) out.v = v.slice(-Math.min(VOL_DAYS, out.c.length));
+  return out;
 }
 
 export async function pool(items, n, fn) {

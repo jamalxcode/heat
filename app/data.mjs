@@ -27,10 +27,23 @@ export function withLive(closes, price) {
   else if (day === today - 1) out.push([today * DAY, price]);
   return out;
 }
+export const computeFor = c => compute(withLive(S.hist[c.id].closes, c.current_price), S.hist[c.id].vols, c.id);
 export function setHist(c, h) {
   S.hist[c.id] = h;
-  S.ind[c.id] = compute(withLive(h.closes, c.current_price));
+  S.ind[c.id] = computeFor(c);
   updateCoin(c);
+}
+// Benchmark for relative strength, as Map(day → close): the market's benchmark asset (with its live price, like every
+// tile) or, for forex, an equal-weight basket of every pair shown, in the quote direction on screen
+export function buildBench() {
+  const dayOf = t => Math.floor(t / DAY);
+  if (M.bench) {
+    const h = S.hist[M.bench], m = S.markets.find(x => x.id === M.bench);
+    S.bench = h ? new Map(withLive(h.closes, m?.current_price).map(([t, v]) => [dayOf(t), v])) : null;
+  } else {
+    const list = S.markets.filter(c => !c.pegged && S.hist[c.id]).map(c => ({ days: S.hist[c.id].closes.map(x => dayOf(x[0])), c: S.hist[c.id].closes.map(x => x[1]) }));
+    S.bench = list.length >= 2 ? SIG.basketIndex(list) : null;
+  }
 }
 // Compute every tile from the candles we have; coins without any show a note
 export function applyHist() {
@@ -43,11 +56,16 @@ export function applyHist() {
 /* ================= indicators (shared engine: signals.mjs) ================= */
 // Signal settings: tuned weekly by the scorer and shipped in data.json; defaults until the first tuning
 export const P = () => S.params;
-export function compute(ser) {
+// ser: [time, close] per day; vols: the volume of each of those days (or null); id: the asset (to spot the benchmark)
+export function compute(ser, vols = null, id = null) {
   const p = P();
   const t = ser.map(x => x[0]), c = ser.map(x => x[1]);
   const n = c.length, last = c[n - 1];
-  const s = SIG.series(c, p);
+  const days = t.map(x => Math.floor(x / DAY)), today = Math.floor(Date.now() / DAY);
+  // today's volume is still building up, so only complete days count
+  const vol = vols && M.volume ? days.map((d, i) => d < today ? vols[i] ?? null : null) : null;
+  const bench = S.bench && id !== M.bench ? SIG.alignBench(days, S.bench) : null;
+  const s = SIG.series(c, p, { bench, vol });
   const r = { t, c, rsi: s.rsi, maF: s.maF, maS: s.maS, bb: s.bb, n, last };
   const back = k => n - 1 - k >= 0 ? (last / c[n - 1 - k] - 1) * 100 : null;
   r.chg = { '24h': back(M.back['24h']), '7d': back(M.back['7d']), '30d': back(M.back['30d']) };
@@ -71,13 +89,12 @@ export function compute(ser) {
     r.trend = null; r.partial = last > mF ? 'above' : 'below';
   }
 
-  const w = s.bb.w[n - 1];
-  if (w != null && s.bbPct[n - 1] != null) {
-    r.bbw = w;
-    r.bbPct = s.bbPct[n - 1];
-    r.bbState = r.bbPct <= p.bbTightPct ? 'tight' : r.bbPct <= Math.max(25, p.bbTightPct) ? 'squeeze' : r.bbPct >= p.bbWidePct ? 'expanded' : 'normal';
-    r.bbShort = s.bb.w.slice(-p.bbLookback).filter(x => x != null).length < 90;
-  }
+  // relative strength vs the benchmark, and the volume surge (signals on trial: shown, scored, not counted)
+  const ex = SIG.extrasAt(s, n - 1, p);
+  r.isBench = id != null && id === M.bench;
+  r.rs = ex.rs;
+  r.rsState = ex.rs == null ? null : ex.rs >= p.rsPct ? 'up' : ex.rs <= -p.rsPct ? 'down' : 'mid';
+  r.vol = ex.vol && { ...ex.vol, state: ex.vol.ratio < p.volRatio ? 'normal' : ex.vol.move > 0 ? 'up' : ex.vol.move < 0 ? 'down' : 'normal' };
   // 🚀 / 😢: exactly what the daily scorecard measures
   r.sig = SIG.scoreOf(SIG.componentsAt(s, n - 1, p), p);
 
@@ -109,7 +126,8 @@ export const match = (ind, f) => {
     case 'ob': return ind.rsiState === 'ob';
     case 'up': return ind.trend === 'up';
     case 'down': return ind.trend === 'down';
-    case 'sq': return ind.bbState === 'tight' || ind.bbState === 'squeeze';
+    case 'rs': return ind.rsState === 'up';
+    case 'vol': return ind.vol?.state === 'up' || ind.vol?.state === 'down';
     case 'cross': return !!ind.cross;
     case 'stop': return ind.stop?.longState === 'closed' || ind.stop?.shortState === 'closed';
   }

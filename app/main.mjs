@@ -3,7 +3,7 @@ import * as SIG from '/signals.mjs';
 import { applyEdge, applyParams, renderAll, renderCounts, renderFooter } from './render.mjs';
 import { $, DAY, fmtWait, LIVE_EVERY, M, MARKETS_TTL, REFRESH_MIN, S, setStatus, SNAPSHOT_GRACE, SNAPSHOT_MAX_AGE, SNAPSHOT_RETRY, store } from './core.mjs';
 import { loadScorecard } from './scorecard.mjs';
-import { applyHist, pickCoins } from './data.mjs';
+import { applyHist, buildBench, pickCoins } from './data.mjs';
 import './interact.mjs';   // hover, clicks, switches and keyboard: sets up its listeners when loaded
 
 /* ================= snapshot (data.json built by GitHub Actions) ================= */
@@ -18,7 +18,8 @@ export async function loadSnapshot() {
   } catch { return null; }
 }
 // one close per day from t0 (crypto), or at t0 + d[i] days when the market skips days (forex: business days)
-export const unpack = h => ({ src: h.src, pair: h.pair, ok: !!h.ok, t: h.t, closes: h.c.map((v, i) => [h.t0 + (h.d ? h.d[i] : i) * DAY, v]) });
+// vols: the volume of each close (data.json keeps only the latest days' volume, lined up with the end of the closes)
+export const unpack = h => ({ src: h.src, pair: h.pair, ok: !!h.ok, t: h.t, closes: h.c.map((v, i) => [h.t0 + (h.d ? h.d[i] : i) * DAY, v]), vols: h.v ? new Array(h.c.length - h.v.length).fill(null).concat(h.v) : null });
 
 // Backup when data.json is missing or stale: run the same build script GitHub runs, right here in the browser
 // (without the slow CoinGecko candle fallback), at most once per 10 minutes per browser, shared across tabs.
@@ -97,6 +98,7 @@ export async function show(raw, live) {
   S.stable = new Set(data.cats?.stable || []); S.gold = new Set(data.cats?.gold || []);
   S.hist = {};
   for (const [id, h] of Object.entries(data.hist || {})) S.hist[id] = unpack(h);
+  buildBench();                               // before any tile is computed: relative strength needs it
   const paramsChanged = applyParams(data.params);
   if (isNew || !S.scorecard) { await loadScorecard(); applyEdge(); }
   if (isNew || paramsChanged || !S.coins.length) { pickCoins(); renderAll(); }

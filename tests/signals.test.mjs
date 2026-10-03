@@ -52,14 +52,6 @@ test('bollinger: flat prices have zero width', () => {
   assert.equal(bb.w.at(-1), 0);
 });
 
-test('rollingPct: rank of the latest width in its window', () => {
-  const w = Array.from({ length: 40 }, (_, i) => i);   // rising: latest is always the widest
-  assert.equal(S.rollingPct(w, 30).at(-1), 100);
-  const falling = w.slice().reverse();                 // falling: latest is the narrowest
-  near(S.rollingPct(falling, 30).at(-1), 100 / 30, 1e-9);
-  assert.equal(S.rollingPct(w, 30)[10], null, 'needs 20 values first');
-});
-
 test('componentsAt / scoreOf: a steady uptrend is a strong uptrend, not a downtrend', () => {
   const c = Array.from({ length: 260 }, (_, i) => 100 * 1.003 ** i + (i % 2 ? 0.4 : -0.4));
   const s = S.series(c, S.DEFAULT_PARAMS);
@@ -71,14 +63,68 @@ test('componentsAt / scoreOf: a steady uptrend is a strong uptrend, not a downtr
   assert.equal(sc.score, sc.good.length - sc.bad.length);
 });
 
-test('scoreOf: weights decide 🚀 vs 😢 vs off, and the squeeze never counts', () => {
-  const a = { trendUp: true, oversold: true, trendDown: false, overbought: false, bbWide: true, squeeze: true };
-  const p = S.withDefaults({ weights: { trendUp: 1, oversold: 0, bbWide: 1 } });
+test('scoreOf: weights decide 🚀 vs 😢 vs off, and signals on trial never count', () => {
+  const a = { trendUp: true, oversold: true, trendDown: false, overbought: true, rsUp: true, volUp: true };
+  const p = S.withDefaults({ weights: { trendUp: 1, oversold: 0, overbought: -1, rsUp: 1, volUp: 1 } });
   const sc = S.scoreOf(a, p);
-  assert.deepEqual(sc.good.sort(), ['bbWide', 'trendUp']);
-  assert.deepEqual(sc.bad, []);
-  assert.equal(sc.score, 2);
-  assert.equal(sc.squeeze, true);
+  assert.deepEqual(sc.good, ['trendUp'], 'rsUp / volUp are testing: never a 🚀, whatever the weight');
+  assert.deepEqual(sc.bad, ['overbought']);
+  assert.equal(sc.score, 0);
+});
+
+test('relative strength: the move vs the benchmark over momDays; missing benchmark = not measured', () => {
+  const p = S.withDefaults({ momDays: 30, rsPct: 10 });
+  const c = Array.from({ length: 260 }, (_, i) => 100 * 1.004 ** i);          // ~+12.7% per 30 days
+  const flat = new Array(260).fill(50), same = c.slice();
+  const at = bench => S.extrasAt(S.series(c, p, { bench }), 259, p).rs;
+  near(at(flat), (1.004 ** 30 - 1) * 100, 1e-9);
+  near(at(same), 0, 1e-9);
+  assert.equal(at(null), null);
+  const a = S.componentsAt(S.series(c, p, { bench: flat }), 259, p);
+  assert.equal(a.rsUp, true);
+  assert.equal(a.rsDown, false);
+  const none = S.componentsAt(S.series(c, p), 259, p);
+  assert.equal(none.rsUp, null);
+  assert.equal(none.trendUp, true, 'the other signals are unaffected');
+});
+
+test('volume surge: recent average vs the days before, with the price direction', () => {
+  const p = S.withDefaults({ volShort: 7, volLong: 30, volRatio: 1.5 });
+  const n = 260, up = Array.from({ length: n }, (_, i) => 100 + i), down = up.slice().reverse();
+  const vol = Array.from({ length: n }, (_, i) => i >= n - 7 ? 200 : 100);     // last 7 days: double volume
+  const v1 = S.extrasAt(S.series(up, p, { vol }), n - 1, p).vol;
+  near(v1.ratio, 2, 1e-9);
+  assert.ok(v1.move > 0);
+  assert.equal(S.componentsAt(S.series(up, p, { vol }), n - 1, p).volUp, true);
+  const d = S.componentsAt(S.series(down, p, { vol }), n - 1, p);
+  assert.equal(d.volDown, true);
+  assert.equal(d.volUp, false);
+  const calm = S.componentsAt(S.series(up, p, { vol: new Array(n).fill(100) }), n - 1, p);
+  assert.equal(calm.volUp, false, 'no surge: neither');
+  const today = vol.slice(); today[n - 1] = null;                              // today's volume unknown: 6 of 7 days
+  near(S.extrasAt(S.series(up, p, { vol: today }), n - 1, p).vol.ratio, 2, 1e-9);
+  const sparse = vol.map((v, i) => i % 3 ? null : v);                           // under half the days: not measured
+  assert.equal(S.extrasAt(S.series(up, p, { vol: sparse }), n - 1, p).vol, null);
+  assert.equal(S.componentsAt(S.series(up, p), n - 1, p).volUp, null);
+});
+
+test('benchmarks: alignBench carries the last close forward; basketIndex averages daily changes', () => {
+  const m = new Map([[10, 1], [12, 2], [15, 3]]);
+  assert.deepEqual(S.alignBench([9, 10, 11, 12, 13, 16], m), [null, 1, 1, 2, 2, 3]);
+  const idx = S.basketIndex([{ days: [1, 2, 3], c: [100, 110, 110] }, { days: [1, 2, 3], c: [50, 50, 45] }]);
+  near(idx.get(2), 100 * 1.05, 1e-9);          // +10% and 0% → +5%
+  near(idx.get(3), 100 * 1.05 * 0.95, 1e-9);   // 0% and −10% → −5%
+  assert.equal(idx.has(1), false, 'no change on the first day');
+});
+
+test('signalRows: rows are kept when a trial signal has no data, and trial signals are scored on their own', () => {
+  const c = Array.from({ length: 320 }, (_, i) => 100 * 1.004 ** i + (i % 2 ? 0.5 : -0.5));   // ~+12.7% per 30 days
+  const rows = S.signalRows([{ id: 'a', symbol: 'A', t0: 0, c }], S.DEFAULT_PARAMS);
+  assert.ok(rows.length > 50, 'no benchmark or volume: the day still counts');
+  assert.ok(rows.every(r => r.a.rsUp == null && r.a.volUp == null));
+  const withBench = S.signalRows([{ id: 'a', symbol: 'A', t0: 0, c, bench: new Array(320).fill(1) }], S.DEFAULT_PARAMS);
+  assert.ok(withBench.some(r => r.a.rsUp === true));
+  assert.ok(withBench.every(r => !r.good.includes('rsUp')));
 });
 
 test('point & figure: scored per day from past closes only, the same way the chart is drawn', () => {

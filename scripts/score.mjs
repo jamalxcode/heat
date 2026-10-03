@@ -43,13 +43,24 @@ await pool(universe, 5, async c => {
   const closes = (h?.closes || []).filter(([t]) => Math.floor(t / DAY) < today);
   if (closes.length < 260) { missing.push(c.symbol.toUpperCase()); return; }
   if (h.verified) verified++;
-  const byDay = new Map(closes.map(([t, v]) => [Math.floor(t / DAY), v]));
-  const days = [...byDay.keys()].sort((a, b) => a - b), filled = [];
-  let last = byDay.get(days[0]);
-  for (let d = days[0]; d <= days[days.length - 1]; d++) { if (byDay.has(d)) last = byDay.get(d); filled.push(last); }
-  coins.push({ id: c.id, symbol: c.symbol.toUpperCase(), name: c.name, t0: days[0] * DAY, c: filled });
+  const byDay = new Map(closes.map(([t, v, vol]) => [Math.floor(t / DAY), [v, vol]]));
+  const days = [...byDay.keys()].sort((a, b) => a - b), filled = [], vols = [];
+  let last = byDay.get(days[0])[0];
+  for (let d = days[0]; d <= days[days.length - 1]; d++) {
+    const x = byDay.get(d);
+    if (x) last = x[0];
+    filled.push(last);
+    vols.push(x?.[1] > 0 ? x[1] : null);   // a gap has no volume (the close is carried forward, the volume isn't)
+  }
+  coins.push({ id: c.id, symbol: c.symbol.toUpperCase(), name: c.name, t0: days[0] * DAY, c: filled, v: vols });
 });
-console.log(`History for ${coins.length}/${universe.length} coins (${verified} on pairs verified by ID)${missing.length ? ' · none for ' + missing.join(', ') : ''}`);
+// Relative strength is measured against Bitcoin
+const btc = coins.find(c => c.id === 'bitcoin');
+if (btc) {
+  const b0 = btc.t0 / DAY, byDayBtc = new Map(btc.c.map((v, i) => [b0 + i, v]));
+  for (const c of coins) c.bench = SIG.alignBench(c.c.map((_, i) => c.t0 / DAY + i), byDayBtc);
+}
+console.log(`History for ${coins.length}/${universe.length} coins (${verified} on pairs verified by ID, ${coins.filter(c => c.v.some(Boolean)).length} with volume)${btc ? '' : ' · no Bitcoin history: relative strength not measured'}${missing.length ? ' · none for ' + missing.join(', ') : ''}`);
 
 // 4. Point-in-time list: record today's top 100, so the scorecard can also judge each day using only the coins that
 // were in the list on that day (scoring today's list alone flatters the signals: coins are there because they rose)
@@ -71,7 +82,7 @@ console.log(`Point-in-time list: ${card.pit?.days ?? 0} day(s) recorded since ${
 console.log(`Signals of ${card.signalDay} → ${card.outcomeDay}: ${y.rockets.n} 🚀 coins (${pct(y.rockets.upRate)} up), ${y.sad.n} 😢 coins (${pct(y.sad.downRate)} down), market ${pct(card.yesterday.market)}`);
 for (const h of SIG.HORIZONS) {
   const w = card.windows.d30[h];
-  console.log(`Last 30 days, ${h}d ahead: 🚀 up ${pct(w.rockets.upRate)} · 😢 down ${pct(w.sad.downRate)} · ⚡ moves ${w.squeeze.ratio?.toFixed(2) ?? '—'}× usual · IC ${w.ic.mean?.toFixed(4) ?? '—'} (t=${w.ic.t?.toFixed(2) ?? '—'})`);
+  console.log(`Last 30 days, ${h}d ahead: 🚀 up ${pct(w.rockets.upRate)} · 😢 down ${pct(w.sad.downRate)} · IC ${w.ic.mean?.toFixed(4) ?? '—'} (t=${w.ic.t?.toFixed(2) ?? '—'})`);
 }
 if (t && card.tuning.lastRun && Date.now() - Date.parse(card.tuning.lastRun) < 3600e3) {
   console.log(`Tuning: ${t.adopted ? 'ADOPTED new settings' : 'kept current settings'} · won ${t.wins}/${t.folds.length} check periods · avg IC ${t.testIC.before?.toFixed(4)} → ${t.testIC.after?.toFixed(4)}`);

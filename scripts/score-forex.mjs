@@ -13,12 +13,12 @@ const readJSON = async (p, fallback) => { try { return JSON.parse(await readFile
 
 // Forex moves are a fraction of crypto's: momentum is judged over 21 business days (about a month), with thresholds
 // in the low single digits. These are the starting settings; the tuner adjusts them.
-const FX_START = { momPct: 3, momDays: 21 };
+const FX_START = { momPct: 3, momDays: 21, rsPct: 1.5 };
 const MOM_PCTS = [1.5, 3, 4.5];
 const HISTORY_FROM = '2010-01-01';
 
 const now = Date.now(), today = Math.floor(now / DAY);
-const params = SIG.withDefaults(await readJSON('params-forex.json', FX_START));
+const params = SIG.withDefaults({ ...FX_START, ...(await readJSON('params-forex.json', {})) });   // FX_START fills settings added later
 const prev = await readJSON('data/forex-scorecard.json', null);
 const tuneNow = process.argv.includes('--tune') || new Date().getUTCDay() === 0;
 
@@ -54,6 +54,9 @@ for (const cur of CURRENCIES.filter(scored)) {
   if (doubtful.length) spiky.push(`${cur.code} ${doubtful.length}`);
   coins.push({ id: cur.code.toLowerCase(), symbol: pairOf(cur), name: cur.name, t0: s.days[0] * DAY, c: s.c, days: s.days, skip });
 }
+// Relative strength is measured against an equal-weight basket of every scored pair (forex has no volume)
+const basket = SIG.basketIndex(coins);
+for (const c of coins) c.bench = SIG.alignBench(c.days, basket);
 console.log(`Scoring ${coins.length} currencies${tuneNow ? ', tuning' : ''}${spiky.length ? ` · unusual jumps left out: ${spiky.join(', ')}` : ''}`);
 
 // 4. Score, and tune on Sundays (or when asked, or the first time)

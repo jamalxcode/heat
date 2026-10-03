@@ -14,14 +14,14 @@
 <meta property="og:site_name" content="heat.sala.company">
 <meta property="og:url" content="https://heat.sala.company/">
 <meta property="og:title" content="Crypto Heatmap: Top 100 Coins with RSI, Trend &amp; Stop-Losses">
-<meta property="og:description" content="The top 100 coins by market cap at a glance: price heat, RSI, 50/200-day trend, Bollinger width, point &amp; figure and suggested stop-losses. Refreshed every 10 minutes.">
+<meta property="og:description" content="The top 100 coins by market cap at a glance: price heat, RSI, 50/200-day trend, strength vs Bitcoin, volume, point &amp; figure and suggested stop-losses. Refreshed every 10 minutes.">
 <meta property="og:image" content="https://heat.sala.company/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="The heat.sala.company crypto heatmap: tiles for Bitcoin, Ethereum and other top coins, colored by 24-hour change">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Crypto Heatmap: Top 100 Coins with RSI, Trend &amp; Stop-Losses">
-<meta name="twitter:description" content="Price heat, RSI, 50/200-day trend, Bollinger width, point &amp; figure and suggested stop-losses for the top 100 coins. Refreshed every 10 minutes.">
+<meta name="twitter:description" content="Price heat, RSI, 50/200-day trend, strength vs Bitcoin, volume, point &amp; figure and suggested stop-losses for the top 100 coins. Refreshed every 10 minutes.">
 <meta name="twitter:image" content="https://heat.sala.company/og-image.png">
 <!-- structured data: what this page is, plus the FAQ shown in the footer -->
 <script type="application/ld+json">
@@ -37,14 +37,14 @@
       "operatingSystem": "Any (web browser)",
       "isAccessibleForFree": true,
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-      "description": "A crypto heatmap of the top 100 coins by market cap, stablecoins excluded. Each tile shows the price move, RSI, the 50/200-day moving-average trend, Bollinger Band width, point & figure trend, 30-day momentum and suggested stop-losses. Data refreshes every 10 minutes, and a daily scorecard checks how the signals did.",
+      "description": "A crypto heatmap of the top 100 coins by market cap, stablecoins excluded. Each tile shows the price move, RSI, the 50/200-day moving-average trend, relative strength vs Bitcoin, volume surges, point & figure trend, 30-day momentum and suggested stop-losses. Data refreshes every 10 minutes, and a daily scorecard checks how the signals did.",
       "publisher": { "@type": "Organization", "name": "sala.company", "url": "https://sala.company/" }
     },
     {
       "@type": "FAQPage",
       "mainEntity": [
         { "@type": "Question", "name": "What does the crypto heatmap show?",
-          "acceptedAnswer": { "@type": "Answer", "text": "The top 100 coins by market cap, stablecoins excluded. Each tile is colored by its 24-hour, 7-day or 30-day price change and shows RSI, the 50/200-day moving-average trend, Bollinger Band width, the point & figure trend, 30-day momentum and suggested long and short stop-losses." } },
+          "acceptedAnswer": { "@type": "Answer", "text": "The top 100 coins by market cap, stablecoins excluded. Each tile is colored by its 24-hour, 7-day or 30-day price change and shows RSI, the 50/200-day moving-average trend, relative strength vs Bitcoin, volume surges, the point & figure trend, 30-day momentum and suggested long and short stop-losses." } },
         { "@type": "Question", "name": "How often is the data updated?",
           "acceptedAnswer": { "@type": "Answer", "text": "Every 10 minutes. Prices are not real-time. Market data is powered by CoinGecko, with daily candles from Binance, Gate.io, OKX, MEXC and KuCoin." } },
         { "@type": "Question", "name": "What do the rocket and sad-face emoji mean?",
@@ -350,7 +350,8 @@ body.signals-unproven .tile .emo, body.signals-unproven .tile .pnf-mark { opacit
 .row .tag { font-weight: 600; font-size: 10.5px; padding: 0 6px; border-radius: 999px; line-height: 16px; flex: none; }
 .tag.os { background: color-mix(in oklab, var(--blue) 20%, transparent); }
 .tag.ob { background: color-mix(in oklab, var(--orange) 24%, transparent); }
-.tag.sq { background: color-mix(in oklab, var(--amber) 32%, transparent); }
+.tag.rs-up, .tag.vol-up { background: color-mix(in oklab, var(--blue) 18%, transparent); color: var(--up-text); }
+.tag.rs-dn, .tag.vol-dn { background: color-mix(in oklab, var(--red) 16%, transparent); color: var(--down-text); }
 .tag.stop-x { background: #b8413f; color: #fff; }
 .row .sl { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink-2); }
 .row .sl.near { color: var(--ink); background: color-mix(in oklab, var(--amber) 30%, transparent); border-radius: 4px; padding: 0 3px; }
@@ -507,7 +508,8 @@ footer .about p { margin: 0; }
         <details class="more" id="moreFilters">
           <summary class="chip" aria-label="More filters">More ▾</summary>
           <div class="menu">
-            <button class="chip" data-f="sq" aria-pressed="false">Squeeze <span class="n"></span></button>
+            <button class="chip" data-f="rs" aria-pressed="false">Beating <span class="bl">BTC</span> <span class="n"></span></button>
+            <button class="chip" data-f="vol" aria-pressed="false" title="Volume over the last 7 days at least 1.5× the 30 days before, while price moved">Volume surge <span class="n"></span></button>
             <button class="chip" data-f="cross" aria-pressed="false">Recent cross <span class="n"></span></button>
           </div>
         </details>
@@ -536,7 +538,7 @@ footer .about p { margin: 0; }
       <h2 id="about-h">About this crypto heatmap</h2>
       <p>heat.sala.company is a free crypto heatmap of the top 100 cryptocurrencies by market cap, including Bitcoin (BTC), Ethereum (ETH), Solana (SOL), XRP, BNB and Cardano (ADA). It combines the price move with technical indicators and suggested stop-losses in one view, and a daily scorecard checks how its signals actually did.</p>
       <h3>What does the crypto heatmap show?</h3>
-      <p>The top 100 coins by market cap, stablecoins excluded. Each tile is colored by its 24-hour, 7-day or 30-day price change and shows RSI, the 50/200-day moving-average trend, Bollinger Band width, the point &amp; figure trend, 30-day momentum and suggested long and short stop-losses.</p>
+      <p>The top 100 coins by market cap, stablecoins excluded. Each tile is colored by its 24-hour, 7-day or 30-day price change and shows RSI, the 50/200-day moving-average trend, relative strength vs Bitcoin, volume surges, the point &amp; figure trend, 30-day momentum and suggested long and short stop-losses.</p>
       <h3>How often is the data updated?</h3>
       <p>Every 10 minutes. Prices are not real-time. Market data is powered by CoinGecko, with daily candles from Binance, Gate.io, OKX, MEXC and KuCoin.</p>
       <h3>What do the rocket and sad-face emoji mean?</h3>

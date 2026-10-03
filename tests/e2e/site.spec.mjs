@@ -75,10 +75,10 @@ test('✓ / ? marks show how each coin was matched', async ({ page }) => {
 });
 
 test('filters show only matching coins, and "All coins" restores them', async ({ page }) => {
-  for (const f of ['up', 'down', 'ob', 'sq', 'cross', 'stop']) {
+  for (const f of ['up', 'down', 'ob', 'rs', 'vol', 'cross', 'stop']) {
     const chip = page.locator(`#filters .chip[data-f="${f}"]`);
     const count = Number(await chip.locator('.n').textContent());
-    if (['sq', 'cross'].includes(f)) await page.locator('#moreFilters summary').click();   // these two live in "More ▾"
+    if (['rs', 'vol', 'cross'].includes(f)) await page.locator('#moreFilters summary').click();   // these live in "More ▾"
     await chip.click();
     if (count) await expect(tiles(page)).toHaveCount(count);
     else await expect(page.locator('#grid .empty')).toContainText('right now');
@@ -89,17 +89,17 @@ test('filters show only matching coins, and "All coins" restores them', async ({
 
 test('"More ▾" holds the less-used filters: picking one closes the menu and shows on its button', async ({ page }) => {
   const more = page.locator('#moreFilters');
-  await expect(more.locator('[data-f="sq"]')).toBeHidden();
+  await expect(more.locator('[data-f="cross"]')).toBeHidden();
   await more.locator('summary').click();
-  await expect(more.locator('[data-f="sq"]')).toBeVisible();
-  await more.locator('[data-f="sq"]').click();
-  await expect(more.locator('summary')).toHaveText('More: Squeeze ▾');
-  await expect(more.locator('[data-f="sq"]')).toBeHidden();                  // closed after picking
+  await expect(more.locator('[data-f="cross"]')).toBeVisible();
+  await more.locator('[data-f="cross"]').click();
+  await expect(more.locator('summary')).toHaveText('More: Recent cross ▾');
+  await expect(more.locator('[data-f="cross"]')).toBeHidden();                  // closed after picking
   await page.locator('#filters .chip[data-f="all"]').click();
   await expect(more.locator('summary')).toHaveText('More ▾');
   await more.locator('summary').click();
   await page.locator('h1').click();                                         // a click elsewhere closes it
-  await expect(more.locator('[data-f="sq"]')).toBeHidden();
+  await expect(more.locator('[data-f="cross"]')).toBeHidden();
 });
 
 test('ⓘ on a tile opens its chart card at once; resting elsewhere on a tile opens it after ~0.7 s', async ({ page }) => {
@@ -390,6 +390,46 @@ test.describe('forex', () => {
     await page.locator('#view button[data-v="score"]').click();
     await expect(page.locator('#scorewrap')).toContainText("Yesterday's calls");
     await expect(page.locator('#scorewrap .sc-chart svg')).toBeVisible();
+  });
+});
+
+// Relative strength and volume rows (Bollinger width is gone from the tiles; the bands stay in the chart)
+test.describe('relative strength and volume', () => {
+  const row = (page, id, k) => tile(page, id).locator('.row', { has: page.locator(`.k:text-is("${k}")`) });
+
+  test('crypto tiles: RS and VOL rows, no BBW; a volume surge on a climb is tagged and filterable', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#status')).toContainText('with indicators');
+    await expect(page.locator('#grid .row .k', { hasText: 'BBW' })).toHaveCount(0);
+    await expect(row(page, 'alpha-coin', 'RS')).toHaveCount(1);
+    await expect(row(page, 'alpha-coin', 'RS')).toContainText('n/a');                // no Bitcoin in the test data: no benchmark
+    await expect(row(page, 'alpha-coin', 'VOL')).toContainText('usual volume');
+    await expect(row(page, 'moon-coin', 'VOL').locator('.tag.vol-up')).toContainText('on a climb');
+    await page.locator('#moreFilters summary').click();
+    const chip = page.locator('#filters .chip[data-f="vol"]');
+    await expect(chip).toBeVisible();
+    await expect(chip.locator('.n')).toHaveText('1');
+    await chip.click();
+    await expect(tiles(page)).toHaveCount(1);
+    await expect(tile(page, 'moon-coin')).toHaveCount(1);
+    await page.locator('#filters .chip[data-f="all"]').click();
+    await tile(page, 'moon-coin').click();
+    await expect(page.locator('#detail dl.kv')).toContainText('Volume (7d vs 30d)');
+    await expect(page.locator('#detail dl.kv')).not.toContainText('BB width');
+    await expect(page.locator('#detail .d-legend')).toContainText('Bollinger');          // still drawn in the chart
+  });
+
+  test('forex compares with the basket (no volume row); metals with gold', async ({ page }) => {
+    await page.goto('/forex/');
+    await expect(page.locator('#status')).toContainText('with indicators');
+    await expect(row(page, 'eur', 'RS')).toContainText(/[+−]\d+\.\d%/);
+    await expect(row(page, 'eur', 'VOL')).toHaveCount(0);
+    await expect(page.locator('#filters .chip[data-f="vol"]')).toBeHidden();
+    await expect(page.locator('#filters .chip[data-f="rs"]')).toContainText('Beating basket');
+    await page.goto('/metals/');
+    await expect(page.locator('#status')).toContainText('with indicators');
+    await expect(row(page, 'xau', 'RS')).toContainText('the benchmark');
+    await expect(row(page, 'xag', 'RS')).toContainText(/[+−]\d+\.\d%/);
   });
 });
 
