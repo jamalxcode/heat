@@ -108,8 +108,24 @@ export function renderScorecard() {
   const Hs = sc.horizons || [1];
   if (!Hs.includes(S.scoreH)) S.scoreH = 1;
   const h = S.scoreH, hw = H_WORD[h];
-  const w = byH(sc.windows[S.scoreWin] || sc.windows.d30)[h];
-  const winName = { d30: 'last 30 days', d90: 'last 90 days', all: 'all history' }[S.scoreWin];
+  // Fair (point-in-time) figures lead whenever the scorer made them: today's list flatters the signals, because coins
+  // are in it because they rose. (Forex has no fair/long split: its list of currencies never changes.)
+  const hasFair = !!sc.pit?.windows;
+  if (!hasFair || !['fair', 'long'].includes(S.scoreSet)) S.scoreSet = hasFair ? 'fair' : 'long';
+  const fair = S.scoreSet === 'fair';
+  const W = fair ? sc.pit.windows : sc.windows, daily = fair ? sc.pit.daily || sc.daily : sc.daily;   // older scorecards: fair 'all' only
+  const w = byH(W[S.scoreWin] || W.d30 || W.all)[h];
+  const winName = { d30: 'last 30 days', d90: 'last 90 days', all: fair ? `all ${sc.pit.days} fair days` : 'all history' }[S.scoreWin];
+  // The plain answer first: do the signals work? (fair figures over all fair days, next day; forex: its whole history)
+  const A = byH(hasFair ? sc.pit.windows.all : sc.windows.all)[1];
+  const nDays = hasFair ? sc.pit.days : A.days, minDays = sc.pit?.minDays || 60;
+  const tooEarly = hasFair && sc.pit.days < minDays;
+  const answer = tooEarly ? `<b>Too early to say.</b> Only ${nDays} fair days so far; about ${minDays} are needed.`
+    : A.ic.t >= 2 ? '<b>Yes, a little.</b>' : A.ic.t <= -2 ? '<b>No, they point the wrong way.</b>' : '<b>Not yet.</b>';
+  const detail = tooEarly || !A.rockets.n ? '' : `Over ${hasFair ? `the last ${nDays} fair days` : `${nDays.toLocaleString()} days of history`}, ${M.noun} with more 🚀 than 😢 went up ${pc(A.rockets.upRate)} of the time the next day, against ${pc(A.all.upRate)} for all ${M.noun}, and moved ${spc(A.rockets.avgExc)} a day compared with the market.`;
+  const fairWhy = hasFair ? `<b>Fair</b> means each day is judged only on the ${M.noun} that were in that day's top 100, including ones that have since dropped out.` : `The list of ${M.noun} never changes, so the whole history is a fair test.`;
+  const answerHTML = `<div class="sc-card sc-answer"><h2>Do the signals work?</h2><p class="sc-answer-line">${answer} ${detail}</p><p class="sc-muted">${fairWhy}${A.ic.t >= 2 ? '' : ' Until a signal proves itself, read the 🚀/😢 as a summary of the chart, not a prediction.'}</p></div>`;
+  const longNote = hasFair && !fair ? `<p class="sc-warn-note">⚠ These figures use <b>today's</b> top 100 over the whole history: longer, but flattering, because ${M.noun} are in today's list partly because they rose. The <b>Fair test</b> is the honest one.</p>` : '';
   const moved = y.coins.filter(c => c.score !== 0);
   const tile = (title, big, lines) => `<div class="sc-tile"><div class="sc-t">${title}</div><div class="sc-big">${big}</div>${lines.map(l => `<div class="sc-l">${l}</div>`).join('')}</div>`;
   const segBtns = (id, attr, cur, opts) => `<div class="seg" id="${id}">${opts.map(([v, l]) => `<button data-${attr}="${v}" aria-pressed="${String(cur) === String(v)}">${l}</button>`).join('')}</div>`;
@@ -143,13 +159,14 @@ export function renderScorecard() {
   const tuneHTML = !t.lastRun || !last ? '<p class="sc-muted">The tuner hasn\'t run yet. It runs every Sunday.</p>' : `
     <p><b>Last run ${new Date(t.lastRun).toLocaleDateString()}</b>: ${last.adopted ? '✅ <b>adopted new settings</b>: they beat the current ones on periods they weren\'t tuned on.' : 'kept the current settings. The alternative didn\'t clearly beat them on periods it wasn\'t tuned on.'}
       ${last.folds ? `Won <b>${last.wins} of ${last.folds.length}</b> check periods · average score (rank correlation over 1/3/7 days): current <b>${last.testIC.before?.toFixed(3) ?? '—'}</b> vs candidate <b>${last.testIC.after?.toFixed(3) ?? '—'}</b>.` : `Check-period score: current <b>${last.testIC.before?.toFixed(3) ?? '—'}</b> vs candidate <b>${last.testIC.after?.toFixed(3) ?? '—'}</b>.`}</p>
+    ${last.fair ? `<p><b>Fair-days check</b>: ${last.fair.ok ? '✅' : '⏸ new signal settings not adopted:'} ${esc(last.fair.why)}${last.fair.current != null ? ` (current ${last.fair.current.toFixed(3)} vs candidate ${last.fair.proposed.toFixed(3)})` : ''}. <span class="sc-muted">The tuner learns on today's list, which flatters the signals, so a change must also hold on the fair days.</span></p>` : ''}
     ${last.holdout ? `<p><b>Untouched check</b> (${last.holdout.from} → ${last.holdout.to}, never used for tuning): current settings scored <b>${last.holdout.current?.toFixed(3) ?? '—'}</b>, the alternative <b>${last.holdout.proposed?.toFixed(3) ?? '—'}</b> <span class="sc-muted">(same score as above; around 0 means no link)</span>.</p>` : ''}
     ${last.stop ? `<p><b>Stop distance</b>: tested ${last.stop.table.map(s => `${s.m}× (exits ${s.avg >= 0 ? 'saved' : 'cost'} ${pc(Math.abs(s.avg), 2)} over 3 days)`).join(', ')}. ${last.stop.adopt ? `✅ <b>Switched from ${last.stop.from}× to ${last.stop.to}×</b>: it did better in ${last.stop.wins} of 3 check periods.` : `Kept <b>${last.stop.from}×</b>: no other distance did clearly better.`}</p>` : ''}
     ${foldsHTML ? `<details><summary>Check periods</summary>${foldsHTML}</details>` : ''}
     <details><summary>What the tuner found for each signal</summary><ul>${(last.notes || []).map(n => `<li>${esc(n)}</li>`).join('')}</ul></details>
     ${(t.history || []).length ? `<details><summary>Settings changes (${t.history.length})</summary><ul>${t.history.map(x => `<li>${x.date}: score ${x.testIC.before?.toFixed(3)} → ${x.testIC.after?.toFixed(3)}</li>`).join('')}</ul></details>` : ''}`;
 
-  box.innerHTML = `
+  const yHTML = `
     <div class="sc-card">
       ${S.quote === 'usd' ? `<p class="sc-muted">ⓘ The scorecard is scored on <b>USD/…</b> pairs (USD/EUR, USD/JPY …), so its calls and moves refer to those, not to the …/USD view on the tiles.</p>` : ''}
       <h2>Yesterday's calls <span class="sc-muted">signals at the ${sc.signalDay} ${M.live ? 'close' : 'rate'}, then how the ${M.noun} did by the ${sc.outcomeDay} ${M.live ? 'close (UTC)' : 'ECB rate'}</span></h2>
@@ -169,11 +186,15 @@ export function renderScorecard() {
       }).join('')}</div>` : ''}
     </div>
 
-    ${sc.daily?.length ? `<div class="sc-card"><h2>Last ${sc.daily.length} days <span class="sc-muted">holding each day's 🚀 ${M.noun} vs 😢 ${M.noun} for one day</span></h2>${basketChart(sc.daily)}</div>` : ''}
+`;
+  box.innerHTML = `
+    ${answerHTML}
+    ${daily?.length ? `<div class="sc-card"><h2>Last ${daily.length} days <span class="sc-muted">${fair ? 'fair test · ' : ''}holding each day's 🚀 ${M.noun} vs 😢 ${M.noun} for one day</span></h2>${basketChart(daily)}</div>` : ''}
 
     <div class="sc-card">
       <div class="sc-head"><h2>Track record <span class="sc-muted">${winName}, judged over ${hw}</span></h2>
         <div class="sc-segs">
+          ${hasFair ? segBtns('scoreSet', 's', S.scoreSet, [['fair', 'Fair test'], ['long', 'Long history']]) : ''}
           ${Hs.length > 1 ? segBtns('scoreH', 'h', h, Hs.map(v => [v, v === 1 ? 'Next day' : `${v} days`])) : ''}
           ${segBtns('scoreWin', 'w', S.scoreWin, [['d30', '30 days'], ['d90', '90 days'], ['all', 'All']])}
         </div></div>
@@ -185,7 +206,7 @@ export function renderScorecard() {
         ${tile('Coin-flip baseline', `${pc(w.all.upRate)} of all ${M.noun} went up`, [`${w.days} days · ${w.rows.toLocaleString()} ${M.one}-days`])}
       </div>
       ${cost != null ? `<p class="sc-muted">Costs: about ${pc(cost, 2)} per round trip (${M.costWords}), taken off once per holding period. A small edge can disappear after costs.</p>` : ''}
-      ${pitHTML}
+      ${fair ? pitHTML : longNote}
       <p class="sc-verdict">Verdict: <b>${icVerdict(w.ic)}</b>. <span class="sc-muted">(Daily rank correlation between score and the move over ${hw}: ${w.ic.mean?.toFixed(3) ?? '—'}, t = ${w.ic.t?.toFixed(1) ?? '—'}. Around 0 means no link; t above 2 means it's unlikely to be luck.${h > 1 ? ' Multi-day moves overlap, so t is scaled down to stay honest.' : ''})</span></p>
       ${stopsHTML(w.stops, h, hw)}
       <h3>More 🚀 → bigger move?</h3>
@@ -193,6 +214,8 @@ export function renderScorecard() {
       <h3>Each signal on its own</h3>
       <div class="tablewrap"><table class="sc-table"><thead><tr><th>Signal</th><th>Counts as</th><th>Fired</th><th>Up</th><th>Avg vs market</th><th>Reliability</th></tr></thead><tbody>${compRows}</tbody></table></div>
     </div>
+
+    ${yHTML}
 
     <div class="sc-card">
       <h2>Self-tuning <span class="sc-muted">weekly, on ${M.tuneHistory}</span></h2>

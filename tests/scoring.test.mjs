@@ -85,3 +85,17 @@ test('point-in-time: a coin that left the top 100 still counts on the days it wa
   const without = S.buildScorecard(coins, null, { prev: { tuning: { lastRun: '2026-01-01T00:00:00Z', history: [] } }, universe });
   assert.equal(without.card.pit.left, 0, 'before the fix: the coin that left was silently missing');
 });
+
+test('tuner guard: no new signal settings while the fair history is short; the fair figures come in 30/90/all windows', () => {
+  const day = d => new Date(d * DAY).toISOString().slice(0, 10);
+  const universe = {};
+  for (let d = 860; d < 900; d++) universe[day(d)] = coins.slice(0, 30).map(c => c.id);   // 40 fair days < 60
+  const { card, newParams } = S.buildScorecard(coins, null, { tuneNow: true, universe });
+  const last = card.tuning.last;
+  assert.equal(last.adopted, false, 'never adopted with under 60 fair days');
+  if (last.fair) assert.match(last.fair.why, /60 needed/);
+  if (newParams) assert.deepEqual(newParams.weights, S.withDefaults(null).weights, 'only a stop change may go through');
+  assert.equal(card.pit.minDays, S.PIT_MIN_DAYS);
+  assert.deepEqual(Object.keys(card.pit.windows).sort(), ['all', 'd30', 'd90']);
+  assert.ok(card.pit.daily.length > 20 && card.pit.daily.every(d => d.mkt != null));
+});

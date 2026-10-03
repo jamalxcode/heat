@@ -310,6 +310,8 @@ $('#legendToggle').addEventListener('click', () => { setLegend(!S.legendOpen); s
 $('#scorewrap').addEventListener('click', e => {
   const b = e.target.closest('[data-w]');
   if (b) { S.scoreWin = b.dataset.w; renderScorecard(); return; }
+  const sb = e.target.closest('[data-s]');           // Fair test | Long history
+  if (sb) { S.scoreSet = sb.dataset.s; renderScorecard(); return; }
   const hb = e.target.closest('[data-h]');
   if (hb) { S.scoreH = +hb.dataset.h; renderScorecard(); return; }
   // Yesterday's coins: open the coin's chart card beside the chip, the same card as a grid click (Price / P&F

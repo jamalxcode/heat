@@ -611,31 +611,65 @@ const isoDay = d => new Date(d * DAY).toISOString().slice(0, 10);
 //   shown after costs; it doesn't change the rank-based verdicts.
 // universe: { 'YYYY-MM-DD': [ids] }, the coins that were in the list on each day. Rows for days with a snapshot are
 //   also scored point-in-time (only coins that were in that day's list), which removes survivorship bias.
+// Fair (point-in-time) days needed before the tuner may change the signal settings (see buildScorecard)
+export const PIT_MIN_DAYS = 60;
 export function buildScorecard(coins, current, { prev = null, tuneNow = false, now = Date.now(), momPcts, costPct = 0, universe = null, extra = null, backfill = null } = {}) {
   const params = withDefaults(current);
   const rows = signalRows(coins, params);
   const lastDay = Math.max(...rows.filter(r => r.ret[1] != null).map(r => r.day)); // latest close whose next day is complete
-  const since = n => rows.filter(r => r.day > lastDay - n);
+  const recent = (rs, n) => rs.filter(r => r.day > lastDay - n);
   const y = rows.filter(r => r.day === lastDay).sort((a, b) => b.score - a.score || b.raw[1] - a.raw[1]);
   const perH = g => Object.fromEntries(HORIZONS.map(h => [h, stats(g, h)]));
-
   // last 60 days: average next-day move of the 🚀 coins, the 😢 coins and all coins (for the chart)
-  const daily = [];
-  const days = byDay(rows);
-  for (let d = lastDay - 59; d <= lastDay; d++) {
-    const g = (days.get(d) || []).filter(r => r.ret[1] != null);
-    if (!g.length) continue;
-    const pos = g.filter(r => r.score > 0), neg = g.filter(r => r.score < 0);
-    daily.push({ day: isoDay(d), mkt: g[0].mkt[1], rockets: pos.length ? mean(pos.map(r => r.ret[1])) : null, sad: neg.length ? mean(neg.map(r => r.ret[1])) : null, nR: pos.length, nS: neg.length });
+  const dailyOf = rs => {
+    const out = [], days = byDay(rs);
+    for (let d = lastDay - 59; d <= lastDay; d++) {
+      const g = (days.get(d) || []).filter(r => r.ret[1] != null);
+      if (!g.length) continue;
+      const pos = g.filter(r => r.score > 0), neg = g.filter(r => r.score < 0);
+      out.push({ day: isoDay(d), mkt: g[0].mkt[1], rockets: pos.length ? mean(pos.map(r => r.ret[1])) : null, sad: neg.length ? mean(neg.map(r => r.ret[1])) : null, nR: pos.length, nS: neg.length });
+    }
+    return out;
+  };
+
+  // Point-in-time ("fair") rows: each day judged on the coins that were in that day's list, including those that have
+  // since left the top 100 (`extra`), compared only with each other. Lists before recording began may be rebuilt
+  // (`backfill`: scripts/backfill-universe.mjs). Worked out before tuning, because the tuner's guard needs them.
+  let pitFor = null, pit = null;
+  if (universe) {
+    const inList = new Map(Object.entries(universe).map(([d, ids]) => [d, new Set(ids)]));
+    pitFor = p => {
+      const all = extra?.length ? signalRows([...coins, ...extra], p) : p === params ? rows : signalRows(coins, p);
+      return rebaseExcess(all.filter(r => inList.get(isoDay(r.day))?.has(r.id)));
+    };
+    pit = pitFor(params);
   }
+  const pitDays = pit ? new Set(pit.map(r => r.day)).size : 0;
 
   const tuning = structuredClone(prev?.tuning || { history: [] });
   let newParams = null;
   if (tuneNow || !tuning.lastRun) {
     const res = tune(coins, params, { momPcts });
+    // Guard: the tuner learns on today's list, which flatters signals (coins are in it because they rose). New signal
+    // settings are adopted only if they also do at least as well on the fair days, and not at all while there are
+    // fewer than PIT_MIN_DAYS of those. (Forex has no such bias: its list of currencies never changes.)
+    let fair = null;
+    if (res.adopt && pitFor) {
+      const obj = rs => mean(HORIZONS.map(h => stats(rs, h).ic.mean ?? 0));
+      if (pitDays < PIT_MIN_DAYS) fair = { days: pitDays, ok: false, why: `only ${pitDays} fair days so far (${PIT_MIN_DAYS} needed to confirm)` };
+      else {
+        const cur = obj(pit), prop = obj(pitFor(res.proposed));
+        fair = { days: pitDays, current: cur, proposed: prop, ok: prop >= cur, why: prop >= cur ? 'confirmed on the fair days' : 'did worse on the fair days' };
+      }
+      if (!fair.ok) {                                       // keep the signal settings; a stop-distance change may still go ahead
+        res.adopt = false;
+        res.params = withDefaults(params);
+        if (res.stop.adopt) res.params.stopMult = res.stop.to;
+      }
+    }
     tuning.lastRun = new Date(now).toISOString();
     tuning.last = {
-      adopted: res.adopt, notes: res.notes, testIC: res.testIC, wins: res.wins, folds: res.folds.map(f => ({ from: isoDay(f.from), to: isoDay(f.to), before: f.before, after: f.after, won: f.won })),
+      adopted: res.adopt, fair, notes: res.notes, testIC: res.testIC, wins: res.wins, folds: res.folds.map(f => ({ from: isoDay(f.from), to: isoDay(f.to), before: f.before, after: f.after, won: f.won })),
       trainFrom: isoDay(res.split.trainFrom), testFrom: isoDay(res.split.cut), testTo: isoDay(res.split.testTo),
       stop: res.stop,
       holdout: res.holdout && { ...res.holdout, from: isoDay(res.holdout.from), to: isoDay(res.holdout.to) },
@@ -655,22 +689,17 @@ export function buildScorecard(coins, current, { prev = null, tuneNow = false, n
       coins: y.map(r => ({ id: r.id, sym: r.sym, score: r.score, good: r.good, bad: r.bad, ret: r.raw[1], exc: r.exc[1] })),
       stats: stats(y, 1),
     },
-    windows: { d30: perH(since(30)), d90: perH(since(90)), all: perH(rows) },
-    daily, tuning, costs: { roundTrip: costPct },
+    windows: { d30: perH(recent(rows, 30)), d90: perH(recent(rows, 90)), all: perH(rows) },
+    daily: dailyOf(rows), tuning, costs: { roundTrip: costPct },
   };
-  // Point-in-time: each day judged on the coins that were in that day's list, including those that have since left
-  // the top 100 (`extra`), and compared only with each other. Lists before recording began may be rebuilt
-  // (`backfill`: scripts/backfill-universe.mjs).
-  if (universe) {
-    const inList = new Map(Object.entries(universe).map(([d, ids]) => [d, new Set(ids)]));
-    const all = extra?.length ? signalRows([...coins, ...extra], params) : rows;
-    const pit = rebaseExcess(all.filter(r => inList.get(isoDay(r.day))?.has(r.id)));
-    const pitDays = new Set(pit.map(r => r.day)), inTopNow = new Set(coins.map(c => c.id));
+  if (pit) {
+    const inTopNow = new Set(coins.map(c => c.id));
     card.pit = {
-      days: pitDays.size, from: pitDays.size ? isoDay(Math.min(...pitDays)) : null,
+      days: pitDays, from: pitDays ? isoDay(Math.min(...pit.map(r => r.day))) : null, minDays: PIT_MIN_DAYS,
       left: new Set(pit.filter(r => !inTopNow.has(r.id)).map(r => r.id)).size,   // coins scored here that are no longer in the top 100
       backfill: backfill || null,
-      windows: pit.length ? { all: perH(pit) } : null,
+      windows: pit.length ? { d30: perH(recent(pit, 30)), d90: perH(recent(pit, 90)), all: perH(pit) } : null,
+      daily: dailyOf(pit),
     };
   }
   return { card, newParams };
