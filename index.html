@@ -424,6 +424,8 @@ td .cell-heat { display: inline-block; padding: 1px 6px; border-radius: 4px; bac
 .d-head { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; padding-right: 24px; }
 .d-head img { width: 22px; height: 22px; border-radius: 50%; }
 .d-head b { font-size: 16px; }
+.d-head .d-link { flex: none; border: 0; background: none; cursor: pointer; font-size: 13px; padding: 0 2px; line-height: 1; opacity: .7; }
+.d-head .d-link:hover { opacity: 1; }
 .d-head a.tv { display: inline-flex; align-items: center; gap: 8px; color: inherit; text-decoration: none; }
 .d-head a.tv:hover b { text-decoration: underline; }
 .d-head .tv-go { font-size: 11px; color: var(--blue); white-space: nowrap; margin-left: auto; }
@@ -473,6 +475,7 @@ footer .about p { margin: 0; }
     <div class="status">
       <span id="status"><span class="dot"></span>Starting…</span>
       <button class="btn" id="refresh" title="Fetch fresh data">↻ Refresh</button>
+      <button class="btn" id="share" title="Copy a link to exactly this view (filter, timeframe, open coin…)">🔗 Link</button>
       <button class="btn" id="theme" title="Switch theme">◐ Auto</button>
       <button class="btn" id="wipBtn" title="Work in progress: read the warning">⚠ WIP</button>
     </div>

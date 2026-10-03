@@ -1,10 +1,10 @@
 // heat.sala.company page script: main (split from index.html; see app/main.mjs for the order things start in)
 import * as SIG from '/signals.mjs';
 import { applyEdge, applyParams, renderAll, renderCounts, renderFooter } from './render.mjs';
-import { $, DAY, fmtWait, LIVE_EVERY, M, MARKETS_TTL, REFRESH_MIN, S, setStatus, SNAPSHOT_GRACE, SNAPSHOT_MAX_AGE, SNAPSHOT_RETRY, store } from './core.mjs';
+import { $, DAY, fmtWait, linkedCoin, LIVE_EVERY, M, MARKETS_TTL, REFRESH_MIN, S, setStatus, SNAPSHOT_GRACE, SNAPSHOT_MAX_AGE, SNAPSHOT_RETRY, store } from './core.mjs';
 import { loadScorecard } from './scorecard.mjs';
 import { applyHist, buildBench, pickCoins } from './data.mjs';
-import './interact.mjs';   // hover, clicks, switches and keyboard: sets up its listeners when loaded
+import { openLinked } from './interact.mjs';   // hover, clicks, switches and keyboard: sets up its listeners when loaded
 
 /* ================= snapshot (data.json built by GitHub Actions) ================= */
 export async function loadSnapshot() {
@@ -62,12 +62,14 @@ export function tick() {
   if (!S.busy && !document.hidden && S.nextAuto && now >= S.nextAuto) run();
 }
 
+let linkedOpened = false;
 export function done() {
   renderFooter();
   renderCounts();   // right away: the deferred refresh is paused in background tabs
   const ok = S.coins.filter(c => S.ind[c.id] && !S.ind[c.id].error).length;
   const via = S.mode === 'live' ? ` · built in your browser from ${S.marketSrc}` : '';
   setStatus(`${ok}/${S.coins.length} ${M.noun} with indicators${via}`, S.stale ? '' : 'live');
+  if (linkedCoin && !linkedOpened) { linkedOpened = true; openLinked(); }   // a shared link to one coin
 }
 
 // Forex "…/USD" view: every USD/XXX pair turned into XXX/USD, so a blue tile means that currency gained on the dollar.
@@ -103,6 +105,7 @@ export async function show(raw, live) {
   if (isNew || !S.scorecard) { await loadScorecard(); applyEdge(); }
   if (isNew || paramsChanged || !S.coins.length) { pickCoins(); renderAll(); }
   applyHist();
+  if (S.filter !== 'all') renderAll();        // indicator filters (e.g. from a shared link) need the indicators first
   done();
   return isNew;
 }

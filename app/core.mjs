@@ -78,7 +78,32 @@ export const S = {
 export const prefs = store.get('hm.prefs') || {};
 export const PEG_PREF = M.pegPref;   // each market remembers its own 'show pegged' choice
 Object.assign(S, { quote: prefs.fxQuote === 'usd' && M.quoteSwitch ? 'usd' : 'market', colorBy: prefs.colorBy || '24h', view: prefs.view || 'grid', pegged: !!prefs[PEG_PREF], chart: prefs.chart === 'pnf' ? 'pnf' : 'price', legendOpen: !!prefs.legendOpen });
+// Shareable links: …/?f=vol&tf=7d&view=table&heat=h2&q=usd&coin=solana opens that exact view. A link overrides the
+// saved settings for this visit only (they're saved again only when the visitor changes something), and the address
+// bar follows every change (syncURL), so copying it always shares what's on screen.
+const URLQ = new URLSearchParams(location.search);
+const fromUrl = (k, ok) => { const v = URLQ.get(k); return v != null && ok(v) ? v : null; };
+const LINKED = {
+  colorBy: fromUrl('tf', v => ['24h', '7d', '30d'].includes(v)),
+  view: fromUrl('view', v => ['grid', 'table', 'score'].includes(v)),
+  quote: M.quoteSwitch ? fromUrl('q', v => ['usd', 'market'].includes(v)) : null,
+  filter: fromUrl('f', v => /^[a-z]{1,12}$/.test(v)),      // checked against the filter buttons in interact.mjs
+  heat: fromUrl('heat', v => /^h-?[0-4]$/.test(v)),
+};
+for (const [k, v] of Object.entries(LINKED)) if (v != null) S[k] = v;
+export const linkedCoin = fromUrl('coin', v => /^[a-z0-9._-]{1,80}$/i.test(v));
 if (!M.scorecard && S.view === 'score') S.view = 'grid';   // metals has no Scorecard view
+export function syncURL() {
+  const q = new URLSearchParams();
+  if (S.filter && S.filter !== 'all') q.set('f', S.filter);
+  if (S.heat) q.set('heat', S.heat);
+  if (S.colorBy !== '24h') q.set('tf', S.colorBy);
+  if (S.view !== 'grid') q.set('view', S.view);
+  if (M.quoteSwitch && S.quote === 'usd') q.set('q', 'usd');
+  if (S.pinned) q.set('coin', S.pinned);
+  const qs = q.toString(), url = location.pathname + (qs ? '?' + qs : '') + location.hash;
+  if (url !== location.pathname + location.search + location.hash) history.replaceState(null, '', url);
+}
 export const savePrefs = () => store.set('hm.prefs', { ...(store.get('hm.prefs') || {}), ...(M.quoteSwitch ? { fxQuote: S.quote } : {}), colorBy: S.colorBy, view: S.view, ...(PEG_PREF ? { [PEG_PREF]: S.pegged } : {}), chart: S.chart, legendOpen: S.legendOpen, theme: document.documentElement.dataset.theme || '' });
 
 export function setStatus(text, kind = '') { $('#status').innerHTML = `<span class="dot ${kind}"></span>${esc(text)}`; }

@@ -393,6 +393,51 @@ test.describe('forex', () => {
   });
 });
 
+test.describe('shareable links', () => {
+  test('a link opens that view (filter, timeframe, coin) without changing the visitor\'s saved settings', async ({ page }) => {
+    await page.goto('/?f=up&tf=7d&coin=alpha-coin');
+    await expect(page.locator('#status')).toContainText('with indicators');
+    await expect(page.locator('#filters .chip[data-f="up"]')).toHaveAttribute('aria-pressed', 'true');
+    const n = Number(await page.locator('#filters .chip[data-f="up"] .n').textContent());
+    await expect(tiles(page)).toHaveCount(n);                                             // filtered once the indicators are in
+    await expect(page.locator('#colorBy [data-v="7d"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#detail')).toHaveClass(/pinned/);
+    await expect(page.locator('#detail .d-head b')).toHaveText('Alpha Coin');
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('hm.prefs') || '{}').colorBy)).not.toBe('7d');
+  });
+
+  test('the address bar follows every change, and 🔗 copies it', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#status')).toContainText('with indicators');
+    await page.locator('#colorBy [data-v="30d"]').click();
+    await expect(page).toHaveURL(/\?tf=30d$/);
+    await page.locator('#filters .chip[data-f="down"]').click();
+    await expect(page).toHaveURL(/\?f=down&tf=30d$/);
+    await page.locator('#filters .chip[data-f="all"]').click();
+    await tile(page, 'moon-coin').click();
+    await expect(page).toHaveURL(/\?tf=30d&coin=moon-coin$/);
+    await page.evaluate(() => { window.copied = []; Object.defineProperty(navigator, 'clipboard', { value: { writeText: async t => window.copied.push(t) }, configurable: true }); });
+    await page.locator('#detail [data-copy-link]').click();
+    await page.locator('#share').click();
+    await expect(page.locator('#share')).toHaveText('✓ Copied');
+    await expect(page.locator('#detail')).toHaveClass(/pinned/);                          // the header button keeps the popup open
+    expect(await page.evaluate(() => window.copied)).toEqual(Array(2).fill(page.url()));
+    await page.locator('#detail .x').click();
+    await expect(page).toHaveURL(/\?tf=30d$/);
+    await page.locator('#colorBy [data-v="24h"]').click();
+    await expect(page).toHaveURL(/\/$/);
+  });
+
+  test('forex: the quote direction travels with the link; a filter the page lacks is ignored', async ({ page }) => {
+    await page.goto('/forex/?q=usd&f=vol&coin=jpy');
+    await expect(page.locator('#status')).toContainText('with indicators');
+    await expect(page.locator('#quote [data-v="usd"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#filters .chip[data-f="all"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#detail .d-head')).toContainText('JPY/USD');
+    await expect(page).toHaveURL(/\/forex\/\?q=usd&coin=jpy$/);
+  });
+});
+
 test('emoji size follows each signal\'s Scorecard record: small and grey until proven, full size once it is', async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('#status')).toContainText('with indicators');

@@ -49,6 +49,8 @@ Click the popup (or the tile) to pin it open, and click outside it to close it. 
 
 **Filters.** The filter buttons (Oversold, Overbought, Uptrend, Downtrend, 🛑 Past stop, and under **More ▾** Beating BTC, Volume surge and Recent cross; on phones all of them sit in one swipeable row) show only the matching coins, in both grid and table. Each button shows its count. **All coins** (or clicking the active button again) brings everything back. **Color scale:** click a range on the scale (e.g. "≤ −10" or "±1") to show only the coins in that color band. It combines with the filter buttons; click the range again, or **All coins**, to show everything.
 
+**Shareable links.** The address bar always matches what is on screen: the filter (`f`), colour range (`heat`), timeframe (`tf`), view (`view`), forex quote direction (`q=usd`) and an open coin (`coin`), e.g. `heat.sala.company/?f=vol&tf=7d&coin=solana`. **🔗 Link** in the header copies it, and the 🔗 in a chart card copies a link to that coin, whose card opens on arrival. A link applies for that visit only: it never overwrites the visitor's own saved settings, and a filter the page doesn't have (Volume surge on forex) is ignored.
+
 The **Table** view sorts by any column, including the recommended stops. The **Scorecard** view shows how the signals have actually performed.
 
 ## Scorecard: are the 🚀 / 😢 right?

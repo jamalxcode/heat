@@ -1,6 +1,6 @@
 // heat.sala.company page script: render (split from index.html; see app/main.mjs for the order things start in)
 import * as SIG from '/signals.mjs';
-import { $, $$, BINS, chgOf, esc, fmtBig, fmtPct, fmtPrice, heatClass, logo, M, S, TF, TOP_N } from './core.mjs';
+import { $, $$, BINS, chgOf, esc, fmtBig, fmtPct, fmtPrice, heatClass, logo, M, S, syncURL, TF, TOP_N } from './core.mjs';
 import { computeFor, match, P } from './data.mjs';
 import { emo, pc, renderScorecard } from './scorecard.mjs';
 import { showDetail } from './interact.mjs';
@@ -325,5 +325,6 @@ export function renderAll() {
   if (S.view === 'grid') renderGrid(); else if (S.view === 'table') renderTable(); else renderScorecard();
   renderCounts();
   renderFooter();
+  syncURL();                                  // the address bar always shares what's on screen
 }
 

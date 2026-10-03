@@ -2,7 +2,7 @@
 import * as SIG from '/signals.mjs';
 import { applyHist, match, P, pickCoins } from './data.mjs';
 import { renderScorecard } from './scorecard.mjs';
-import { $, $$, chgOf, DAY, esc, fmtBig, fmtPct, fmtPrice, logo, M, MARKET, prefs, S, savePrefs, store, TF } from './core.mjs';
+import { $, $$, chgOf, DAY, esc, fmtBig, fmtPct, fmtPrice, linkedCoin, logo, M, MARKET, prefs, S, savePrefs, store, syncURL, TF } from './core.mjs';
 import { done, run, show } from './main.mjs';
 import { renderAll, renderTable, rsWindow, signals } from './render.mjs';
 import { chartUrl, pick } from '/scripts/tradingview.mjs';
@@ -102,7 +102,7 @@ export function showDetail(id, anchor, keepPos) {
   // the logo and name link to the TradingView chart, only when that symbol is known to exist there
   const tv = pick(c, S.raw?.hist?.[id], MARKET, S.tv, S.quote === 'usd');
   const tvA = inner => tv ? `<a class="tv" href="${chartUrl(tv)}" target="_blank" rel="noopener noreferrer" title="Open the ${esc(tv)} chart on TradingView">${inner}</a>` : inner;
-  let body = `<div class="d-head">${tvA(`${logo(c, 22)}<b>${esc(c.name)}</b>`)}<span style="color:var(--ink-2)">${esc(c.symbol.toUpperCase())}${M.ranked ? ` · #${c.market_cap_rank}` : ''}</span>${tv ? tvA('<span class="tv-go">TradingView ↗</span>') : ''}</div>
+  let body = `<div class="d-head">${tvA(`${logo(c, 22)}<b>${esc(c.name)}</b>`)}<span style="color:var(--ink-2)">${esc(c.symbol.toUpperCase())}${M.ranked ? ` · #${c.market_cap_rank}` : ''}</span>${tv ? tvA('<span class="tv-go">TradingView ↗</span>') : ''}<button type="button" class="d-link" data-copy-link title="Copy a link to this ${M.one}" aria-label="Copy a link to this ${M.one}">🔗</button></div>
     <div class="d-price">${fmtPrice(c.current_price)}</div>
     <div class="d-chg"><span>${TF('24h')} ${fmtPct(chgOf(c, '24h'))}</span><span>${TF('7d')} ${fmtPct(chgOf(c, '7d'))}</span><span>${TF('30d')} ${fmtPct(chgOf(c, '30d'))}</span>${M.ranked ? `<span>Cap ${fmtBig(c.market_cap)}</span>` : ''}</div>
     ${c.warn ? `<div class="d-src">⚠ <b>${esc(c.name)}: the official rate and the street (market) rate differ a lot.</b> This rate comes from a community feed whose sources aren't documented, so it may not match what you'd actually get. It is left out of the scorecard.</div>` : ''}
@@ -168,6 +168,7 @@ export function hideDetail(force) {
   $$('#scorewrap [aria-expanded="true"]').forEach(x => x.setAttribute('aria-expanded', 'false'));
   $('#detail').classList.remove('show', 'pinned');
   $('#scrim').classList.remove('show');
+  syncURL();
 }
 export function pinDetail(id, anchor) {
   S.pinned = id;
@@ -175,6 +176,7 @@ export function pinDetail(id, anchor) {
   $('#detail').classList.add('pinned');
   $('#scrim').classList.add('show');
   $('#detail .x').focus({ preventScroll: true });
+  syncURL();
 }
 
 /* ================= events ================= */
@@ -253,6 +255,7 @@ $('#detail').addEventListener('click', e => {
   if (S.pinned || !S.hoverId || e.target.closest('.x')) return;
   // pin in place: no redraw, no move
   S.pinned = S.hoverId;
+  syncURL();
   $('#detail').classList.add('pinned');
   $('#scrim').classList.add('show');
 });
@@ -280,7 +283,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') hideDetail(t
 // Close a pinned popup on a click elsewhere. Uses the click's original path, because a redraw can detach e.target.
 document.addEventListener('click', e => {
   if (!S.pinned) return;
-  const inside = e.composedPath().some(n => n.id === 'detail' || n.classList?.contains('tile') || n.dataset?.coin || (n.tagName === 'TR' && n.dataset?.id));
+  const inside = e.composedPath().some(n => n.id === 'detail' || n.id === 'share' || n.classList?.contains('tile') || n.dataset?.coin || (n.tagName === 'TR' && n.dataset?.id));
   if (!inside) hideDetail(true);
 });
 addEventListener('scroll', () => { if (!S.pinned) hideDetail(); }, { passive: true });
@@ -316,15 +319,18 @@ $('#scorewrap').addEventListener('click', e => {
   pinDetail(chip.dataset.coin, chip);
   $$('#scorewrap [data-coin]').forEach(x => x.setAttribute('aria-expanded', x === chip));
 });
-export function setFilter(f) {
-  S.filter = f;
-  if (f === 'all') S.heat = null;               // "All coins" / "Show all coins" also clears a color-scale range
+// the filter buttons show the current filter; one picked from "More ▾" shows on its button: "More: Volume surge ▾"
+export function markFilter() {
   $$('#filters .chip[data-f]').forEach(x => x.setAttribute('aria-pressed', x.dataset.f === S.filter));
-  // a filter picked from "More ▾" closes the menu and shows on its button: "More: Squeeze ▾"
   const more = $('#moreFilters'), inMore = more.querySelector(`[data-f="${S.filter}"]`);
   more.toggleAttribute('data-active', !!inMore);
   more.querySelector('summary').textContent = inMore ? `More: ${inMore.firstChild.textContent.trim()} ▾` : 'More ▾';
-  if (!phone.matches) more.open = false;
+}
+export function setFilter(f) {
+  S.filter = f;
+  if (f === 'all') S.heat = null;               // "All coins" / "Show all coins" also clears a color-scale range
+  markFilter();
+  if (!phone.matches) $('#moreFilters').open = false;
   hideDetail(true);
   renderAll();
 }
@@ -355,6 +361,28 @@ $$('#colorBy button').forEach(b => { b.textContent = TF(b.dataset.v); b.title = 
 $('#filters .chip[data-f="all"]').textContent = `All ${M.noun}`;
 $('#filters .chip[data-f="rs"] .bl').textContent = M.benchLabel;
 if (!M.volume) $('#filters .chip[data-f="vol"]').hidden = true;   // forex and metals: no volume data
+// a shared link's filter must be one this page has (there's no Volume surge on forex, for one)
+const linkedChip = $(`#filters .chip[data-f="${S.filter}"]`);
+if (!linkedChip || linkedChip.hidden) S.filter = 'all';
+markFilter();
+
+// 🔗 copies a link to what's on screen; the popup's 🔗 copies a link to that coin (its chart card opens on arrival)
+async function copyLink(btn) {
+  syncURL();
+  const url = location.href, label = btn.textContent;
+  try { await navigator.clipboard.writeText(url); } catch { prompt('Copy this link:', url); return; }
+  btn.textContent = btn.id === 'share' ? '✓ Copied' : '✓';
+  setTimeout(() => { btn.textContent = label; }, 1500);
+}
+$('#share').addEventListener('click', e => copyLink(e.currentTarget));
+document.addEventListener('click', e => { const b = e.target.closest('[data-copy-link]'); if (b) copyLink(b); });
+// a link with ?coin=: open that coin's chart card once the data is in (main.mjs calls this once)
+export function openLinked() {
+  if (!linkedCoin || !S.coins.some(c => c.id === linkedCoin)) return;
+  const anchor = $(`.tile[data-id="${CSS.escape(linkedCoin)}"]`) || $(`#tablewrap tr[data-id="${CSS.escape(linkedCoin)}"]`);
+  anchor?.scrollIntoView({ block: 'center' });
+  pinDetail(linkedCoin, anchor || $('#status'));
+}
 if (M.pegLabel) {
   $('#pegged').parentElement.lastChild.textContent = ' ' + M.pegLabel;
   $('#pegged').parentElement.title = M.pegTitle;
