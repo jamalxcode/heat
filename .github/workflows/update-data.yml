@@ -33,7 +33,7 @@ jobs:
           node-version: 22
 
       - id: pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       # Browsers may reuse each file for 10 minutes, so right after a release a page could run with some old cached
       # scripts (e.g. new /metals/ page + old app/markets.mjs = crypto). Tag every script address with the commit, in
@@ -97,10 +97,10 @@ jobs:
           timeout 90 node scripts/tradingview.mjs _site/tv.json _site/data.json _site/forex.json _site/metals.json \
             || { echo "::warning::TradingView check failed, republishing the last tv.json"; curl -sf "$BASE_URL/tv.json" -o _site/tv.json || true; }
 
-      - uses: actions/upload-pages-artifact@v4
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: _site
 
       - id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
       # No keep-alive needed: score-signals.yml commits the scorecard daily, which keeps the schedules active.
