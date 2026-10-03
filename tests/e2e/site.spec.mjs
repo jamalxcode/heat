@@ -452,6 +452,10 @@ test('↺ Reset, right before the market switch, puts every control back to the 
 });
 
 test.describe('shareable links', () => {
+  // on the page's own default tiles (heatmap), so the links carry only what each test changes
+  test.beforeEach(async ({ page }) => {
+    await page.evaluate(() => { localStorage.setItem('hm.realDefaults', '1'); const p = JSON.parse(localStorage.getItem('hm.prefs') || '{}'); delete p.tiles; localStorage.setItem('hm.prefs', JSON.stringify(p)); });
+  });
   test('a link opens that view (filter, timeframe, coin) without changing the visitor\'s saved settings', async ({ page }) => {
     await page.goto('/?f=up&tf=7d&coin=alpha-coin');
     await expect(page.locator('#status')).toContainText('with indicators');
