@@ -322,6 +322,8 @@ export function renderAll() {
   $('#grid').hidden = S.view !== 'grid';
   $('#tablewrap').hidden = S.view !== 'table';
   $('#scorewrap').hidden = S.view !== 'score';
+  $('#grid').classList.toggle('compact', S.density === 'compact');   // small tiles: symbol, change, price
+  $('#density').hidden = S.view !== 'grid';
   if (S.view === 'grid') renderGrid(); else if (S.view === 'table') renderTable(); else renderScorecard();
   renderCounts();
   renderFooter();

@@ -393,6 +393,34 @@ test.describe('forex', () => {
   });
 });
 
+test('Compact tiles: symbol, change and price only, many more per row; remembered, linkable, grid view only', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('#status')).toContainText('with indicators');
+  const cols = () => page.locator('#grid').evaluate(g => getComputedStyle(g).gridTemplateColumns.split(' ').length);
+  const detailedCols = await cols();
+  await page.locator('#density [data-v="compact"]').click();
+  await expect(page.locator('#grid')).toHaveClass(/compact/);
+  await expect(page).toHaveURL(/\?d=compact$/);
+  expect(await cols()).toBeGreaterThan(detailedCols);
+  const t = tile(page, 'alpha-coin');
+  await expect(t.locator('.ind')).toBeHidden();
+  await expect(t.locator('.name')).toBeHidden();
+  await expect(t.locator('.chg')).toBeVisible();
+  await expect(t.locator('.px')).toBeVisible();
+  await t.click();                                                                          // the chart card still opens
+  await expect(page.locator('#detail .d-head b')).toHaveText('Alpha Coin');
+  await page.locator('#detail .x').click();
+  await page.locator('#view [data-v="table"]').click();
+  await expect(page.locator('#density')).toBeHidden();
+  await page.goto('/');                                                                     // remembered
+  await expect(page.locator('#grid')).toHaveClass(/compact/);
+  await page.locator('#density [data-v="detailed"]').click();
+  await expect(page.locator('#grid')).not.toHaveClass(/compact/);
+  await page.goto('/?d=compact');                                                           // a link applies for that visit
+  await expect(page.locator('#grid')).toHaveClass(/compact/);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('hm.prefs')).density)).toBe('detailed');
+});
+
 test.describe('shareable links', () => {
   test('a link opens that view (filter, timeframe, coin) without changing the visitor\'s saved settings', async ({ page }) => {
     await page.goto('/?f=up&tf=7d&coin=alpha-coin');

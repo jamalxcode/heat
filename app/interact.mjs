@@ -299,6 +299,7 @@ export function seg(id, key, after) {
 }
 seg('colorBy', 'colorBy', renderAll);
 seg('view', 'view', () => { hideDetail(true); renderAll(); });
+seg('density', 'density', () => { hideDetail(true); renderAll(); });   // Detailed | Compact tiles (grid view only)
 // Forex: USD/… | …/USD. Redraws everything from the same rates, flipped or not (see quoteView)
 $('#quote').hidden = !M.quoteSwitch;
 seg('quote', 'quote', () => { hideDetail(true); if (S.raw) { S.coins = []; show(S.raw, S.mode === 'live'); } });
