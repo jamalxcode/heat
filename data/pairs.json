@@ -1,5 +1,5 @@
 {
- "t": 1791073727310,
+ "t": 1791094246858,
  "pairs": {
   "bitcoin": {
    "Binance": "BTC",
@@ -31,8 +31,8 @@
   "solana": {
    "Binance": "SOL",
    "Gate.io": "SOL",
-   "MEXC": "SOL",
    "OKX": "SOL",
+   "MEXC": "SOL",
    "KuCoin": "SOL"
   },
   "zcash": {
@@ -42,8 +42,8 @@
    "Gate.io": "ZEC"
   },
   "hyperliquid": {
-   "Binance": "HYPE",
    "Gate.io": "HYPE",
+   "Binance": "HYPE",
    "OKX": "HYPE",
    "KuCoin": "HYPE",
    "MEXC": "HYPE"
@@ -67,13 +67,13 @@
   },
   "cardano": {
    "Binance": "ADA",
-   "Gate.io": "ADA",
    "MEXC": "ADA",
+   "Gate.io": "ADA",
    "OKX": "ADA",
    "KuCoin": "ADA"
   },
   "rain": {
-   "MEXC": "RAIN",
+   "KuCoin": "RAIN",
    "Gate.io": "RAIN"
   },
   "leo-token": {
@@ -103,21 +103,21 @@
   },
   "uniswap": {
    "Binance": "UNI",
-   "OKX": "UNI",
    "KuCoin": "UNI",
+   "OKX": "UNI",
    "Gate.io": "UNI",
    "MEXC": "UNI"
   },
   "canton-network": {
-   "Gate.io": "CC",
    "OKX": "CC",
+   "Gate.io": "CC",
    "KuCoin": "CC",
    "MEXC": "CC"
   },
   "litecoin": {
    "Binance": "LTC",
-   "Gate.io": "LTC",
    "KuCoin": "LTC",
+   "Gate.io": "LTC",
    "MEXC": "LTC",
    "OKX": "LTC"
   },
@@ -217,8 +217,8 @@
    "KuCoin": "DOT",
    "Binance": "DOT",
    "OKX": "DOT",
-   "MEXC": "DOT",
-   "Gate.io": "DOT"
+   "Gate.io": "DOT",
+   "MEXC": "DOT"
   },
   "worldcoin-wld": {
    "Binance": "WLD",
@@ -265,8 +265,8 @@
   "internet-computer": {
    "Binance": "ICP",
    "OKX": "ICP",
-   "Gate.io": "ICP",
    "KuCoin": "ICP",
+   "Gate.io": "ICP",
    "MEXC": "ICP"
   },
   "htx-dao": {
@@ -297,7 +297,9 @@
    "KuCoin": "TRX",
    "Gate.io": "TRX"
   },
-  "whitebit": {},
+  "whitebit": {
+   "MEXC": "WBT"
+  },
   "crypto-com-chain": {
    "OKX": "CRO",
    "Gate.io": "CRO",
@@ -324,8 +326,8 @@
    "Binance": "ALGO",
    "OKX": "ALGO",
    "KuCoin": "ALGO",
-   "MEXC": "ALGO",
-   "Gate.io": "ALGO"
+   "Gate.io": "ALGO",
+   "MEXC": "ALGO"
   },
   "render-token": {
    "Binance": "RENDER",
@@ -358,8 +360,8 @@
   },
   "lighter": {
    "OKX": "LIT",
-   "Gate.io": "LIT",
    "MEXC": "LIT",
+   "Gate.io": "LIT",
    "KuCoin": "LIT"
   },
   "jupiter-exchange-solana": {
@@ -370,8 +372,7 @@
    "MEXC": "JUP"
   },
   "kucoin-shares": {
-   "KuCoin": "KCS",
-   "MEXC": "KCS"
+   "KuCoin": "KCS"
   },
   "pi-network": {
    "OKX": "PI",
@@ -381,8 +382,8 @@
   "blockchain-capital": {},
   "cosmos": {
    "Binance": "ATOM",
-   "OKX": "ATOM",
    "MEXC": "ATOM",
+   "OKX": "ATOM",
    "KuCoin": "ATOM",
    "Gate.io": "ATOM"
   },
@@ -418,10 +419,10 @@
   },
   "injective-protocol": {
    "Binance": "INJ",
-   "MEXC": "INJ",
-   "Gate.io": "INJ",
+   "KuCoin": "INJ",
    "OKX": "INJ",
-   "KuCoin": "INJ"
+   "MEXC": "INJ",
+   "Gate.io": "INJ"
   },
   "ether-fi": {
    "Binance": "ETHFI",
