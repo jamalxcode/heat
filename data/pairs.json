@@ -1,11 +1,11 @@
 {
- "t": 1790618849190,
+ "t": 1791073727310,
  "pairs": {
   "bitcoin": {
    "Binance": "BTC",
    "MEXC": "BTC",
-   "Gate.io": "BTC",
    "OKX": "BTC",
+   "Gate.io": "BTC",
    "KuCoin": "BTC"
   },
   "ethereum": {
@@ -16,49 +16,49 @@
   },
   "binancecoin": {
    "Binance": "BNB",
-   "KuCoin": "BNB",
    "MEXC": "BNB",
    "Gate.io": "BNB",
+   "KuCoin": "BNB",
    "OKX": "BNB"
   },
   "ripple": {
    "Binance": "XRP",
-   "KuCoin": "XRP",
-   "OKX": "XRP",
+   "Gate.io": "XRP",
    "MEXC": "XRP",
-   "Gate.io": "XRP"
+   "OKX": "XRP",
+   "KuCoin": "XRP"
   },
   "solana": {
    "Binance": "SOL",
-   "OKX": "SOL",
-   "MEXC": "SOL",
    "Gate.io": "SOL",
+   "MEXC": "SOL",
+   "OKX": "SOL",
    "KuCoin": "SOL"
   },
   "zcash": {
    "Binance": "ZEC",
-   "OKX": "ZEC",
    "KuCoin": "ZEC",
+   "OKX": "ZEC",
    "Gate.io": "ZEC"
   },
   "hyperliquid": {
-   "OKX": "HYPE",
    "Binance": "HYPE",
    "Gate.io": "HYPE",
+   "OKX": "HYPE",
    "KuCoin": "HYPE",
    "MEXC": "HYPE"
   },
   "dogecoin": {
    "Binance": "DOGE",
    "OKX": "DOGE",
-   "Gate.io": "DOGE",
-   "KuCoin": "DOGE"
+   "KuCoin": "DOGE",
+   "Gate.io": "DOGE"
   },
   "chainlink": {
    "Binance": "LINK",
    "KuCoin": "LINK",
-   "OKX": "LINK",
    "Gate.io": "LINK",
+   "OKX": "LINK",
    "MEXC": "LINK"
   },
   "monero": {
@@ -67,14 +67,13 @@
   },
   "cardano": {
    "Binance": "ADA",
-   "OKX": "ADA",
-   "MEXC": "ADA",
    "Gate.io": "ADA",
+   "MEXC": "ADA",
+   "OKX": "ADA",
    "KuCoin": "ADA"
   },
   "rain": {
    "MEXC": "RAIN",
-   "KuCoin": "RAIN",
    "Gate.io": "RAIN"
   },
   "leo-token": {
@@ -84,15 +83,15 @@
   "stellar": {
    "Binance": "XLM",
    "OKX": "XLM",
-   "KuCoin": "XLM",
    "Gate.io": "XLM",
+   "KuCoin": "XLM",
    "MEXC": "XLM"
   },
   "near": {
    "Binance": "NEAR",
    "KuCoin": "NEAR",
-   "OKX": "NEAR",
    "Gate.io": "NEAR",
+   "OKX": "NEAR",
    "MEXC": "NEAR"
   },
   "bitcoin-cash": {
@@ -110,30 +109,30 @@
    "MEXC": "UNI"
   },
   "canton-network": {
-   "OKX": "CC",
    "Gate.io": "CC",
+   "OKX": "CC",
    "KuCoin": "CC",
    "MEXC": "CC"
   },
   "litecoin": {
    "Binance": "LTC",
+   "Gate.io": "LTC",
    "KuCoin": "LTC",
-   "OKX": "LTC",
    "MEXC": "LTC",
-   "Gate.io": "LTC"
+   "OKX": "LTC"
   },
   "avalanche-2": {
    "Binance": "AVAX",
    "KuCoin": "AVAX",
-   "OKX": "AVAX",
    "Gate.io": "AVAX",
+   "OKX": "AVAX",
    "MEXC": "AVAX"
   },
   "sui": {
    "Binance": "SUI",
-   "KuCoin": "SUI",
    "OKX": "SUI",
    "Gate.io": "SUI",
+   "KuCoin": "SUI",
    "MEXC": "SUI"
   },
   "the-open-network": {
@@ -145,14 +144,14 @@
   "hedera-hashgraph": {
    "Binance": "HBAR",
    "OKX": "HBAR",
-   "KuCoin": "HBAR",
    "Gate.io": "HBAR",
+   "KuCoin": "HBAR",
    "MEXC": "HBAR"
   },
   "quant-network": {
    "Binance": "QNT",
-   "KuCoin": "QNT",
    "Gate.io": "QNT",
+   "KuCoin": "QNT",
    "MEXC": "QNT"
   },
   "bitway": {
@@ -160,10 +159,10 @@
    "MEXC": "BTW"
   },
   "bittensor": {
-   "Binance": "TAO",
    "KuCoin": "TAO",
-   "OKX": "TAO",
+   "Binance": "TAO",
    "Gate.io": "TAO",
+   "OKX": "TAO",
    "MEXC": "TAO"
   },
   "shiba-inu": {
@@ -175,19 +174,19 @@
   "ethena": {
    "Binance": "ENA",
    "MEXC": "ENA",
+   "Gate.io": "ENA",
    "KuCoin": "ENA",
-   "OKX": "ENA",
-   "Gate.io": "ENA"
+   "OKX": "ENA"
   },
   "memecore": {
-   "Gate.io": "M",
-   "MEXC": "M"
+   "MEXC": "M",
+   "Gate.io": "M"
   },
   "ondo-finance": {
    "Binance": "ONDO",
+   "Gate.io": "ONDO",
    "OKX": "ONDO",
    "KuCoin": "ONDO",
-   "Gate.io": "ONDO",
    "MEXC": "ONDO"
   },
   "okb": {
@@ -196,23 +195,23 @@
    "MEXC": "OKB"
   },
   "aave": {
-   "KuCoin": "AAVE",
    "Binance": "AAVE",
-   "OKX": "AAVE",
+   "KuCoin": "AAVE",
    "Gate.io": "AAVE",
+   "OKX": "AAVE",
    "MEXC": "AAVE"
   },
   "pump-fun": {
    "Binance": "PUMP",
    "MEXC": "PUMP",
    "OKX": "PUMP",
-   "KuCoin": "PUMP",
-   "Gate.io": "PUMP"
+   "Gate.io": "PUMP",
+   "KuCoin": "PUMP"
   },
   "mantle": {
    "Gate.io": "MNT",
-   "MEXC": "MNT",
-   "KuCoin": "MNT"
+   "KuCoin": "MNT",
+   "MEXC": "MNT"
   },
   "polkadot": {
    "KuCoin": "DOT",
@@ -230,15 +229,15 @@
   },
   "aster-2": {
    "Binance": "ASTER",
+   "Gate.io": "ASTER",
    "KuCoin": "ASTER",
    "MEXC": "ASTER",
-   "Gate.io": "ASTER",
    "OKX": "ASTER"
   },
   "sky": {
    "Binance": "SKY",
-   "KuCoin": "SKY",
    "OKX": "SKY",
+   "KuCoin": "SKY",
    "Gate.io": "SKY",
    "MEXC": "SKY"
   },
@@ -246,34 +245,34 @@
    "Binance": "WLFI",
    "OKX": "WLFI",
    "Gate.io": "WLFI",
-   "MEXC": "WLFI",
-   "KuCoin": "WLFI"
+   "KuCoin": "WLFI",
+   "MEXC": "WLFI"
   },
   "morpho": {
    "Binance": "MORPHO",
    "OKX": "MORPHO",
+   "KuCoin": "MORPHO",
    "Gate.io": "MORPHO",
-   "MEXC": "MORPHO",
-   "KuCoin": "MORPHO"
+   "MEXC": "MORPHO"
   },
   "pepe": {
    "Binance": "PEPE",
    "OKX": "PEPE",
-   "KuCoin": "PEPE",
    "Gate.io": "PEPE",
+   "KuCoin": "PEPE",
    "MEXC": "PEPE"
   },
   "internet-computer": {
    "Binance": "ICP",
    "OKX": "ICP",
-   "KuCoin": "ICP",
    "Gate.io": "ICP",
+   "KuCoin": "ICP",
    "MEXC": "ICP"
   },
   "htx-dao": {
    "MEXC": "HTX",
-   "Gate.io": "HTX",
-   "KuCoin": "HTX"
+   "KuCoin": "HTX",
+   "Gate.io": "HTX"
   },
   "ethereum-classic": {
    "Binance": "ETC",
@@ -286,39 +285,35 @@
    "MEXC": "BGB"
   },
   "venice-token": {
-   "KuCoin": "VVV",
    "Gate.io": "VVV",
+   "KuCoin": "VVV",
    "OKX": "VVV",
    "MEXC": "VVV"
   },
   "tron": {
    "Binance": "TRX",
-   "KuCoin": "TRX",
    "MEXC": "TRX",
    "OKX": "TRX",
+   "KuCoin": "TRX",
    "Gate.io": "TRX"
   },
-  "whitebit": {
-   "MEXC": "WBT"
-  },
+  "whitebit": {},
   "crypto-com-chain": {
    "OKX": "CRO",
    "Gate.io": "CRO",
-   "KuCoin": "CRO",
-   "MEXC": "CRO"
+   "MEXC": "CRO",
+   "KuCoin": "CRO"
   },
   "arbitrum": {
+   "KuCoin": "ARB",
    "Binance": "ARB",
    "OKX": "ARB",
-   "KuCoin": "ARB",
    "Gate.io": "ARB",
    "MEXC": "ARB"
   },
   "just": {
    "Binance": "JST",
-   "Gate.io": "JST",
-   "MEXC": "JST",
-   "KuCoin": "JST"
+   "MEXC": "JST"
   },
   "kaspa": {
    "Gate.io": "KAS",
@@ -329,15 +324,15 @@
    "Binance": "ALGO",
    "OKX": "ALGO",
    "KuCoin": "ALGO",
-   "Gate.io": "ALGO",
-   "MEXC": "ALGO"
+   "MEXC": "ALGO",
+   "Gate.io": "ALGO"
   },
   "render-token": {
    "Binance": "RENDER",
-   "OKX": "RENDER",
    "KuCoin": "RENDER",
-   "Gate.io": "RENDER",
-   "MEXC": "RENDER"
+   "OKX": "RENDER",
+   "MEXC": "RENDER",
+   "Gate.io": "RENDER"
   },
   "pancakeswap-token": {
    "Binance": "CAKE",
@@ -348,8 +343,8 @@
   "vechain": {
    "Binance": "VET",
    "KuCoin": "VET",
-   "Gate.io": "VET",
-   "MEXC": "VET"
+   "MEXC": "VET",
+   "Gate.io": "VET"
   },
   "polygon-ecosystem-token": {
    "Binance": "POL",
@@ -363,8 +358,8 @@
   },
   "lighter": {
    "OKX": "LIT",
-   "MEXC": "LIT",
    "Gate.io": "LIT",
+   "MEXC": "LIT",
    "KuCoin": "LIT"
   },
   "jupiter-exchange-solana": {
@@ -386,16 +381,16 @@
   "blockchain-capital": {},
   "cosmos": {
    "Binance": "ATOM",
-   "MEXC": "ATOM",
    "OKX": "ATOM",
+   "MEXC": "ATOM",
    "KuCoin": "ATOM",
    "Gate.io": "ATOM"
   },
   "filecoin": {
    "Binance": "FIL",
    "OKX": "FIL",
-   "MEXC": "FIL",
    "Gate.io": "FIL",
+   "MEXC": "FIL",
    "KuCoin": "FIL"
   },
   "nexo": {
@@ -406,20 +401,20 @@
   "aerodrome-finance": {
    "Binance": "AERO",
    "MEXC": "AERO",
-   "Gate.io": "AERO",
-   "KuCoin": "AERO"
+   "KuCoin": "AERO",
+   "Gate.io": "AERO"
   },
   "dash": {
    "Binance": "DASH",
-   "OKX": "DASH",
    "MEXC": "DASH",
    "KuCoin": "DASH",
+   "OKX": "DASH",
    "Gate.io": "DASH"
   },
   "stable-2": {
    "MEXC": "STABLE",
-   "Gate.io": "STABLE",
-   "KuCoin": "STABLE"
+   "KuCoin": "STABLE",
+   "Gate.io": "STABLE"
   },
   "injective-protocol": {
    "Binance": "INJ",
@@ -453,9 +448,9 @@
    "MEXC": "AKE"
   },
   "flare-networks": {
+   "Gate.io": "FLR",
    "OKX": "FLR",
    "KuCoin": "FLR",
-   "Gate.io": "FLR",
    "MEXC": "FLR"
   },
   "pudgy-penguins": {
@@ -480,8 +475,8 @@
    "Gate.io": "PYTH"
   },
   "blockstack": {
-   "Binance": "STX",
    "OKX": "STX",
+   "Binance": "STX",
    "KuCoin": "STX",
    "Gate.io": "STX",
    "MEXC": "STX"
@@ -499,10 +494,10 @@
   },
   "layerzero": {
    "Binance": "ZRO",
-   "KuCoin": "ZRO",
    "OKX": "ZRO",
+   "Gate.io": "ZRO",
    "MEXC": "ZRO",
-   "Gate.io": "ZRO"
+   "KuCoin": "ZRO"
   },
   "virtual-protocol": {
    "Binance": "VIRTUAL",
@@ -528,8 +523,8 @@
   "midnight-3": {
    "Binance": "NIGHT",
    "OKX": "NIGHT",
-   "KuCoin": "NIGHT",
    "Gate.io": "NIGHT",
+   "KuCoin": "NIGHT",
    "MEXC": "NIGHT"
   },
   "sei-network": {

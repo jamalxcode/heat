@@ -6,21 +6,29 @@
   "maSlow": 200,
   "bbPeriod": 20,
   "bbK": 2,
-  "bbLookback": 180,
-  "bbTightPct": 10,
-  "bbWidePct": 80,
-  "stopMult": 2.5,
+  "rsPct": 10,
+  "volShort": 7,
+  "volLong": 30,
+  "volRatio": 1.5,
+  "stopMult": 1.5,
   "stopLookback": 20,
   "momPct": 20,
+  "momDays": 30,
   "weights": {
     "trendUp": 1,
     "oversold": 0,
     "trendDown": -1,
     "overbought": 0,
-    "bbWide": 0,
     "momUp": 1,
     "momDown": -1,
     "pnfUp": 1,
-    "pnfDown": -1
-  }
+    "pnfDown": -1,
+    "rsUp": 0,
+    "rsDown": 0,
+    "volUp": 0,
+    "volDown": 0
+  },
+  "bbLookback": 180,
+  "bbTightPct": 10,
+  "bbWidePct": 80
 }
