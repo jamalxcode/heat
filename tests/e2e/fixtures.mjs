@@ -3,6 +3,7 @@
 import * as SIG from '../../signals.mjs';
 import { assemble, toSnapshot, CURRENCIES, scored, pairOf, isoDay } from '../../scripts/build-forex.mjs';
 import { metalSeries, toSnapshot as metalsSnapshot } from '../../scripts/build-metals.mjs';
+import { ENERGY, toHist as energyHist, toSnapshot as energySnapshot } from '../../scripts/build-energy.mjs';
 
 const DAY = 864e5, N = 260;
 
@@ -123,6 +124,7 @@ export function makeTvFixture(now = Date.now()) {
     'BINANCE:BETUSDT': [0, now, ''], 'CRYPTO:BETUSD': [1, now, 'Betting Token'], 'COINBASE:BETUSD': [0, now, ''],
     'FX_IDC:USDJPY': [1, now, 'U.S. DOLLAR / JAPANESE YEN'], 'FX_IDC:JPYUSD': [1, now, 'JAPANESE YEN / U.S. DOLLAR'],
     'TVC:GOLD': [1, now, 'Gold'],
+    'NYMEX:CL1!': [1, now, 'Crude Oil Futures'],
   } };
 }
 
@@ -133,4 +135,22 @@ export function makeHealthFixture(now = Date.now()) {
     { key: 'ecb', name: 'ECB', what: 'official currency rates', state: 'ok', note: 'rates of today' },
     { key: 'swissquote', name: 'Swissquote', what: 'current metal prices, cross-check', state: 'warn', note: 'live · disagrees: Silver 2.4%' },
   ] };
+}
+
+// energy.json: the six futures over ~300 weekdays (no weekend candles), quoted 15 minutes ago; TTF's latest update
+// failed, so it keeps its last price and is flagged as not refreshed
+export function makeEnergyFixtures(cryptoData, now = Date.now()) {
+  const today = Math.floor(now / DAY), weekdays = [];
+  for (let d = today; weekdays.length < 300; d--) if (![0, 6].includes(new Date(d * DAY).getUTCDay())) weekdays.unshift(d);
+  const base = { wti: 90, brent: 100, diesel: 4.5, gasoline: 3.2, natgas: 3.05, ttf: 73 };
+  const series = {}, quotes = {};
+  ENERGY.forEach((a, k) => {
+    const w = walk(41 + k, weekdays.length, 0.0006 * (k - 2), 0.02);
+    series[a.id] = energyHist(new Map(weekdays.map((d, i) => [d, +(w[i] / 100 * base[a.id]).toPrecision(6)])), a, now);
+    if (a.id !== 'ttf') quotes[a.id] = { price: series[a.id].c.at(-1), t: now - 15 * 60e3 };
+  });
+  const snap = energySnapshot(series, { params: cryptoData.params }, { now, quotes });
+  const ttf = snap.markets.find(m => m.id === 'ttf');
+  Object.assign(ttf, { notRefreshed: true, quoteAt: now - 3 * 3600e3 });
+  return snap;
 }

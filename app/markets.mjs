@@ -12,6 +12,7 @@ export const MARKETS = {
   crypto: {
     key: 'crypto', data: '/data.json', scorecard: '/scorecard.json', top: 100, noun: 'coins', one: 'coin', nameCol: 'Coin',
     live: true,                       // a live price between daily candles; today's candle is still forming
+    liveBuild: true,                  // if data.json goes stale, the page builds it itself (scripts/build-data.mjs)
     ranked: true,                     // tiles show the market-cap rank (#1, #2 …) and the table has a market-cap column
     quoteSwitch: false,               // no USD/… | …/USD switch
     pegPref: 'pegged',                // localStorage key for "show stablecoins"
@@ -82,6 +83,7 @@ MARKETS.metals = {
   ...MARKETS.crypto,
   key: 'metals', data: '/metals.json', scorecard: null, top: 999, noun: 'assets', one: 'asset', nameCol: 'Asset',
   live: true,                         // the crypto tiles move all day; the metals file has one value per day (today's is still forming)
+  liveBuild: false,                   // the in-browser rebuild makes crypto data: here an older metals.json is shown instead
   ranked: false, quoteSwitch: false, pegPref: null, pegLabel: null,
   bins: { '24h': [0.25, 0.75, 1.5, 3], '7d': [1, 2.5, 5, 8], '30d': [2, 5, 10, 15] },
   bench: 'xau', benchLabel: 'gold', volume: false,     // the metal prices come without volume
@@ -94,10 +96,35 @@ MARKETS.metals = {
     : `${c.check?.ok ? `✓ exchange-api and Swissquote agree within ${Math.abs(c.check.diff)}% (${c.check.day})` : c.check ? `⚠ exchange-api and Swissquote differ by ${Math.abs(c.check.diff)}% (${c.check.day})` : '? exchange-api history, not cross-checked yet'} · US dollars per troy ounce · ${ind.n} daily closes`,
   srcInfo: ({ marketSrc, stale }) => `Metals: daily history from the exchange-api feed (public domain), current prices from Swissquote's public quotes, which also cross-check each day's close; US dollars per troy ounce. Tokenized gold and Bitcoin: the crypto page's data (${marketSrc.split(' + ').pop()})${stale ? ', saved copy' : ''}.`,
   costWords: '', tuneHistory: '',
-  fresh: ({ tm, ago, next, late, refreshMin, metalsDate }) => `<span>🕒 <b>Last refreshed ${tm}</b> (${ago}) · ${next} · <b>not real-time</b>: every ${refreshMin} min while markets are open${metalsDate ? ` (latest ${metalsDate})` : ''}`
+  fresh: ({ tm, ago, next, late, refreshMin, latestDate }) => `<span>🕒 <b>Last refreshed ${tm}</b> (${ago}) · ${next} · <b>not real-time</b>: every ${refreshMin} min while markets are open${latestDate ? ` (latest ${latestDate})` : ''}`
     + (late ? ' · <b>⚠ this update is running late</b>' : '') + '</span>' + linkCG,
 };
 
-export const MARKET = location.pathname.startsWith('/forex') ? 'forex' : location.pathname.startsWith('/metals') ? 'metals' : 'crypto';
+// Energy: crude oil, refined products and natural gas, front-month futures from Yahoo Finance (scripts/build-energy.mjs).
+// Futures trade on weekdays only, so the changes count trading days, like forex.
+const linkYahoo = '<a class="cg-attr" href="https://finance.yahoo.com/markets/commodities/" target="_blank" rel="noopener">Source: Yahoo Finance</a>';
+MARKETS.energy = {
+  ...MARKETS.metals,
+  key: 'energy', data: '/energy.json',
+  bins: { '24h': [0.5, 1.5, 3, 5], '7d': [1.5, 4, 8, 12], '30d': [3, 8, 15, 25] },
+  tradingDays: true,                  // the live price never starts a new day by itself (no weekend candles)
+  bench: 'brent', benchLabel: 'Brent', volume: false,  // front-month volume jumps at every contract roll, so it isn't used
+  back: { '24h': 1, '7d': 5, '30d': 21 },
+  label: { '24h': '1d', '7d': '1w', '30d': '1m' },
+  closeWord: 'daily close', stopWhere: 'your broker', days: n => `${n} trading days`,
+  noHistory: 'No price history from Yahoo Finance for this contract right now.',
+  // prices as quoted, without a currency sign: the units differ (dollars per barrel, per gallon, per MMBtu; TTF in euros per MWh)
+  price(p) {
+    const d = p >= 10 ? 2 : 3;
+    return p.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+  },
+  verify: c => c.notRefreshed ? `<span class="vf guess" title="Yahoo Finance didn't answer for this contract in the latest update: showing its last known price" aria-label="not refreshed">?</span>` : '',
+  sourceLine: (c, h, ind) => `${c.notRefreshed ? '⚠ not refreshed in the latest update · ' : ''}Front-month futures ${esc(h.pair)} on Yahoo Finance · ${esc(c.where || '')} · ${esc(c.unit || '')} · ${ind.n} trading days`,
+  srcInfo: () => 'Energy: front-month futures prices from Yahoo Finance (unofficial, no key), delayed about 10 minutes by the exchanges, so up to about 20–30 minutes old here. Oil and products per barrel or gallon and US gas per MMBtu, in US dollars; European gas (TTF) in euros per MWh.',
+  fresh: ({ tm, ago, next, late, refreshMin, latestDate }) => `<span>🕒 <b>Last refreshed ${tm}</b> (${ago}) · ${next} · <b>not real-time</b>: every ${refreshMin} min, futures prices delayed ~10 min, weekdays only${latestDate ? ` (latest ${latestDate})` : ''}`
+    + (late ? ' · <b>⚠ this update is running late</b>' : '') + '</span>' + linkYahoo,
+};
+
+export const MARKET = ['forex', 'metals', 'energy'].find(m => location.pathname.startsWith('/' + m)) || 'crypto';
 export const M = MARKETS[MARKET];
 export const TF = tf => M.label[tf];                       // what a timeframe is called on this market (24h / 1d …)

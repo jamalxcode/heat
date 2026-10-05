@@ -1,13 +1,13 @@
-// Makes a market's page (forex/index.html, metals/index.html) from index.html: the same page, with that market's search
+// Makes a market's page (forex/index.html, metals/index.html, energy/index.html) from index.html: the same page, with that market's search
 // tags, About/FAQ text and source credits swapped in between the <!-- SEO:start -->…<!-- SEO:end --> (and ABOUT,
 // SOURCES) markers, from seo/<market>-head.html, -about.html and -sources.html. The page picks its market from its
-// address (/forex/, /metals/), so the rest of the file stays identical and every change shows on all markets.
+// address (/forex/, /metals/, /energy/), so the rest of the file stays identical and every change shows on all markets.
 //   node scripts/market-page.mjs <market> <out.html>     (used by the deploy job and the browser tests' local server)
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 const root = new URL('../', import.meta.url);
-export const PAGES = ['forex', 'metals'];   // markets with their own page; crypto is index.html itself
+export const PAGES = ['forex', 'metals', 'energy'];   // markets with their own page; crypto is index.html itself
 
 // Replace the block between <!-- NAME:start … --> and <!-- NAME:end --> (markers included) with `block`
 export function swap(html, name, block) {

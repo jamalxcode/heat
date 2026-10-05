@@ -609,12 +609,12 @@ test.describe('metals', () => {
     await expect(page.locator('#status')).toContainText(`${N}/${N} assets with indicators`);
   });
 
-  test('loads its own data and search tags; no scorecard, no pegged checkbox; the switch links all three pages', async ({ page }) => {
+  test('loads its own data and search tags; no scorecard, no pegged checkbox; the switch links all four pages', async ({ page }) => {
     await expect(tiles(page)).toHaveCount(N);
     await expect(page).toHaveTitle(/Precious Metals Heatmap/);
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://heat.sala.company/metals/');
     await expect(page.locator('#market a[aria-current="page"]')).toHaveText(/Metals/);
-    await expect(page.locator('#market a')).toHaveCount(3);
+    await expect(page.locator('#market a')).toHaveCount(4);
     await expect(page.locator('#market a[data-m="forex"]')).toHaveAttribute('href', '/forex/');
     await expect(page.locator('#view [data-v="score"]')).toBeHidden();
     await expect(page.locator('#pegged')).toBeHidden();
@@ -661,6 +661,47 @@ test.describe('metals', () => {
   });
 });
 
+// Energy: the same page at /energy/, with energy.json (tests/e2e/fixtures.mjs: six futures on weekdays only)
+test.describe('energy', () => {
+  const N = 6;
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/energy/');
+    await expect(page.locator('#status')).toContainText(`${N}/${N} assets with indicators`);
+  });
+
+  test('loads its own data and search tags; no scorecard; trading-day timeframes', async ({ page }) => {
+    await expect(tiles(page)).toHaveCount(N);
+    await expect(page).toHaveTitle(/Oil, Diesel & Natural Gas/);
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://heat.sala.company/energy/');
+    await expect(page.locator('#market a[aria-current="page"]')).toHaveText(/Energy/);
+    await expect(page.locator('#view [data-v="score"]')).toBeHidden();
+    await expect(page.locator('#pegged')).toBeHidden();
+    await expect(page.locator('#colorBy button')).toHaveText(['1d', '1w', '1m']);
+    await expect(page.locator('#fresh')).toContainText('delayed ~10 min');
+    await expect(page.locator('#fresh a')).toHaveText('Source: Yahoo Finance');
+    const ld = JSON.parse(await page.locator('script[type="application/ld+json"]').textContent());
+    const faq = ld['@graph'].find(x => x['@type'] === 'FAQPage').mainEntity.map(q => q.name);
+    expect(await page.locator('footer .about h3').allTextContents()).toEqual(faq);
+    expect(external).toEqual([]);
+  });
+
+  test('tiles: product badges, prices without a currency sign, units in the popup, a TradingView link', async ({ page }) => {
+    const wti = tile(page, 'wti');
+    await expect(wti.locator('.metal')).toHaveText('WTI');
+    await expect(wti).toContainText('WTI crude oil');
+    expect(await wti.locator('.px').textContent()).toMatch(/^[\d,]+\.\d\d$/);
+    expect(await tile(page, 'natgas').locator('.px').textContent()).toMatch(/^\d\.\d{3}$/);
+    await expect(page.locator('#grid .metal')).toHaveCount(N);
+    await expect(wti.locator('.vf')).toHaveCount(0);
+    await expect(tile(page, 'ttf').locator('.vf.guess')).toHaveAttribute('title', /didn't answer/);   // not refreshed
+    await wti.click();
+    await expect(page.locator('#detail')).toHaveClass(/pinned/);
+    await expect(page.locator('#detail .d-src', { hasText: 'US dollars per barrel' })).toContainText('CL=F');
+    await expect(page.locator('#detail .d-head a.tv').first()).toHaveAttribute('href', /symbol=NYMEX%3ACL1!$/);
+    await expect(page.locator('#detail')).toContainText('vs Brent');
+  });
+});
+
 test.describe('phone', () => {
   test.use({ viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true });
 
@@ -675,8 +716,8 @@ test.describe('phone', () => {
     await expect(popup).not.toHaveClass(/show/);
   });
 
-  test('every page fits the screen with the three-way market switch', async ({ page }) => {
-    for (const url of ['/', '/forex/', '/metals/']) {
+  test('every page fits the screen with the four-way market switch', async ({ page }) => {
+    for (const url of ['/', '/forex/', '/metals/', '/energy/']) {
       await page.goto(url);
       await expect(tiles(page).first()).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), url).toBe(true);
