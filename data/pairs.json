@@ -609,6 +609,13 @@
    "Binance": "BTTC",
    "MEXC": "BTT",
    "KuCoin": "BTT"
+  },
+  "starknet": {
+   "Binance": "STRK",
+   "OKX": "STRK",
+   "Gate.io": "STRK",
+   "MEXC": "STRK",
+   "KuCoin": "STRK"
   }
  }
 }
