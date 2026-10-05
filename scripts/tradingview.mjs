@@ -2,25 +2,28 @@
 // Each asset has a list of candidate TradingView symbols, best first (the exchange pair its candles came from, then
 // fallbacks). The deploy job checks the candidates against TradingView's public symbol lookup and caches the results
 // in tv.json; the page links to the first candidate known to exist, and shows no link when none does.
-//   node scripts/tradingview.mjs <out tv.json> <data.json> [forex.json] [metals.json]   (env PREV_URL = last tv.json)
+//   node scripts/tradingview.mjs <out tv.json> <data.json> [forex.json] [metals.json] [energy.json]   (env PREV_URL = last tv.json)
 // The page imports candidates() and pick(), so it has no Node dependencies.
 
 // our candle source → TradingView exchange prefix
 const EXCH = { Binance: 'BINANCE', 'Gate.io': 'GATE', OKX: 'OKX', MEXC: 'MEXC', KuCoin: 'KUCOIN' };
 const METAL = { xau: 'TVC:GOLD', xag: 'TVC:SILVER', xpt: 'TVC:PLATINUM', xpd: 'TVC:PALLADIUM' };
+// energy: the continuous front-month contract, as on Yahoo Finance (same list as scripts/build-energy.mjs)
+const ENERGY = { wti: 'NYMEX:CL1!', brent: 'ICEEUR:BRN1!', diesel: 'NYMEX:HO1!', gasoline: 'NYMEX:RB1!', natgas: 'NYMEX:NG1!', ttf: 'ICEENDEX:TFM1!' };
 const clean = s => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
 // symbols that may belong to a different asset with the same ticker: only trusted if TradingView's description
 // matches the asset's name (the exchange pairs come from verified trading pairs, so they don't need this)
 const loose = sym => sym.startsWith('CRYPTO:') || sym.startsWith('COINBASE:');
 
-// c: the tile (id, symbol, name); h: its hist entry (src, pair); market: 'crypto' | 'forex' | 'metals'; flipped: the
+// c: the tile (id, symbol, name); h: its hist entry (src, pair); market: 'crypto' | 'forex' | 'metals' | 'energy'; flipped: the
 // forex …/USD view
 export function candidates(c, h, market, flipped = false) {
   if (market === 'forex') {
     const x = clean(c.id);
     return [flipped ? `FX_IDC:${x}USD` : `FX_IDC:USD${x}`];
   }
+  if (market === 'energy') return ENERGY[c.id] ? [ENERGY[c.id]] : [];
   if (METAL[c.id]) return [METAL[c.id]];
   const out = [], sym = clean(c.symbol);
   const base = clean(String(h?.pair || '').split('/')[0]);
@@ -92,10 +95,11 @@ export async function refresh(assets, prev = {}, { now = Date.now(), lookupFn = 
   return sym;
 }
 
-// every asset on the three pages (both quote directions for forex); the short lists first, so a first run (80
+// every asset on the four pages (both quote directions for forex); the short lists first, so a first run (80
 // checks at most) covers metals and currencies, and the coins over the next few runs
-export function assetsOf({ crypto, forex, metals }) {
+export function assetsOf({ crypto, forex, metals, energy }) {
   const out = [];
+  for (const c of energy?.markets || []) out.push([c, energy.hist?.[c.id], 'energy']);
   for (const c of metals?.markets || []) out.push([c, metals.hist?.[c.id], 'metals']);
   for (const c of forex?.markets || []) out.push([c, null, 'forex', false], [c, null, 'forex', true]);
   for (const c of crypto?.markets || []) out.push([c, crypto.hist?.[c.id], 'crypto']);
@@ -108,12 +112,12 @@ if (IS_NODE && process.argv[1] && import.meta.url.endsWith(process.argv[1].repla
   const { readFile, writeFile } = await import('node:fs/promises');
   const [out = 'tv.json', ...files] = process.argv.slice(2);
   const read = async f => { try { return JSON.parse(await readFile(f, 'utf8')); } catch { return null; } };
-  const [crypto, forex, metals] = await Promise.all(files.map(read));
+  const [crypto, forex, metals, energy] = await Promise.all(files.map(read));
   let prev = {};
   if (process.env.PREV_URL) {
     try { prev = (await (await fetch(process.env.PREV_URL + '?b=' + Date.now(), { signal: AbortSignal.timeout(20e3) })).json()).sym || {}; }
     catch { console.log('No previous tv.json (first run?)'); }
   }
-  const sym = await refresh(assetsOf({ crypto, forex, metals }), prev);
+  const sym = await refresh(assetsOf({ crypto, forex, metals, energy }), prev);
   await writeFile(out, JSON.stringify({ v: 1, t: Date.now(), sym }));
 }

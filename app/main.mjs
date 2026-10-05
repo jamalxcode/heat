@@ -48,7 +48,7 @@ export function renderFresh(now) {
   const late = age > REFRESH_MIN * 2.5 * 60e3;
   const next = S.busy ? 'refreshing now' : S.nextAuto > now ? `next in ~${Math.max(1, Math.ceil((S.nextAuto - now) / 60e3))} min` : 'checking for new prices';
   el.classList.toggle('late', late);
-  const html = M.fresh({ tm, ago, next, late, refreshMin: REFRESH_MIN, rateDate: S.rateDate, metalsDate: S.metalsDate });   // includes the data credit
+  const html = M.fresh({ tm, ago, next, late, refreshMin: REFRESH_MIN, rateDate: S.rateDate, latestDate: S.latestDate });   // includes the data credit
   if (el.innerHTML !== html) el.innerHTML = html;
 }
 
@@ -97,7 +97,7 @@ export async function show(raw, live) {
   const data = quoteView(raw);
   const isNew = data.generated !== S.updated;
   S.mode = live ? 'live' : 'snapshot';
-  S.markets = data.markets; S.updated = data.generated; S.marketSrc = data.marketSrc; S.stale = !!data.marketStale; S.rateDate = data.rateDate; S.metalsDate = data.metalsDate;
+  S.markets = data.markets; S.updated = data.generated; S.marketSrc = data.marketSrc; S.stale = !!data.marketStale; S.rateDate = data.rateDate; S.latestDate = data.latestDate ?? data.metalsDate;
   S.stable = new Set(data.cats?.stable || []); S.gold = new Set(data.cats?.gold || []);
   S.hist = {};
   for (const [id, h] of Object.entries(data.hist || {})) S.hist[id] = unpack(h);
@@ -118,15 +118,15 @@ export async function run() {
   try {
     if (!S.coins.length) setStatus('Loading prices…', 'busy');
     const snap = S.noSnapshot ? null : await loadSnapshot();
-    // forex rates change once a day, so an older snapshot is still the latest rate: no in-browser rebuild
-    if (snap && (Date.now() - snap.generated < SNAPSHOT_MAX_AGE || !M.live)) {
+    // only the crypto page can rebuild its data in the browser; elsewhere (forex, metals, energy) an older file is still the latest
+    if (snap && (Date.now() - snap.generated < SNAPSHOT_MAX_AGE || !M.liveBuild)) {
       const isNew = await show(snap, false);
       // the next build lands ~10 min after this one; if it hasn't appeared yet, look again every 2 min
       S.nextAuto = isNew ? Math.max(S.updated + MARKETS_TTL + SNAPSHOT_GRACE, Date.now() + 30e3) : Date.now() + SNAPSHOT_RETRY;
     } else {
       // no data.json (local preview) or the scheduled job is stuck
       let data = null;
-      if (M.live) try { data = await buildLive(snap); } catch { data = null; }
+      if (M.liveBuild) try { data = await buildLive(snap); } catch { data = null; }
       if (!data) data = snap;
       if (!data) throw new Error('No price data available right now');
       await show(data, data !== snap);

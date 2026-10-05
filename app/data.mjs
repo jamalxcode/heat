@@ -24,7 +24,7 @@ export function withLive(closes, price) {
   const out = closes.slice(), last = out[out.length - 1];
   const today = Math.floor(Date.now() / DAY), day = Math.floor(last[0] / DAY);
   if (day === today) out[out.length - 1] = [last[0], price];
-  else if (day === today - 1) out.push([today * DAY, price]);
+  else if (day === today - 1 && !M.tradingDays) out.push([today * DAY, price]);   // energy: no trading today (weekend), no candle
   return out;
 }
 export const computeFor = c => compute(withLive(S.hist[c.id].closes, c.current_price), S.hist[c.id].vols, c.id);

@@ -249,6 +249,11 @@ button.sc-chip:hover, button.sc-chip[aria-expanded="true"] { box-shadow: inset 0
 .metal-xag { background: radial-gradient(circle at 35% 30%, #ffffff, #c9ced6 55%, #8d949e); }
 .metal-xpt { background: radial-gradient(circle at 35% 30%, #f7f8fa, #b9c0c9 55%, #7c8591); color: #1f2730; }
 .metal-xpd { background: radial-gradient(circle at 35% 30%, #f2efe9, #c6beb1 55%, #8a8174); }
+/* energy: the same disc, with the contract's short name, in a color per product (oil dark, diesel amber, gasoline red, gas blue) */
+.metal-wti, .metal-brent { background: radial-gradient(circle at 35% 30%, #6b6b6b, #2a2a2a 60%, #000); color: #f3f3f3; font-size: 7.5px; }
+.metal-diesel { background: radial-gradient(circle at 35% 30%, #ffe08a, #e0a526 60%, #a36d0b); font-size: 7.5px; }
+.metal-gasoline { background: radial-gradient(circle at 35% 30%, #ffb3a6, #e0533d 60%, #a32a17); color: #fff; font-size: 7.5px; }
+.metal-natgas, .metal-ttf { background: radial-gradient(circle at 35% 30%, #bfe3ff, #3d8fe0 60%, #1b5ea3); color: #fff; font-size: 7.5px; }
 .flag-code { flex: none; display: inline-grid; place-items: center; min-width: 20px; height: 15px; padding: 0 2px; border-radius: 3px; font-size: 9px; font-weight: 800; letter-spacing: .02em; line-height: 1; color: var(--ink); background: color-mix(in oklab, var(--surface) 70%, transparent); box-shadow: inset 0 0 0 1px var(--axis); }   /* where flag emoji are missing (Windows) */
 .chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .chip { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 3px 7px; cursor: pointer; font-size: 12.5px; color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; }
@@ -535,6 +540,7 @@ footer .about p { margin: 0; }
       <a href="/" data-m="crypto">🪙 Crypto</a>
       <a href="/forex/" data-m="forex">💱 Forex</a>
       <a href="/metals/" data-m="metals">🥇 Metals</a>
+      <a href="/energy/" data-m="energy">🛢️ Energy</a>
     </nav>
     <div class="seg" id="colorBy" role="group" aria-label="Color by">
       <button data-v="24h" aria-pressed="true" title="Color by 24h change">24h</button>
