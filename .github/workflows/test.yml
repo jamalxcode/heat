@@ -20,5 +20,3 @@ jobs:
         with:
           node-version: 22
       - run: node --test   # finds tests/*.test.mjs
-      # TEMPORARY (energy branch only): does Yahoo Finance answer GitHub's servers?
-      - run: node scripts/build-energy.mjs /tmp/energy.json /dev/null && node scripts/tradingview.mjs /tmp/tv.json /dev/null /dev/null /dev/null /tmp/energy.json
