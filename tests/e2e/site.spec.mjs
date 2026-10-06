@@ -737,9 +737,9 @@ test.describe('rates', () => {
     await expect(page.locator('#rlegend')).toContainText('1m change in the 10-year yield');
   });
 
-  test('a card opens its curve in a popup: now and before, the slope history, a shareable address; closes like the others', async ({ page }) => {
+  test('a card opens its curve in a small popup beside it (two cards wide and tall): key numbers first, details below; closes like the others', async ({ page }) => {
     const pop = page.locator('#detail');
-    await expect(page.locator('#ratesAll .r-chart path')).toHaveCount(14);
+    await expect(page.locator('#ratesAll')).toHaveCount(0);                  // no combined chart under the cards
     await expect(pop).not.toHaveClass(/pinned/);
     await page.locator('.rtile[data-id="ca"]').click();
     await expect(pop).toHaveClass(/pinned/);
@@ -747,6 +747,11 @@ test.describe('rates', () => {
     await expect(pop.locator('.r-says')).toContainText('Inverted');
     await expect(pop.locator('.r-keys')).toContainText('A year ago');
     await expect(pop.locator('.r-chart')).toHaveCount(2);
+    await expect(pop.locator('.r-mini')).toContainText('10y');
+    const card = await page.locator('.rtile[data-id="ca"]').boundingBox(), box = await pop.boundingBox();
+    expect(Math.abs(box.width - (card.width * 2 + 8))).toBeLessThan(3);       // about two cards wide …
+    expect(box.height).toBeLessThanOrEqual(card.height * 2 + 10);           // … and at most two cards tall
+    expect(box.x >= card.x + card.width || box.x + box.width <= card.x).toBe(true);   // beside the card, not over it
     await expect(page.locator('.rtile.sel')).toHaveAttribute('data-id', 'ca');
     await expect(page).toHaveURL(/\/rates\/\?c=ca$/);
     await page.locator('.rtile[data-id="jp"]').dispatchEvent('click');    // another card (under the popup here): switches, stays open
@@ -759,8 +764,8 @@ test.describe('rates', () => {
     await expect(pop.locator('h2')).toContainText('Canada');
     await pop.locator('.x').click();
     await expect(pop).not.toHaveClass(/pinned/);
-    await page.locator('#ratesAll .r-pick[data-id="jp"]').click();          // the chart's legend opens it too
-    await expect(pop.locator('h2')).toContainText('Japan');
+    await page.locator('.mtile[data-id="it"]').click();                    // a monthly card opens its own
+    await expect(pop.locator('h2')).toContainText('Italy');
   });
 
   test('mouse: resting on a card previews its curve beside it; moving away closes it; a click pins it in place', async ({ page }) => {

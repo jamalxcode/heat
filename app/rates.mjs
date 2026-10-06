@@ -111,22 +111,18 @@ function detailHTML(c) {
   const at = (snap, t) => { const p = snap?.pts; if (!p?.length || t < p[0][0] - 1e-6 || t > p[p.length - 1][0] + 1e-6) return null; const i = p.findIndex(q => q[0] >= t - 1e-6); return Math.abs(p[i][0] - t) < 1e-6 ? p[i][1] : p[i - 1][1] + (p[i][1] - p[i - 1][1]) * (t - p[i - 1][0]) / (p[i][0] - p[i - 1][0]); };
   const rows = tenors.map(t => { const now = at({ pts: c.curve }, t), m = at(c.then?.m1, t), y = at(c.then?.y1, t);
     return `<tr><td>${t === 0 ? 'Bank Rate' : tenorLabel(t)}</td><td>${fmtY(now)}</td><td>${m == null ? '—' : fmtBp((now - m) * 100)}</td><td>${y == null ? '—' : fmtBp((now - y) * 100)}</td></tr>`; }).join('');
-  return `<div class="r-card r-pop" data-country="${esc(c.id)}"><div class="r-head"><h2>${logoOf(c)} ${esc(c.name)}: yield curve</h2>
+  // small enough to sit beside the card: the curve and its key numbers first, the explanation and history below (scroll)
+  return `<div class="r-card r-pop" data-country="${esc(c.id)}"><div class="r-head"><h2>${logoOf(c)} ${esc(c.name)} <span class="r-muted">yield curve</span></h2>
       <span class="rt-state st-${esc(c.state || 'none')}">${st ? `${st.icon} ${st.label}` : '—'}</span></div>
-    <p class="r-says">${st ? `The 10-year yield is <b>${fmtY(c.y10)}</b> and the ${SHORT_WORDS[shortLabel(c)] || shortLabel(c)} <b>${fmtY(c.yShort)}</b>: a gap of <b>${fmtPP(c.slope)}</b>. ${st.label}: ${st.note}.` : 'No reading yet.'}</p>
+    <div class="r-mini">10y <b>${fmtY(c.y10)}</b> · ${shortLabel(c)} <b>${fmtY(c.yShort)}</b> · gap <b>${fmtPP(c.slope)}</b> · ${dayLabel(c.date)}</div>
     ${curveChart(lines.map(l => ({ ...l, color: l.faint ? col : l.color, width: l.faint ? 1 : l.width })), `${c.name} yield curve`)}
     <div class="r-keys">${key}</div>
+    <div class="r-more">
+    <p class="r-says">${st ? `The 10-year yield is <b>${fmtY(c.y10)}</b> and the ${SHORT_WORDS[shortLabel(c)] || shortLabel(c)} <b>${fmtY(c.yShort)}</b>: a gap of <b>${fmtPP(c.slope)}</b>. ${st.label}: ${st.note}.` : 'No reading yet.'}</p>
     <h3>10-year minus ${shortLabel(c)}, last two years <span class="r-muted">(shaded: inverted)</span></h3>
     ${slopeChart(c)}
     <details class="r-table"><summary>Every maturity</summary><table><thead><tr><th>Maturity</th><th>Yield</th><th>vs a month ago</th><th>vs a year ago</th></tr></thead><tbody>${rows}</tbody></table></details>
-    <p class="r-src">${c.notRefreshed ? '⚠ The source didn’t answer in the latest check: showing its last curve. ' : ''}Source: <a href="${esc(c.srcUrl)}" target="_blank" rel="noopener">${esc(c.src)}</a>, closing yields of ${dayLabel(c.date)}.${c.note ? ' ' + esc(c.note) : ''}</p></div>`;
-}
-
-function allCurves() {
-  const cs = R.countries.filter(c => c.curve?.length);
-  const lines = cs.map(c => ({ pts: c.curve, color: COLORS[c.id] || 'var(--ink)', width: c.id === sel ? 3 : 1.6, label: `${c.name} (${dayLabel(c.date)})`, dots: c.id === sel }));
-  const key = cs.map(c => `<button class="r-key r-pick${c.id === sel ? ' on' : ''}" data-id="${esc(c.id)}" data-coin="1" aria-haspopup="dialog"><svg width="18" height="8" aria-hidden="true"><line x1="0" x2="18" y1="4" y2="4" stroke="${COLORS[c.id]}" stroke-width="3"/></svg>${esc(c.name)}</button>`).join('');
-  return `<h2>All curves, latest</h2>${curveChart(lines, 'Every market’s latest yield curve')}<div class="r-keys">${key}</div>`;
+    <p class="r-src">${c.notRefreshed ? '⚠ The source didn’t answer in the latest check: showing its last curve. ' : ''}Source: <a href="${esc(c.srcUrl)}" target="_blank" rel="noopener">${esc(c.src)}</a>, closing yields of ${dayLabel(c.date)}.${c.note ? ' ' + esc(c.note) : ''}</p></div></div>`;
 }
 
 /* ---------- Europe, monthly (ECB): 10-year yields only, one value a month ---------- */
@@ -144,7 +140,7 @@ function monthChart(m) {
   const months = m.series.map(p => p[0]), idx = new Map(months.map((ym, i) => [ym, i]));
   const vals = lines.flatMap(l => l.s.filter(p => idx.has(p[0])).map(p => p[1]));
   if (months.length < 2 || !vals.length) return '';
-  const H2 = W < 600 ? 170 : 200, sc = yScale(vals), y = v => PT + (sc.hi - v) / (sc.hi - sc.lo) * (H2 - PT - PB);
+  const H2 = H, sc = yScale(vals), y = v => PT + (sc.hi - v) / (sc.hi - sc.lo) * (H2 - PT - PB);
   const x = i => PL + i / (months.length - 1) * (W - PL - PR);
   return `<svg class="r-chart" viewBox="0 0 ${W} ${H2}" role="img" aria-label="${esc(`${m.name}: monthly 10-year yield`)}">`
     + niceTicks(sc.lo, sc.hi).map(v => `<line x1="${PL}" x2="${W - PR}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${PL - 6}" y="${y(v) + 3.5}" font-size="10" text-anchor="end" fill="var(--muted)">${v}%</text>`).join('')
@@ -155,11 +151,13 @@ function monthChart(m) {
 function monthHTML(m) {
   const key = [`<span class="r-key"><svg width="22" height="8" aria-hidden="true"><line x1="0" x2="22" y1="4" y2="4" stroke="var(--blue, #2f6fd0)" stroke-width="2.4"/></svg>${esc(m.name)}</span>`,
     m.de ? `<span class="r-key"><svg width="22" height="8" aria-hidden="true"><line x1="0" x2="22" y1="4" y2="4" stroke="${COLORS.de}" stroke-width="1.4" stroke-dasharray="5 4"/></svg>Germany</span>` : ''].join('');
-  return `<div class="r-card r-pop" data-country="${esc(m.id)}"><div class="r-head"><h2>${logoOf(m)} ${esc(m.name)}: 10-year yield, monthly</h2><span class="r-muted">📅 monthly</span></div>
-    <p class="r-says">${esc(m.name)}’s 10-year government bond yield averaged <b>${fmtY(m.y10)}</b> in ${monthLabel(m.month, true)}: <b>${fmtBp(m.chg1m)}</b> on the month and <b>${fmtBp(m.chg12m)}</b> on the year${m.vsDE != null ? `, <b>${fmtPP(m.vsDE)}</b> above Germany’s (the gap investors watch as a measure of risk in the euro area)` : ''}.</p>
+  return `<div class="r-card r-pop" data-country="${esc(m.id)}"><div class="r-head"><h2>${logoOf(m)} ${esc(m.name)} <span class="r-muted">10-year, monthly</span></h2><span class="r-muted">📅 monthly</span></div>
+    <div class="r-mini">${monthLabel(m.month)} <b>${fmtY(m.y10)}</b> · month <b>${fmtBp(m.chg1m)}</b> · year <b>${fmtBp(m.chg12m)}</b>${m.vsDE != null ? ` · vs Germany <b>${fmtPP(m.vsDE)}</b>` : ''}</div>
     ${monthChart(m)}
     <div class="r-keys">${key}</div>
-    <p class="r-src">${m.notRefreshed ? '⚠ The source didn’t answer in the latest check: showing the last figures. ' : ''}Source: <a href="https://data.ecb.europa.eu/data/datasets/IRS" target="_blank" rel="noopener">European Central Bank</a>, long-term interest rates for convergence purposes: the monthly average of the country’s benchmark 10-year government bond yield, published early the next month. No free source has these countries’ daily yields or whole curves, so there is no curve or normal / flat / inverted reading here.</p></div>`;
+    <div class="r-more">
+    <p class="r-says">${esc(m.name)}’s 10-year government bond yield averaged <b>${fmtY(m.y10)}</b> in ${monthLabel(m.month, true)}: <b>${fmtBp(m.chg1m)}</b> on the month and <b>${fmtBp(m.chg12m)}</b> on the year${m.vsDE != null ? `, <b>${fmtPP(m.vsDE)}</b> above Germany’s (the gap investors watch as a measure of risk in the euro area)` : ''}.</p>
+    <p class="r-src">${m.notRefreshed ? '⚠ The source didn’t answer in the latest check: showing the last figures. ' : ''}Source: <a href="https://data.ecb.europa.eu/data/datasets/IRS" target="_blank" rel="noopener">European Central Bank</a>, long-term interest rates for convergence purposes: the monthly average of the country’s benchmark 10-year government bond yield, published early the next month. No free source has these countries’ daily yields or whole curves, so there is no curve or normal / flat / inverted reading here.</p></div></div>`;
 }
 
 function render() {
@@ -170,8 +168,6 @@ function render() {
   const ms = R.monthly || [];
   $('#ratesMonthly').hidden = !ms.length;
   if (ms.length) $('#ratesMonthly').innerHTML = `<h2>Europe, monthly <span class="r-muted">📅 10-year yields only, the average of ${monthLabel(ms[0].month, true)} (ECB, published early each month): no free daily source has these countries. Colour: change on the month.</span></h2><div class="grid rgrid">${ms.map(mTileHTML).join('')}</div>`;
-  W = Math.max(300, Math.min(1100, ($('#ratesAll').clientWidth || 900) - 32)); H = W < 600 ? 230 : 300;
-  $('#ratesAll').innerHTML = allCurves();
   $$('#rtf button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === tf));
   const t = M.bins[tf];
   $('#rlegend').innerHTML = `${tf} change in the 10-year yield: <span class="scale">${[['h-4', `≤ −${t[3]}`], ['h-2', `−${t[1]}…${t[2]}`], ['h0', `±${t[0]}`], ['h2', `${t[1]}…${t[2]}`], ['h4', `≥ ${t[3]}`]].map(([k, l]) => `<span class="${k}">${l}</span>`).join('')}</span> bp · <b>blue = yields rose</b> (bond prices fell)`;
@@ -191,18 +187,23 @@ function openPopup(id, { pin = true, anchor = null } = {}) {
   const box = $('#detail'), body = box.querySelector('.body');
   const pinning = pin && previewId === id && box.classList.contains('show') && !box.classList.contains('pinned');
   if (!pinning) {                             // (pinning the preview that's showing keeps it where it is)
-    box.classList.add('show');
-    const keep = [W, H];                      // the charts are drawn at the popup's width, then the page's again
-    W = Math.max(280, (body.clientWidth || 640)); H = W < 600 ? 220 : 270;
+    // about two cards wide and two cards tall, beside the card (a phone shows it as a bottom sheet, from the CSS)
+    const card = anchor || $(`.rtile[data-id="${CSS.escape(id)}"]`), cr = card?.getBoundingClientRect();
+    const phone = innerWidth <= 640;
+    box.classList.add('show', 'r-compact');
+    box.style.width = !phone && cr ? Math.round(cr.width * 2 + 8) + 'px' : '';
+    box.style.maxHeight = !phone && cr ? Math.round(cr.height * 2 + 8) + 'px' : '';
+    box.scrollTop = 0;
+    const keep = [W, H];                      // the charts are drawn at the popup's width
+    W = Math.max(260, (body.clientWidth || 420)); H = phone ? 200 : 130;
     body.innerHTML = c ? detailHTML(c) : monthHTML(m);
     [W, H] = keep;
-    const bw = box.offsetWidth, bh = box.offsetHeight, vw = innerWidth, vh = innerHeight, gap = 10, mg = 12;
+    const bw = box.offsetWidth, bh = box.offsetHeight, vw = innerWidth, vh = innerHeight, gap = 8, mg = 12;
     let left = (vw - bw) / 2, top = (vh - bh) / 2;
-    if (!pin && anchor) {                     // beside the card if there's room, else below or above it
-      const r = anchor.getBoundingClientRect();
-      if (r.right + gap + bw <= vw - mg) { left = r.right + gap; top = r.top; }
-      else if (r.left - gap - bw >= mg) { left = r.left - gap - bw; top = r.top; }
-      else { left = r.left + r.width / 2 - bw / 2; top = r.bottom + gap + bh <= vh - mg ? r.bottom + gap : r.top - gap - bh; }
+    if (cr) {                                 // to the side of the card if there's room, else below or above it
+      if (cr.right + gap + bw <= vw - mg) { left = cr.right + gap; top = cr.top; }
+      else if (cr.left - gap - bw >= mg) { left = cr.left - gap - bw; top = cr.top; }
+      else { left = cr.left + cr.width / 2 - bw / 2; top = cr.bottom + gap + bh <= vh - mg ? cr.bottom + gap : cr.top - gap - bh; }
     }
     box.style.left = Math.min(Math.max(mg, left), Math.max(mg, vw - bw - mg)) + 'px';
     box.style.top = Math.min(Math.max(mg, top), Math.max(mg, vh - bh - mg)) + 'px';
@@ -247,13 +248,12 @@ export function start() {
   for (const s of ['#colorBy', '#quote', '#view', '#density', '.controls .ctl', '#legend', '#reset', '#refresh', '#share', '#excluded']) { const el = $(s); if (el) el.hidden = true; }
   const main = $('main');
   main.insertAdjacentHTML('afterbegin', `<div class="r-bar"><div class="seg" id="rtf" role="group" aria-label="Change over">${TFS.map(([v]) => `<button data-v="${v}" aria-pressed="${v === tf}">${v}</button>`).join('')}</div><span id="rlegend" class="leg-item"></span></div>`);
-  $('#grid').insertAdjacentHTML('afterend', `<section id="ratesMonthly" class="r-month" aria-label="Europe, monthly 10-year yields" hidden></section><section id="ratesAll" class="r-card" aria-label="All yield curves"></section>`);
+  $('#grid').insertAdjacentHTML('afterend', `<section id="ratesMonthly" class="r-month" aria-label="Europe, monthly 10-year yields" hidden></section>`);
   $('#detail').setAttribute('aria-label', 'Yield curve');
   const linked = new URLSearchParams(location.search).get('c');
   $('#rtf').addEventListener('click', e => { const b = e.target.closest('button[data-v]'); if (!b) return; tf = b.dataset.v; store.set('hm.ratesTf', tf); render(); });
   const pick = e => { const b = e.target.closest('[data-id]'); if (b && R) openPopup(b.dataset.id); };
   $('#grid').addEventListener('click', pick);
-  $('#ratesAll').addEventListener('click', pick);
   $('#ratesMonthly').addEventListener('click', pick);
   // with a mouse, resting on a card for 0.7 s previews its curve beside it (as the price pages do); moving away closes
   // it unless the mouse goes onto the popup; a click on the card or the popup pins it
