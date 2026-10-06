@@ -815,6 +815,8 @@ test.describe('rates', () => {
     await expect(pop.locator('.r-mini').nth(1)).toContainText('Real yield');
     await expect(pop.locator('.r-mini').nth(1)).toContainText('steeper than');
     await expect(pop.locator('.r-mini').first()).toContainText('10y−3m');
+    await expect(pop.locator('a.tv-go')).toHaveAttribute('href', /symbol=TVC%3AUS10Y$/);   // TradingView, as on the other pages
+    await expect(pop.locator('a.tv-go')).toHaveAttribute('target', '_blank');
     await expect(pop.locator('[data-rtab="curve"]')).toHaveAttribute('aria-pressed', 'true');
     await pop.locator('[data-rtab="history"]').click();
     await expect(pop.locator('[data-rtab="history"]')).toHaveAttribute('aria-pressed', 'true');

@@ -293,7 +293,10 @@ button.sc-chip:hover, button.sc-chip[aria-expanded="true"] { box-shadow: inset 0
 .r-pop { box-shadow: none; background: none; padding: 0; margin: 0; }   /* a market's curve inside the shared popup */
 .r-pop .r-head { padding-right: 30px; }   /* clear of the × */
 #detail.r-compact { padding: 10px 12px 8px; }
-.r-pop .r-head h2 { font-size: 14px; margin: 0; }
+.r-pop .r-head h2 { font-size: 14px; margin: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 6px; }
+.r-pop a.tv { color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+.r-pop a.tv:hover { text-decoration: underline; }
+.r-pop a.tv-go { font-size: 11px; font-weight: 500; color: var(--blue, #2f6fd0); }
 .r-pop .r-head .rt-state { font-size: 12px; }
 .r-mini { font-size: 12px; color: var(--ink-2); margin: 2px 0 2px; padding-right: 26px; font-variant-numeric: tabular-nums; }
 .r-pop .r-keys { font-size: 11px; gap: 2px 10px; margin-top: 2px; }

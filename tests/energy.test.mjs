@@ -104,3 +104,12 @@ test('TradingView: each contract links to its continuous front-month chart; ener
   const list = assetsOf({ energy: { markets: [{ id: 'wti' }], hist: {} }, metals: { markets: [{ id: 'xau' }], hist: {} } });
   assert.deepEqual(list.map(x => x[2]), ['energy', 'metals']);
 });
+
+test('TradingView, rates: each market’s 10-year yield (TVC:XX10Y; the UK is GB, the euro area EU), monthly ones too', () => {
+  assert.deepEqual(candidates({ id: 'us' }, null, 'rates'), ['TVC:US10Y']);
+  assert.deepEqual(candidates({ id: 'uk' }, null, 'rates'), ['TVC:GB10Y']);
+  assert.deepEqual(candidates({ id: 'ea' }, null, 'rates'), ['TVC:EU10Y']);
+  assert.deepEqual(candidates({ id: 'it' }, null, 'rates'), ['TVC:IT10Y']);
+  const list = assetsOf({ rates: { countries: [{ id: 'us' }], monthly: [{ id: 'fr' }] } });
+  assert.deepEqual(list.map(x => [x[0].id, x[2]]), [['us', 'rates'], ['fr', 'rates']]);
+});

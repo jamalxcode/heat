@@ -131,7 +131,7 @@ jobs:
           BASE_URL: ${{ steps.pages.outputs.base_url }}
         run: |
           cp scripts/tradingview.mjs _site/scripts/   # the page imports it for the link
-          timeout 90 node scripts/tradingview.mjs _site/tv.json _site/data.json _site/forex.json _site/metals.json _site/energy.json \
+          timeout 90 node scripts/tradingview.mjs _site/tv.json _site/data.json _site/forex.json _site/metals.json _site/energy.json _site/rates.json \
             || { echo "::warning::TradingView check failed, republishing the last tv.json"; curl -sf "$BASE_URL/tv.json" -o _site/tv.json || true; }
 
       # Sources health: one footer line on every page saying which data sources are working (from the files just built)
