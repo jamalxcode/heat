@@ -60,12 +60,15 @@ export function bizDaysSince(iso, now = Date.now()) {
   return n;
 }
 const inflNote = x => x.infl ? `inflation ${x.infl.v.toFixed(1)}% (${monthLabel(x.infl.month)})` : 'inflation —';
+// the real yield as a coloured pill (green above zero, red below) and inflation as a quiet grey note, so they can't be confused
+const realPill = x => `<span class="r-real ${x.real == null ? '' : x.real >= 0 ? 'pos' : 'neg'}" title="Real yield: the 10-year yield minus the latest yearly inflation">Real yield <b>${fmtReal(x.real)}</b></span>`;
+const inflTag = x => `<span class="r-infl" title="Latest yearly consumer-price inflation${x.infl ? ` (${monthLabel(x.infl.month, true)}, ${esc(x.infl.src)})` : ''}">CPI ${x.infl ? x.infl.v.toFixed(1) + '%' : '—'}${x.infl ? ` · ${monthLabel(x.infl.month).split(' ')[0]}` : ''}</span>`;
 const rankNote = c => c.slopePct == null ? null : `steeper than ${c.slopePct}% of the last ${c.longYears >= 9.5 ? '10' : Math.max(1, Math.round(c.longYears))} years`;
 
 /* ---------- sketches: a tiny curve in each card (the 10-year path for the monthly ones) ---------- */
 function spark(vals, xs, cls) {
   if (!vals || vals.length < 2) return '';
-  const w = 46, h = 16, lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1, x0 = xs[0], x1 = xs[xs.length - 1];
+  const w = 36, h = 16, lo = Math.min(...vals), hi = Math.max(...vals), span = hi - lo || 1, x0 = xs[0], x1 = xs[xs.length - 1];
   const d = vals.map((v, i) => `${i ? 'L' : 'M'}${((xs[i] - x0) / (x1 - x0 || 1) * (w - 2) + 1).toFixed(1)},${(h - 2 - (v - lo) / span * (h - 4)).toFixed(1)}`).join('');
   return `<svg class="rt-spark ${cls || ''}" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>`;
 }
@@ -78,7 +81,7 @@ function tileHTML(c) {
     <div class="rt-top"><span class="rt-name">${logoOf(c)}<b>${esc(c.name)}</b></span><span class="rt-chg">${fmtBp(bp)}</span>
       <span class="rt-y"><span class="rt-yl">10-year</span> ${fmtY(c.y10)}</span><span class="rt-date${old ? ' old' : ''}"${old ? ' title="More than 2 business days old: this source publishes late, or didn’t update"' : ''}>${c.notRefreshed ? '⚠ ' : ''}${dayLabel(c.date)}</span></div>
     <div class="rt-bot"><span class="rt-state st-${esc(c.state || 'none')}">${st ? `${st.icon} ${st.label}` : '—'}</span>${curveSpark(c)}<span class="rt-slope" title="10-year minus ${shortLabel(c)}, in percentage points">10y−${shortTag(c)} ${fmtPP(c.slope).replace(' pp', '')}</span></div>
-    <div class="rt-bot rt-real"><span title="10-year yield minus the latest yearly inflation">real <b>${fmtReal(c.real)}</b></span><span>${inflNote(c)}</span></div>
+    <div class="rt-bot rt-real">${realPill(c)}${inflTag(c)}</div>
   </button>`;
 }
 function mTileHTML(m) {
@@ -86,7 +89,7 @@ function mTileHTML(m) {
     <div class="rt-top"><span class="rt-name">${logoOf(m)}<b>${esc(m.name)}</b></span><span class="rt-chg">${fmtBp(m.chg1m)}</span>
       <span class="rt-y"><span class="rt-yl">10-year</span> ${fmtY(m.y10)}</span><span class="rt-date">${m.notRefreshed ? '⚠ ' : ''}${monthLabel(m.month)}</span></div>
     <div class="rt-bot"><span>${m.vsDE != null ? `vs 🇩🇪 ${fmtPP(m.vsDE)}` : 'not in the euro'}</span>${monthSpark(m)}<span class="rt-slope">1y ${fmtBp(m.chg12m)}</span></div>
-    <div class="rt-bot rt-real"><span title="10-year yield minus the latest yearly inflation">real <b>${fmtReal(m.real)}</b></span><span>${inflNote(m)}</span></div>
+    <div class="rt-bot rt-real">${realPill(m)}${inflTag(m)}</div>
   </button>`;
 }
 
@@ -199,7 +202,7 @@ function detailHTML(c) {
   return `<div class="r-card r-pop" data-country="${esc(c.id)}"><div class="r-head"><h2>${logoOf(c)} ${esc(c.name)} <span class="r-muted">yield curve</span></h2>
       <span class="rt-state st-${esc(c.state || 'none')}">${st ? `${st.icon} ${st.label}` : '—'}</span></div>
     <div class="r-mini">10y <b>${fmtY(c.y10)}</b> · ${shortLabel(c)} <b>${fmtY(c.yShort)}</b> · gap <b>${fmtPP(c.slope)}</b>${c.slope3m != null && c.short !== '3m' ? ` · 10y−3m <b>${fmtPP(c.slope3m)}</b>` : ''} · ${dayLabel(c.date)}</div>
-    <div class="r-mini">real <b>${fmtReal(c.real)}</b> (${inflNote(c)})${rank ? ` · ${rank}` : ''}</div>
+    <div class="r-mini r-mini2">${realPill(c)}${inflTag(c)}${rank ? `<span>${rank}</span>` : ''}</div>
     <div class="seg r-tabs" role="group" aria-label="Chart"><button data-rtab="curve" aria-pressed="${popTab === 'curve'}">Curve</button><button data-rtab="history" aria-pressed="${popTab === 'history'}">History</button></div>
     ${chart}
     <div class="r-more">
@@ -210,7 +213,7 @@ function detailHTML(c) {
 function monthHTML(m) {
   return `<div class="r-card r-pop" data-country="${esc(m.id)}"><div class="r-head"><h2>${logoOf(m)} ${esc(m.name)} <span class="r-muted">10-year, monthly</span></h2><span class="r-muted">📅 monthly</span></div>
     <div class="r-mini">${monthLabel(m.month)} <b>${fmtY(m.y10)}</b> · month <b>${fmtBp(m.chg1m)}</b> · year <b>${fmtBp(m.chg12m)}</b>${m.vsDE != null ? ` · vs Germany <b>${fmtPP(m.vsDE)}</b>` : ''}</div>
-    <div class="r-mini">real <b>${fmtReal(m.real)}</b> (${inflNote(m)})</div>
+    <div class="r-mini r-mini2">${realPill(m)}${inflTag(m)}</div>
     ${monthChart(m)}
     <div class="r-keys">${keyOf(m.name, 'var(--blue, #2f6fd0)', 2.4)}${m.de ? keyOf('Germany', COLORS.de, 1.4, '5 4') : ''}</div>
     <div class="r-more">
