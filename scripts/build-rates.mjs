@@ -291,7 +291,8 @@ export function summarize(c, days, now) {
 }
 export async function build({ prev = null, log = console.log, now = Date.now(), fetchFn = fetch, force = false } = {}) {
   const same = prev?.market === 'rates' && prev?.fmt === FMT;
-  if (same && !force && now - (prev.fetched || 0) < REFETCH) return { ...prev, generated: now };
+  const ids = COUNTRIES.map(c => c.id).join(',');           // a market added or removed: fetch now, don't wait for REFETCH
+  if (same && !force && prev.ids === ids && now - (prev.fetched || 0) < REFETCH) return { ...prev, generated: now };
   const today = Math.floor(now / DAY), out = [], failed = [];
   const prevOf = id => same ? prev.countries.find(c => c.id === id) : null;
   // every market at once (each source is a different server); the list keeps COUNTRIES' order
@@ -310,7 +311,7 @@ export async function build({ prev = null, log = console.log, now = Date.now(), 
   out.push(...results.filter(Boolean));
   if (!out.length) throw new Error('no yield curve source answered');
   log(`Rates: ${out.map(c => `${c.id} ${c.date} 10y ${c.y10?.toFixed(2)}% slope ${c.slope > 0 ? '+' : ''}${c.slope?.toFixed(2)} (${c.state})`).join(' · ')}${failed.length ? ` · failed: ${failed.join(', ')}` : ''}`);
-  return { v: 1, fmt: FMT, market: 'rates', generated: now, fetched: now, flatPP: FLAT_PP, countries: out };
+  return { v: 1, fmt: FMT, market: 'rates', generated: now, fetched: now, flatPP: FLAT_PP, ids, countries: out };
 }
 
 /* ---------- CLI (Node only) ---------- */
