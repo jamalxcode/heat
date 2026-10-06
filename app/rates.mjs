@@ -180,23 +180,39 @@ function render() {
   if (url !== location.pathname + location.search) history.replaceState(null, '', url);
 }
 
-// A market's curve in the shared popup (#detail): centred over the page, a bottom sheet on a phone (the CSS). The
-// shared handlers close it (×, Escape, the backdrop, a click elsewhere); S.pinned tells them it's open.
-function openPopup(id) {
+// A market's curve in the shared popup (#detail). Two ways in, as on the price pages:
+//   - pinned (a click or tap, or a ?c= link): centred over the page, a bottom sheet on a phone (the CSS); the shared
+//     handlers close it (×, Escape, the backdrop, a click elsewhere), S.pinned tells them it's open
+//   - preview (the mouse resting on a card): beside the card, closing when the mouse moves away; a click pins it
+let previewId = null;
+function openPopup(id, { pin = true, anchor = null } = {}) {
   const c = R?.countries.find(x => x.id === id), m = !c && R?.monthly?.find(x => x.id === id);
   if (!c && !m) return;
-  sel = id;
   const box = $('#detail'), body = box.querySelector('.body');
-  box.classList.add('show', 'pinned');
+  const pinning = pin && previewId === id && box.classList.contains('show') && !box.classList.contains('pinned');
+  if (!pinning) {                             // (pinning the preview that's showing keeps it where it is)
+    box.classList.add('show');
+    const keep = [W, H];                      // the charts are drawn at the popup's width, then the page's again
+    W = Math.max(280, (body.clientWidth || 640)); H = W < 600 ? 220 : 270;
+    body.innerHTML = c ? detailHTML(c) : monthHTML(m);
+    [W, H] = keep;
+    const bw = box.offsetWidth, bh = box.offsetHeight, vw = innerWidth, vh = innerHeight, gap = 10, mg = 12;
+    let left = (vw - bw) / 2, top = (vh - bh) / 2;
+    if (!pin && anchor) {                     // beside the card if there's room, else below or above it
+      const r = anchor.getBoundingClientRect();
+      if (r.right + gap + bw <= vw - mg) { left = r.right + gap; top = r.top; }
+      else if (r.left - gap - bw >= mg) { left = r.left - gap - bw; top = r.top; }
+      else { left = r.left + r.width / 2 - bw / 2; top = r.bottom + gap + bh <= vh - mg ? r.bottom + gap : r.top - gap - bh; }
+    }
+    box.style.left = Math.min(Math.max(mg, left), Math.max(mg, vw - bw - mg)) + 'px';
+    box.style.top = Math.min(Math.max(mg, top), Math.max(mg, vh - bh - mg)) + 'px';
+  }
+  previewId = id;
+  if (!pin) return;
+  sel = id;
+  box.classList.add('pinned');
   $('#scrim').classList.add('show');
   S.pinned = 'rates:' + id;
-  const keep = [W, H];                      // the charts are drawn at the popup's width, then the page's again
-  W = Math.max(280, (body.clientWidth || 640)); H = W < 600 ? 220 : 270;
-  body.innerHTML = c ? detailHTML(c) : monthHTML(m);
-  [W, H] = keep;
-  const bw = box.offsetWidth, bh = box.offsetHeight;
-  box.style.left = Math.max(12, (innerWidth - bw) / 2) + 'px';
-  box.style.top = Math.max(12, (innerHeight - bh) / 2) + 'px';
   box.querySelector('.x').focus({ preventScroll: true });
   render();
 }
@@ -239,8 +255,34 @@ export function start() {
   $('#grid').addEventListener('click', pick);
   $('#ratesAll').addEventListener('click', pick);
   $('#ratesMonthly').addEventListener('click', pick);
+  // with a mouse, resting on a card for 0.7 s previews its curve beside it (as the price pages do); moving away closes
+  // it unless the mouse goes onto the popup; a click on the card or the popup pins it
+  const finePointer = matchMedia('(hover: hover) and (pointer: fine)');
+  let openT = 0, hideT = 0;
+  const hidePreview = () => { if (!S.pinned && !$('#detail').matches(':hover')) { $('#detail').classList.remove('show'); previewId = null; } };
+  for (const el of [$('#grid'), $('#ratesMonthly')]) {
+    el.addEventListener('mouseover', e => {
+      const card = e.target.closest('.rtile[data-id]');
+      if (!finePointer.matches || !card || S.pinned || card.contains(e.relatedTarget)) return;
+      clearTimeout(openT); clearTimeout(hideT);
+      openT = setTimeout(() => { if (!S.pinned && card.matches(':hover')) openPopup(card.dataset.id, { pin: false, anchor: card }); }, 700);
+    });
+    el.addEventListener('mouseout', e => {
+      const card = e.target.closest('.rtile[data-id]');
+      if (!card || card.contains(e.relatedTarget)) return;
+      clearTimeout(openT);
+      hideT = setTimeout(hidePreview, 250);
+    });
+  }
+  $('#detail').addEventListener('mouseenter', () => clearTimeout(hideT));
+  $('#detail').addEventListener('mouseleave', () => { hideT = setTimeout(hidePreview, 250); });
+  $('#detail').addEventListener('click', e => { if (!S.pinned && previewId && !e.target.closest('.x')) openPopup(previewId); });
   // closed by the shared handlers: forget the market (and take it off the address)
-  new MutationObserver(() => { if (sel && !$('#detail').classList.contains('pinned')) { sel = null; render(); } }).observe($('#detail'), { attributes: true, attributeFilter: ['class'] });
+  new MutationObserver(() => {
+    const box = $('#detail');
+    if (!box.classList.contains('show')) previewId = null;
+    if (sel && !box.classList.contains('pinned')) { sel = null; render(); }
+  }).observe($('#detail'), { attributes: true, attributeFilter: ['class'] });
   load().then(() => { if (linked) openPopup(linked); });
   let rz = 0;
   addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(render, 150); });

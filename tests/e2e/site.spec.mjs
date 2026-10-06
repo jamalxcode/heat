@@ -763,6 +763,27 @@ test.describe('rates', () => {
     await expect(pop.locator('h2')).toContainText('Japan');
   });
 
+  test('mouse: resting on a card previews its curve beside it; moving away closes it; a click pins it in place', async ({ page }) => {
+    const pop = page.locator('#detail'), card = page.locator('.rtile[data-id="ca"]');
+    await card.hover();
+    await expect(pop).toHaveClass(/show/);
+    await expect(pop).not.toHaveClass(/pinned/);
+    await expect(pop.locator('h2')).toContainText('Canada');
+    await expect(page).toHaveURL(/\/rates\/$/);                              // a preview doesn't change the address
+    await page.mouse.move(5, 5);
+    await expect(pop).not.toHaveClass(/show/);
+    await card.hover();
+    await expect(pop).toHaveClass(/show/);
+    const left = await pop.evaluate(b => b.style.left);
+    await card.click();
+    await expect(pop).toHaveClass(/pinned/);
+    expect(await pop.evaluate(b => b.style.left)).toBe(left);                // pinned where it was
+    await expect(page).toHaveURL(/\/rates\/\?c=ca$/);
+    await page.mouse.move(5, 5);
+    await page.waitForTimeout(500);
+    await expect(pop).toHaveClass(/pinned/);                                 // stays open once pinned
+  });
+
   test('Europe, monthly: its own labelled row; a tile opens the monthly chart with Germany for comparison', async ({ page }) => {
     const row = page.locator('#ratesMonthly');
     await expect(row).toBeVisible();
