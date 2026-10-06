@@ -746,7 +746,7 @@ test.describe('rates', () => {
     await expect(pop.locator('h2')).toContainText('Canada');
     await expect(pop.locator('.r-says')).toContainText('Inverted');
     await expect(pop.locator('.r-keys')).toContainText('A year ago');
-    await expect(pop.locator('.r-chart')).toHaveCount(2);
+    await expect(pop.locator('.r-chart')).toHaveCount(1);                   // one chart at a time (Curve | History)
     await expect(pop.locator('.r-mini')).toContainText('10y');
     const card = await page.locator('.rtile[data-id="ca"]').boundingBox(), box = await pop.boundingBox();
     expect(Math.abs(box.width - (card.width * 2 + 8))).toBeLessThan(3);       // about two cards wide …
@@ -852,8 +852,8 @@ test.describe('rates', () => {
     await expect(row.locator('.mtile')).toHaveCount(15);
     const it = row.locator('.mtile[data-id="it"]');
     await expect(it.locator('.rt-date')).toHaveText('Aug 2026');
-    await expect(it.locator('.rt-bot')).toContainText('+0.85 pp');
-    await expect(row.locator('.mtile[data-id="pl"] .rt-bot')).toContainText('not in the euro');
+    await expect(it.locator('.rt-bot').first()).toContainText('+0.85 pp');
+    await expect(row.locator('.mtile[data-id="pl"] .rt-bot').first()).toContainText('not in the euro');
     await it.click();
     const pop = page.locator('#detail');
     await expect(pop).toHaveClass(/pinned/);

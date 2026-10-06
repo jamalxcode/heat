@@ -20,5 +20,11 @@ jobs:
         with:
           node-version: 22
       - run: node --test   # finds tests/*.test.mjs
-      # TEMPORARY (rates-v2 branch only): a full rates build (with the ten-year history) from GitHub's servers
-      - run: time node scripts/build-rates.mjs /tmp/rates.json && ls -la /tmp/rates.json
+      # TEMPORARY (rates-v2 branch only): does the OECD answer GitHub's servers?
+      - run: |
+          U="https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_PRICES@DF_PRICES_ALL,1.0/USA+GBR+CAN+AUS+BRA+CHN+IND.M.N.CPI.PA._T.N.GY?lastNObservations=1&format=csvfile"
+          curl -s -o /tmp/o1 -w "plain %{http_code} %{size_download}\n" "$U" || true
+          curl -s -o /tmp/o2 -w "browser UA %{http_code} %{size_download}\n" -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/140.0" "$U" || true
+          curl -s -o /tmp/o3 -w "accept csv %{http_code} %{size_download}\n" -H "Accept: application/vnd.sdmx.data+csv; charset=utf-8" "https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_PRICES@DF_PRICES_ALL,1.0/USA+GBR+CAN+AUS+BRA+CHN+IND.M.N.CPI.PA._T.N.GY?lastNObservations=1" || true
+          sleep 5; curl -s -o /tmp/o4 -w "again %{http_code} %{size_download}\n" -A "Mozilla/5.0" "$U" || true
+          head -c 300 /tmp/o1; echo; head -c 300 /tmp/o4
