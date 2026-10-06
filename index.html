@@ -301,18 +301,22 @@ button.sc-chip:hover, button.sc-chip[aria-expanded="true"] { box-shadow: inset 0
 .r-more .r-says { font-size: 12px; }
 /* rates: card sketch, real-yield line, stale dates, sort/group/table controls, "How to read", Curve | History */
 .rt-spark { flex: none; align-self: center; color: var(--muted); }
-.rt-spark.st-normal { color: #2f9e6a; } .rt-spark.st-flat { color: #c9971a; } .rt-spark.st-inverted { color: #d0453b; }
+/* colour-blind safe: blue / grey / orange, and the inverted one dashed too */
+.rt-spark.st-normal { color: #2f6fd0; } .rt-spark.st-flat { color: #8a8780; } .rt-spark.st-inverted { color: #d9730d; }
+.rt-spark.st-inverted path { stroke-dasharray: 3 2; }
+.st-ico { font-weight: 900; font-size: 1.1em; line-height: 1; }
+.st-normal .st-ico { color: #2f6fd0; } .st-flat .st-ico { color: #8a8780; } .st-inverted .st-ico { color: #d9730d; }
 .rt-bot.rt-real { padding-top: 0; align-items: center; }
-/* real yield: a coloured pill (green above zero, red below); inflation: a small grey note beside it */
+/* real yield: a pill, ▲ on blue above zero, ▼ on orange below (colour-blind safe); inflation: a small grey note */
 .r-real { display: inline-flex; align-items: baseline; gap: 4px; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--neutral); color: var(--ink-2); white-space: nowrap; }
 .r-real b { font-size: 12.5px; font-weight: 800; color: inherit; }
-.r-real.pos { background: #dff3e7; color: #17643d; }
-.r-real.neg { background: #fbe2df; color: #9c2b24; }
-:root[data-theme="dark"] .r-real.pos { background: rgba(47,158,106,.22); color: #86d9ab; }
-:root[data-theme="dark"] .r-real.neg { background: rgba(208,69,59,.25); color: #f3a29a; }
+.r-real.pos { background: #dde9fb; color: #1a4f9c; }
+.r-real.neg { background: #fde6cc; color: #8a4300; }
+:root[data-theme="dark"] .r-real.pos { background: rgba(47,111,208,.28); color: #9cc2ff; }
+:root[data-theme="dark"] .r-real.neg { background: rgba(217,115,13,.28); color: #ffbf7a; }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .r-real.pos { background: rgba(47,158,106,.22); color: #86d9ab; }
-  :root:not([data-theme="light"]) .r-real.neg { background: rgba(208,69,59,.25); color: #f3a29a; }
+  :root:not([data-theme="light"]) .r-real.pos { background: rgba(47,111,208,.28); color: #9cc2ff; }
+  :root:not([data-theme="light"]) .r-real.neg { background: rgba(217,115,13,.28); color: #ffbf7a; }
 }
 .r-infl { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
 .r-mini2 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 3px; }

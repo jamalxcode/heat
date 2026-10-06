@@ -772,7 +772,12 @@ test.describe('rates', () => {
     await expect(page.locator('#grid .rt-spark')).toHaveCount(14);
     const us = page.locator('.rtile[data-id="us"]');
     await expect(us.locator('.rt-real .r-real')).toContainText('Real yield');
-    await expect(us.locator('.rt-real .r-real')).toHaveClass(/pos/);           // green above zero
+    await expect(us.locator('.rt-real .r-real')).toHaveClass(/pos/);           // ▲ on blue above zero
+    await expect(us.locator('.rt-real .r-real')).toContainText('▲');
+    // readable without telling colours apart: every reading has an arrow for its slope
+    await expect(us.locator('.rt-state .st-ico')).toContainText('↗');
+    await expect(page.locator('.rtile[data-id="ca"] .rt-state .st-ico')).toContainText('↘');
+    await expect(page.locator('.rtile[data-id="ea"] .rt-state .st-ico')).toContainText('→');
     await expect(us.locator('.rt-real .r-infl')).toHaveText('CPI 2.5% · Aug');
     await expect(page.locator('.rtile[data-id="ch"] .rt-real .r-real')).toContainText('Real yield —');
     await expect(page.locator('.rtile[data-id="jp"] .rt-date')).toHaveClass(/old/);
