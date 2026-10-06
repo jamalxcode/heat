@@ -1,7 +1,7 @@
 // Unit tests for the rates page data (scripts/build-rates.mjs). Run: node --test tests/
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { COUNTRIES, interp, parseUS, parseECB, parseBoE, parseMOF, parseBoC, parseRBA, parseBBK, parseSNB, parseNB, mergeSeries, mergeSARB, parseTesouro, parseChinaBond, parseFBIL, unzipEntries, parseIRS, summarizeMonthly, daysFromSummary, EU_MONTHLY, summarize, slopeState, build } from '../scripts/build-rates.mjs';
+import { COUNTRIES, interp, parseUS, parseECB, parseBoE, parseMOF, parseBoC, parseRBA, parseBBK, parseSNB, parseNB, mergeSeries, mergeSARB, parseTesouro, parseChinaBond, parseFBIL, unzipEntries, parseIRS, summarizeMonthly, daysFromSummary, EU_MONTHLY, parseEurostat, parseOECD, parseJapanCPI, summarize, slopeState, build } from '../scripts/build-rates.mjs';
 import { health } from '../scripts/health.mjs';
 import { dayNum, DAY } from '../scripts/build-forex.mjs';
 import { deflateRawSync } from 'node:zlib';
@@ -223,6 +223,42 @@ test('health: the monthly figures count as late 75 days after their month began'
   const now = Date.parse('2026-10-06T10:00:00Z'), countries = [{ badge: 'US', date: '2026-10-05' }];
   const row = month => health({ rates: { countries, monthly: [{ month }] } }, now).sources.find(s => s.key === 'yields');
   assert.equal(row('2026-08').state, 'ok');
-  assert.match(row('2026-08').note, /Europe monthly to 2026-08$/);
+  assert.match(row('2026-08').note, /Europe monthly to 2026-08 · inflation for 0\/2$/);
   assert.equal(row('2026-06').state, 'warn');
+});
+
+test('inflation: Eurostat (JSON-stat), the OECD (csv), Japan’s CPI index → the latest yearly rate per market', () => {
+  const es = parseEurostat({ dimension: { geo: { category: { index: { EA20: 0, EL: 1, XX: 2 } } }, time: { category: { index: { '2026-07': 0, '2026-08': 1, '2026-09': 2 } } } },
+    value: { 0: 2.7, 1: 2.9, 2: 3.8, 3: 3.0, 4: 3.1, 6: 1 } });
+  assert.deepEqual(es.ea, { v: 3.8, month: '2026-09', src: 'Eurostat' });
+  assert.deepEqual(es.gr, { v: 3.1, month: '2026-08', src: 'Eurostat' }, 'Greece (EL): its latest month with a value');
+  assert.equal(Object.keys(es).length, 2, 'areas not on the page are ignored');
+  const oe = parseOECD('DATAFLOW,REF_AREA,FREQ,TIME_PERIOD,OBS_VALUE\nx,USA,M,2026-08,3.396548\nx,GBR,M,2026-08,3.3\nx,JPN,M,2021-06,-0.5\n');
+  assert.deepEqual(oe.us, { v: 3.3965, month: '2026-08', src: 'OECD' });
+  assert.equal(oe.jp, undefined, 'Japan comes from its own statistics bureau');
+  const jp = parseJapanCPI('header,…\n202508,111.0,1\n202607,113.9,1\n202608,114.3,1\n');
+  assert.deepEqual(jp, { v: 2.973, month: '2026-08', src: 'Statistics Bureau of Japan' });
+  assert.equal(parseJapanCPI('202608,114.3\n'), null, 'no year-ago month: no rate');
+});
+
+test('summarize: ten years of weekly history, today’s slope ranked against it, and the 10-year minus 3-month gap', () => {
+  const from = dayNum('2021-01-04'), n = 2000, now = (from + n - 1) * DAY;
+  // the slope (10y − 2y) drifts from −1 to +1 over the period, so today's is the steepest
+  const days = new Map();
+  for (let i = 0; i < n; i++) { const s = -1 + 2 * i / (n - 1); days.set(from + i, [[0.25, 3], [2, 3.5], [10, 3.5 + s]]); }
+  const s = summarize(COUNTRIES[0], days, now);
+  assert.ok(s.long.d.length > 270 && s.long.d.length < 290, 'one point a week');
+  assert.ok(s.longYears > 5.4 && s.longYears < 5.6);
+  assert.ok(s.slopePct >= 99, 'steeper than nearly every week');
+  assert.equal(s.series.d.length, 761, 'the daily series keeps two years');
+  assert.equal(s.y3m, 3);
+  assert.equal(s.slope3m, 1.5);
+  // the next run fetches only the recent days: the history is carried over from the last one
+  const recent = new Map([...days].filter(([d]) => d >= from + n - 30));
+  const t = summarize(COUNTRIES[0], recent, now, s.long);
+  assert.equal(t.long.d.length, s.long.d.length);
+  assert.equal(t.slopePct, s.slopePct);
+  const uk = summarize(COUNTRIES.find(c => c.id === 'uk'), new Map([[from, [[0, 4], [5, 4.2], [10, 4.6], [20, 5]]]]), from * DAY);
+  assert.equal(uk.y3m, null, 'not for a curve whose short end is the Bank Rate');
+  assert.equal(uk.slopePct, null, 'too little history to rank');
 });
