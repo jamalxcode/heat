@@ -498,10 +498,12 @@ export async function fetchInflation(fetchFn, today) {
       const geos = Object.keys(EUROSTAT_GEO).map(g => `&geo=${g}`).join('');
       Object.assign(out, parseEurostat(JSON.parse(await getText(`https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/prc_hicp_minr?format=JSON&coicop18=TOTAL&unit=RCH_A&sinceTimePeriod=${since}${geos}`, fetchFn))));
     },
-    async () => {                         // (the OECD's service sometimes answers 500 for a moment: one retry)
+    async () => {                         // (the OECD's service often answers 500 to shared cloud servers: three tries)
       const url = `https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_PRICES@DF_PRICES_ALL,1.0/${Object.keys(OECD_AREA).join('+')}.M.N.CPI.PA._T.N.GY?lastNObservations=1&format=csvfile`;
       let text;
-      try { text = await getText(url, fetchFn, { timeout: 60e3 }); } catch { await sleep(5000); text = await getText(url, fetchFn, { timeout: 60e3 }); }
+      for (let k = 0; k < 3 && text == null; k++) {
+        try { text = await getText(url, fetchFn, { timeout: 60e3 }); } catch (e) { if (k === 2) throw e; await sleep(8000 * (k + 1)); }
+      }
       Object.assign(out, parseOECD(text));
     },
     async () => {
@@ -573,7 +575,9 @@ export async function build({ prev = null, log = console.log, now = Date.now(), 
   // inflation for the real yields (a source that fails keeps each market's last figure)
   const { inflation, failed: inflFailed } = await fetchInflation(fetchFn, today);
   failed.push(...inflFailed.map(f => `inflation ${f}`));
-  const withReal = x => { const i = inflation[x.id] || x.infl || null; return { ...x, infl: i, real: i && x.y10 != null ? r4(x.y10 - i.v) : null }; };
+  // a source that fails keeps each market's figure from the last file (inflation changes once a month)
+  const lastInfl = id => same ? [...(prev.countries || []), ...(prev.monthly || [])].find(p => p.id === id)?.infl : null;
+  const withReal = x => { const i = inflation[x.id] || x.infl || lastInfl(x.id) || null; return { ...x, infl: i, real: i && x.y10 != null ? r4(x.y10 - i.v) : null }; };
   out.splice(0, out.length, ...out.map(withReal));
   monthly = monthly.map(withReal);
   if (!out.length) throw new Error('no yield curve source answered');
