@@ -747,7 +747,7 @@ test.describe('rates', () => {
     await expect(pop.locator('.r-says')).toContainText('Inverted');
     await expect(pop.locator('.r-keys')).toContainText('A year ago');
     await expect(pop.locator('.r-chart')).toHaveCount(1);                   // one chart at a time (Curve | History)
-    await expect(pop.locator('.r-mini')).toContainText('10y');
+    await expect(pop.locator('.r-mini').first()).toContainText('10y');
     const card = await page.locator('.rtile[data-id="ca"]').boundingBox(), box = await pop.boundingBox();
     expect(Math.abs(box.width - (card.width * 2 + 8))).toBeLessThan(3);       // about two cards wide …
     expect(box.height).toBeLessThanOrEqual(card.height * 2 + 10);           // … and at most two cards tall

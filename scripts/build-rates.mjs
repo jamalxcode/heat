@@ -496,7 +496,12 @@ export async function fetchInflation(fetchFn, today) {
       const geos = Object.keys(EUROSTAT_GEO).map(g => `&geo=${g}`).join('');
       Object.assign(out, parseEurostat(JSON.parse(await getText(`https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/prc_hicp_minr?format=JSON&coicop18=TOTAL&unit=RCH_A&sinceTimePeriod=${since}${geos}`, fetchFn))));
     },
-    async () => Object.assign(out, parseOECD(await getText(`https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_PRICES@DF_PRICES_ALL,1.0/${Object.keys(OECD_AREA).join('+')}.M.N.CPI.PA._T.N.GY?lastNObservations=1&format=csvfile`, fetchFn, { timeout: 60e3 }))),
+    async () => {                         // (the OECD's service sometimes answers 500 for a moment: one retry)
+      const url = `https://sdmx.oecd.org/public/rest/data/OECD.SDD.TPS,DSD_PRICES@DF_PRICES_ALL,1.0/${Object.keys(OECD_AREA).join('+')}.M.N.CPI.PA._T.N.GY?lastNObservations=1&format=csvfile`;
+      let text;
+      try { text = await getText(url, fetchFn, { timeout: 60e3 }); } catch { await sleep(5000); text = await getText(url, fetchFn, { timeout: 60e3 }); }
+      Object.assign(out, parseOECD(text));
+    },
     async () => {
       const list = await sarb('CPI1000F', isoDay(today - 200), isoDay(today), fetchFn), last = list?.[0];
       if (last?.Value != null) out.za = { v: r4(+last.Value), month: String(last.Period).slice(0, 7), src: 'South African Reserve Bank' };
