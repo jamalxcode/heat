@@ -342,6 +342,26 @@ button.sc-chip:hover, button.sc-chip[aria-expanded="true"] { box-shadow: inset 0
 .r-tbl td.old { opacity: .5; font-style: italic; }
 .r-tabs { margin: 4px 0 2px; }
 .r-tabs button { font-size: 11.5px; padding: 1px 10px; }
+/* Energy: the weekly pump-price and refined-product rows under the futures (app/fuel.mjs) */
+.f-wrap { margin-top: 22px; }
+.f-sec + .f-sec { margin-top: 22px; }
+.f-sec h2 { font-size: 16px; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.f-tag { font-size: 11.5px; font-weight: 600; color: var(--ink-2); background: var(--neutral); border-radius: 999px; padding: 2px 9px; }
+.f-note { font-size: 12.5px; color: var(--ink-2); margin: 0 0 8px; max-width: 900px; line-height: 1.5; }
+.f-ctl { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 0 0 6px; font-size: 12px; color: var(--ink-2); }
+.f-key { display: inline-flex; align-items: center; gap: 6px; }
+.f-key .f-bar { width: 18px; position: static; }
+.f-tbl { min-width: 680px; }
+.f-cell { position: relative; min-width: 120px; }
+.f-cell b { position: relative; z-index: 1; }
+.f-track { display: inline-block; width: 80px; height: 6px; border-radius: 3px; background: var(--grid); vertical-align: middle; margin-left: 8px; overflow: hidden; }
+.f-bar { display: block; height: 6px; border-radius: 3px; }
+.f-key .f-bar { display: inline-block; }
+.f-bar.petrol { background: #2f6fd0; } .f-bar.diesel { background: #8a8780; }
+.f-chg.up { color: #1a4f9c; } .f-chg.dn { color: #b35c00; }
+.f-muted { color: var(--muted); font-size: 11.5px; }
+.f-spark { color: var(--ink-2); vertical-align: middle; }
+.f-stale { opacity: .6; }
 .flag-code { flex: none; display: inline-grid; place-items: center; min-width: 20px; height: 15px; padding: 0 2px; border-radius: 3px; font-size: 9px; font-weight: 800; letter-spacing: .02em; line-height: 1; color: var(--ink); background: color-mix(in oklab, var(--surface) 70%, transparent); box-shadow: inset 0 0 0 1px var(--axis); }   /* where flag emoji are missing (Windows) */
 .chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .chip { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 3px 7px; cursor: pointer; font-size: 12.5px; color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; }

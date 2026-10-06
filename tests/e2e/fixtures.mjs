@@ -182,3 +182,18 @@ export function makeRatesFixture(now = Date.now()) {
   const daily = countries.map(infl).map(c => c.id === 'jp' ? { ...c, date: new Date((today - 8) * DAY).toISOString().slice(0, 10) } : c);
   return { v: 1, fmt: 1, market: 'rates', generated: now, fetched: now, flatPP: 0.5, countries: daily, monthly: summarizeMonthly(by).map(infl) };
 }
+
+// fuel.json: pump prices for three countries (Germany new this week, so no change yet) and two US spot prices
+export function makeFuelFixture(now = Date.now()) {
+  const d = new Date(now - 2 * DAY).toISOString().slice(0, 10), rate = { EUR: 1.1, GBP: 1.3, USD: 1 };
+  const pump = (id, name, flag, region, cur, petrol, diesel, chg) => ({ id, name, flag, badge: id.toUpperCase(), region, cur, unit: 'litre', src: 'Test', srcUrl: '', date: d,
+    petrol: { local: petrol, usdL: petrol * rate[cur], chg }, diesel: { local: diesel, usdL: diesel * rate[cur], chg: null }, hist: [] });
+  return {
+    v: 1, fmt: 1, generated: now, fetched: now, fx: rate,
+    pump: [pump('us', 'United States', '🇺🇸', 'Americas', 'USD', 1.15, 1.64, -2.5), pump('uk', 'United Kingdom', '🇬🇧', 'Europe', 'GBP', 1.75, 1.99, 0.8), pump('de', 'Germany', '🇩🇪', 'Europe', 'EUR', 2.35, 2.44, null)],
+    spot: [
+      { id: 'DDFUELNYH', name: 'Diesel (ULSD)', where: 'New York Harbor', usdGal: 5, date: d, chg1w: -0.2, chg1m: 14.9, series: [[d, 4.9], [d, 5]] },
+      { id: 'DJFUELUSGULF', name: 'Jet fuel', where: 'US Gulf Coast', usdGal: 4.4, date: d, chg1w: 1, chg1m: 15.6, series: [[d, 4.3], [d, 4.4]] },
+    ],
+  };
+}
