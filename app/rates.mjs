@@ -22,7 +22,8 @@ const US_INVERTED = ' In the US an inverted curve has come before most recession
 const COLORS = { us: '#2f6fd0', ea: '#2f9e6a', de: '#8a6a3c', uk: '#d0453b', jp: '#c9971a', ca: '#8a5cd0', au: '#b8862b', ch: '#d0458f', se: '#1aa3b8', no: '#5d6f93', br: '#e0782a', cn: '#c8102e', in: '#ff9933', za: '#6aa83a' };
 const pref = (k, ok, d) => { const v = store.get(k); return ok.includes(v) ? v : d; };
 let R = null, sel = null, loadedAt = 0;
-let tf = pref('hm.ratesTf', TFS.map(t => t[0]), '1d');
+let tf = pref('hm.ratesTf', TFS.map(t => t[0]), '1w');      // a week by default: a day is mostly noise for bonds
+let colorBy = pref('hm.ratesColor', ['change', 'curve', 'real'], 'change');
 let sortBy = pref('hm.ratesSort', SORTS.map(s => s[0]), 'default');
 let groupBy = pref('hm.ratesGroup', ['none', 'region'], 'none');
 let viewAs = pref('hm.ratesView', ['cards', 'table'], 'cards');
@@ -84,18 +85,33 @@ function spark(vals, xs, cls) {
 const curveSpark = c => spark(c.curve?.map(p => p[1]), c.curve?.map(p => Math.sqrt(p[0])), 'st-' + (c.state || 'none'));
 const monthSpark = m => { const s = m.series?.slice(-13) || []; return spark(s.map(p => p[1]), s.map((_, i) => i), ''); };
 
+// What a card's colour (and the number in its top corner) shows: the change in the 10-year yield (1d / 1w / 1m), the
+// curve's slope (10-year minus the short leg) or the real yield. The same red ↔ blue scale as everywhere, and the corner
+// always carries the number with its sign, so the colour is never the only cue.
+const CURVE_BINS = [[1.5, 'h3'], [1, 'h2'], [0.5, 'h1'], [0, 'h0'], [-0.25, 'h-1'], [-0.5, 'h-2'], [-Infinity, 'h-3']];
+const REAL_BINS = [[3, 'h4'], [2, 'h3'], [1, 'h2'], [0.25, 'h1'], [-0.25, 'h0'], [-1, 'h-1'], [-2, 'h-2'], [-Infinity, 'h-3']];
+const binOf = (v, bins) => v == null ? 'h0' : bins.find(([t]) => v >= t)[1];
+export function colourOf(x, monthly, mode = colorBy, tfKey = tf) {
+  if (mode === 'curve') return monthly ? { cls: 'h0', corner: '' } : { cls: binOf(x.slope, CURVE_BINS), corner: fmtPP(x.slope) };
+  if (mode === 'real') return { cls: binOf(x.real, REAL_BINS), corner: fmtReal(x.real) };
+  if (monthly) return { cls: heat(x.chg1m, '1m'), corner: fmtBp(x.chg1m) };
+  const bp = changeBp(x, TFS.find(t => t[0] === tfKey)[1]);
+  return { cls: heat(bp, tfKey), corner: fmtBp(bp) };
+}
+
 function tileHTML(c) {
-  const k = TFS.find(x => x[0] === tf)[1], bp = changeBp(c, k), st = STATE[c.state], old = bizDaysSince(c.date) > 2;
-  return `<button class="rtile ${heat(bp, tf)}${c.id === sel ? ' sel' : ''}" data-id="${esc(c.id)}" data-coin="1" aria-haspopup="dialog" aria-label="${esc(`${c.name}: 10-year ${fmtY(c.y10)}, ${tf} ${fmtBp(bp)}, curve ${st?.label || 'unknown'}, real yield ${fmtReal(c.real)}`)}">
-    <div class="rt-top"><span class="rt-name">${logoOf(c)}<b>${esc(c.name)}</b></span><span class="rt-chg">${fmtBp(bp)}</span>
+  const k = TFS.find(x => x[0] === tf)[1], bp = changeBp(c, k), st = STATE[c.state], old = bizDaysSince(c.date) > 2, col = colourOf(c, false);
+  return `<button class="rtile ${col.cls}${c.id === sel ? ' sel' : ''}" data-id="${esc(c.id)}" data-coin="1" aria-haspopup="dialog" aria-label="${esc(`${c.name}: 10-year ${fmtY(c.y10)}, ${tf} ${fmtBp(bp)}, curve ${st?.label || 'unknown'}, real yield ${fmtReal(c.real)}`)}">
+    <div class="rt-top"><span class="rt-name">${logoOf(c)}<b>${esc(c.name)}</b></span><span class="rt-chg">${col.corner}</span>
       <span class="rt-y"><span class="rt-yl">10-year</span> ${fmtY(c.y10)}</span><span class="rt-date${old ? ' old' : ''}"${old ? ' title="More than 2 business days old: this source publishes late, or didn’t update"' : ''}>${c.notRefreshed ? '⚠ ' : ''}${dayLabel(c.date)}</span></div>
     <div class="rt-bot"><span class="rt-state st-${esc(c.state || 'none')}">${st ? `<span class="st-ico" aria-hidden="true">${st.icon}</span> ${st.label}` : '—'}</span>${curveSpark(c)}<span class="rt-slope" title="10-year minus ${shortLabel(c)}, in percentage points">10y−${shortTag(c)} ${fmtPP(c.slope).replace(' pp', '')}</span></div>
     <div class="rt-bot rt-real">${realPill(c)}${inflTag(c)}</div>
   </button>`;
 }
 function mTileHTML(m) {
-  return `<button class="rtile mtile ${heat(m.chg1m, '1m')}${m.id === sel ? ' sel' : ''}" data-id="${esc(m.id)}" data-coin="1" aria-haspopup="dialog" aria-label="${esc(`${m.name}: 10-year ${fmtY(m.y10)} in ${monthLabel(m.month, true)}, ${fmtBp(m.chg1m)} on the month, real yield ${fmtReal(m.real)}`)}">
-    <div class="rt-top"><span class="rt-name">${logoOf(m)}<b>${esc(m.name)}</b></span><span class="rt-chg">${fmtBp(m.chg1m)}</span>
+  const col = colourOf(m, true);
+  return `<button class="rtile mtile ${col.cls}${m.id === sel ? ' sel' : ''}" data-id="${esc(m.id)}" data-coin="1" aria-haspopup="dialog" aria-label="${esc(`${m.name}: 10-year ${fmtY(m.y10)} in ${monthLabel(m.month, true)}, ${fmtBp(m.chg1m)} on the month, real yield ${fmtReal(m.real)}`)}">
+    <div class="rt-top"><span class="rt-name">${logoOf(m)}<b>${esc(m.name)}</b></span><span class="rt-chg">${col.corner}</span>
       <span class="rt-y"><span class="rt-yl">10-year</span> ${fmtY(m.y10)}</span><span class="rt-date">${m.notRefreshed ? '⚠ ' : ''}${monthLabel(m.month)}</span></div>
     <div class="rt-bot"><span>${m.vsDE != null ? `vs 🇩🇪 ${fmtPP(m.vsDE)}` : 'not in the euro'}</span>${monthSpark(m)}<span class="rt-slope">1y ${fmtBp(m.chg12m)}</span></div>
     <div class="rt-bot rt-real">${realPill(m)}${inflTag(m)}</div>
@@ -233,7 +249,7 @@ function monthHTML(m) {
 /* ---------- "How to read" ---------- */
 const HELP = `<div class="r-help" id="rhelp" hidden>
   <p><b>10-year yield:</b> what the government pays a year to borrow for ten years. <b>bp</b> = basis point, 0.01 percentage point (+25 bp: from 4.00% to 4.25%). <b>pp</b> = percentage point.</p>
-  <p><b>Card colour:</b> the change in the 10-year yield over 1 day, 1 week or 1 month (the switch). Blue: yields rose, so bond prices fell; red: yields fell. The monthly European cards always show the change on the month.</p>
+  <p><b>Card colour</b> (and the number in each card's top corner), your choice: <b>Change</b>, the move in the 10-year yield over 1 day, 1 week or 1 month (blue: yields rose, so bond prices fell; a day is mostly noise for bonds, so a week is the default); <b>Curve</b>, how steep the curve is (red: inverted, grey: flat, blue: steep); or <b>Real yield</b> (blue: above inflation, red: below). The monthly European cards show the change on the month and have no curve.</p>
   <p><b>The reading</b> compares long and short rates: 10-year minus 2-year (UK: minus the Bank Rate, BR; South Africa: minus the 3-month bill). ↗ Normal: +0.5 pp or more. → Flat: 0 to +0.5. ↘ Inverted: below zero (the arrow shows which way the curve slopes). “Steeper than 85% of the last 10 years” compares today’s gap with that country’s own history, which matters more than the fixed bands for a country whose curve is usually steep or usually flat. The popup also gives the 10-year minus 3-month gap where it exists.</p>
   <p><b>Real yield:</b> the 10-year yield minus the latest yearly inflation: roughly what a lender earns after rising prices. It makes Brazil’s 14% and Switzerland’s 0.6% comparable.</p>
   <p><b>The sketch</b> on each card is the shape of today’s curve, short maturities on the left; on the monthly cards it is the 10-year over the last year. A greyed date is more than 2 business days old.</p>
@@ -254,14 +270,21 @@ function render() {
       grid.innerHTML = REGIONS.map(r => { const g = cs.filter(c => c.region === r); return g.length ? `<section class="r-group"><h3>${r}</h3><div class="grid rgrid">${g.map(tileHTML).join('')}</div></section>` : ''; }).join('')
         + (cs.some(c => !REGIONS.includes(c.region)) ? `<section class="r-group"><div class="grid rgrid">${cs.filter(c => !REGIONS.includes(c.region)).map(tileHTML).join('')}</div></section>` : '');
     } else { grid.className = 'grid rgrid'; grid.innerHTML = cs.map(tileHTML).join(''); }
-    if (ms.length) $('#ratesMonthly').innerHTML = `<h2>Europe, monthly <span class="r-muted">📅 10-year yields only, the average of ${monthLabel(ms[0].month, true)} (ECB, published early each month): no free daily source has these countries. Colour: change on the month (the 1d / 1w / 1m switch doesn’t apply).</span></h2><div class="grid rgrid">${ms.map(mTileHTML).join('')}</div>`;
+    if (ms.length) $('#ratesMonthly').innerHTML = `<h2>Europe, monthly <span class="r-muted">📅 10-year yields only, the average of ${monthLabel(ms[0].month, true)} (ECB, published early each month): no free daily source has these countries. ${colorBy === 'curve' ? 'No curve here, so these cards stay grey when colouring by the curve.' : colorBy === 'real' ? 'Colour: the real yield.' : 'Colour: change on the month (the 1d / 1w / 1m switch doesn’t apply).'}</span></h2><div class="grid rgrid">${ms.map(mTileHTML).join('')}</div>`;
   }
   $$('#rtf button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === tf));
   $$('#rview button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === viewAs));
   $('#rsort').value = sortBy; $('#rgroup').value = groupBy;
   $('#rgroup').disabled = viewAs === 'table';
   const t = M.bins[tf];
-  $('#rlegend').innerHTML = `${tf} change in the 10-year yield: <span class="scale">${[['h-4', `≤ −${t[3]}`], ['h-2', `−${t[1]}…${t[2]}`], ['h0', `±${t[0]}`], ['h2', `${t[1]}…${t[2]}`], ['h4', `≥ ${t[3]}`]].map(([k, l]) => `<span class="${k}">${l}</span>`).join('')}</span> bp · <b>blue = yields rose</b> (bond prices fell)`;
+  const scale = cells => `<span class="scale">${cells.map(([k, l]) => `<span class="${k}">${l}</span>`).join('')}</span>`;
+  $('#rlegend').innerHTML = colorBy === 'curve'
+    ? `Colour: the curve, 10-year minus 2-year: ${scale([['h-3', '≤ −0.5'], ['h-1', '−0.25…0'], ['h0', '0…0.5 flat'], ['h1', '0.5…1'], ['h3', '≥ 1.5']])} pp · <b>red = inverted</b>, blue = steep`
+    : colorBy === 'real'
+      ? `Colour: the real yield (10-year minus inflation): ${scale([['h-3', '≤ −2'], ['h-1', '−1…−0.25'], ['h0', '±0.25'], ['h2', '1…2'], ['h4', '≥ 3']])} % · <b>blue = above inflation</b>, red = below`
+      : `${tf} change in the 10-year yield: ${scale([['h-4', `≤ −${t[3]}`], ['h-2', `−${t[1]}…${t[2]}`], ['h0', `±${t[0]}`], ['h2', `${t[1]}…${t[2]}`], ['h4', `≥ ${t[3]}`]])} bp · <b>blue = yields rose</b> (bond prices fell)`;
+  $('#rtf').hidden = colorBy !== 'change';
+  $$('#rcolor button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === colorBy));
   // the address names the open market (?c=jp), so a link opens its curve
   const url = location.pathname + (sel ? '?c=' + encodeURIComponent(sel) : '');
   if (url !== location.pathname + location.search) history.replaceState(null, '', url);
@@ -352,6 +375,7 @@ export function start() {
   // this page has none of the price controls: no filters, views, tile styles, quote switch, legend or refresh button
   for (const s of ['#colorBy', '#quote', '#view', '#density', '.controls .ctl', '#legend', '#reset', '#refresh', '#share', '#excluded']) { const el = $(s); if (el) el.hidden = true; }
   $('main').insertAdjacentHTML('afterbegin', `<div class="r-bar">
+    <div class="seg" id="rcolor" role="group" aria-label="Colour the cards by"><button data-v="change" title="The change in the 10-year yield">Change</button><button data-v="curve" title="How steep or inverted the curve is">Curve</button><button data-v="real" title="The 10-year yield minus inflation">Real yield</button></div>
     <div class="seg" id="rtf" role="group" aria-label="Change over">${TFS.map(([v]) => `<button data-v="${v}" aria-pressed="${v === tf}">${v}</button>`).join('')}</div>
     <div class="seg" id="rview" role="group" aria-label="View"><button data-v="cards">Cards</button><button data-v="table">Table</button></div>
     <label class="r-sel">Sort <select id="rsort">${SORTS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></label>
@@ -361,6 +385,7 @@ export function start() {
   $('#grid').insertAdjacentHTML('afterend', `<section id="ratesMonthly" class="r-month" aria-label="Europe, monthly 10-year yields" hidden></section><section id="ratesTable" aria-label="Yields as a table" hidden></section>`);
   $('#detail').setAttribute('aria-label', 'Yield curve');
   const linked = new URLSearchParams(location.search).get('c');
+  $('#rcolor').addEventListener('click', e => { const b = e.target.closest('button[data-v]'); if (!b) return; colorBy = b.dataset.v; store.set('hm.ratesColor', colorBy); render(); });
   $('#rtf').addEventListener('click', e => { const b = e.target.closest('button[data-v]'); if (!b) return; tf = b.dataset.v; store.set('hm.ratesTf', tf); render(); });
   $('#rview').addEventListener('click', e => { const b = e.target.closest('button[data-v]'); if (!b) return; viewAs = b.dataset.v; store.set('hm.ratesView', viewAs); render(); });
   $('#rsort').addEventListener('change', e => { sortBy = e.target.value; store.set('hm.ratesSort', sortBy); render(); });
