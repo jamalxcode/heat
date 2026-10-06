@@ -685,6 +685,25 @@ test.describe('energy', () => {
     expect(external).toEqual([]);
   });
 
+  test('weekly rows under the futures: pump prices in $/litre (sortable) and US refined spot prices, each marked as such', async ({ page }) => {
+    const pumpRow = page.locator('#fuelPump');
+    await expect(pumpRow.locator('h2')).toContainText('Pump prices');
+    await expect(pumpRow.locator('.f-tag')).toContainText('weekly');
+    await expect(pumpRow.locator('tbody tr')).toHaveCount(3);
+    await expect(pumpRow.locator('tbody tr').first()).toContainText('Germany');       // dearest petrol first
+    await expect(pumpRow.locator('tbody tr').first()).toContainText('$2.59');
+    await expect(pumpRow.locator('tbody tr').first()).toContainText('new');           // no week-on-week yet
+    await expect(pumpRow.locator('tr', { hasText: 'United States' })).toContainText('▼ 2.5%');
+    await pumpRow.locator('#fsort').selectOption('name');
+    await expect(pumpRow.locator('tbody tr').first()).toContainText('Germany');
+    await pumpRow.locator('#fsort').selectOption('chg');
+    await expect(pumpRow.locator('tbody tr').first()).toContainText('United Kingdom');
+    const spot = page.locator('#fuelSpot');
+    await expect(spot.locator('.f-tag')).toContainText('about a week behind');
+    await expect(spot.locator('tbody tr')).toHaveCount(2);
+    await expect(spot.locator('tr', { hasText: 'Jet fuel' })).toContainText('$4.40');
+  });
+
   test('tiles: product badges, prices without a currency sign, units in the popup, a TradingView link', async ({ page }) => {
     const wti = tile(page, 'wti');
     await expect(wti.locator('.metal')).toHaveText('WTI');

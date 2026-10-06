@@ -15,6 +15,8 @@ export const CHECKS = [
   ['energy.json', d => Date.now() - d.generated, HOUR, 'energy file last built'],
   ['energy.json', d => Date.now() - (d.sources?.at || 0), 3 * DAY + 6 * HOUR, 'newest energy futures quote'],   // Fri 21:00 UTC → Mon 03:00, or a holiday
   ['rates.json', d => Date.now() - d.generated, HOUR, 'rates file last built'],
+  ['fuel.json', d => Date.now() - d.generated, HOUR, 'fuel file last built'],
+  ['fuel.json', d => Date.now() - Date.parse((d.pump.find(p => p.id === 'us')?.date || '1970-01-01') + 'T00:00:00Z'), 10 * DAY, 'latest US pump prices (weekly)'],
   ['rates.json', d => Date.now() - Date.parse(d.countries.map(c => c.date).sort().at(-1) + 'T22:00:00Z'), 4 * DAY + 6 * HOUR, 'newest official yield curve'],   // Fri close → Tue morning, or a holiday
   // a source that has kept failing for a day (a site redesign, a changed file): caught the same day, not when the data goes quiet
   ['rates.json', d => Math.max(0, ...[...d.countries, ...(d.monthly || [])].map(c => c.failedSince ? Date.now() - c.failedSince : 0)), DAY, 'longest-failing bond yield source'],

@@ -150,4 +150,5 @@ if (M.custom) {
   fetch('/tv.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).then(j => { S.tv = j?.sym || null; }).catch(() => {});
   setInterval(tick, 1000);
   document.addEventListener('visibilitychange', tick);
+  if (M.key === 'energy') import('./fuel.mjs').then(f => f.start());   // the weekly pump-price and refined-product rows under the futures
 }

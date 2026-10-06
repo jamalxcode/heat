@@ -1,7 +1,7 @@
 // Sources health: one line in every page's footer saying which data sources are working, so a source that quietly
 // fails (a backup in use, a stale feed) is visible instead of silent. Built at the end of the deploy job from the
 // files it just made, so it costs no extra requests.
-//   node scripts/health.mjs <out health.json> <data.json> <forex.json> <metals.json> <tv.json> [energy.json] [rates.json]
+//   node scripts/health.mjs <out health.json> <data.json> <forex.json> <metals.json> <tv.json> [energy.json] [rates.json] [fuel.json]
 // state: 'ok' (✓), 'warn' (⚠: working, but on a backup, partly, or a bit old) or 'down' (✕: not working)
 const DAY = 864e5, HOUR = 36e5;
 const ageDays = (iso, now) => iso ? (now - Date.parse(iso + 'T00:00:00Z')) / DAY : Infinity;
@@ -13,7 +13,7 @@ export function futuresOpen(now) {
   return !(wd === 6 || (wd === 5 && h >= 21) || (wd === 0 && h < 23));
 }
 
-export function health({ crypto, forex, metals, energy, rates, tv }, now = Date.now()) {
+export function health({ crypto, forex, metals, energy, rates, fuel, tv }, now = Date.now()) {
   const out = [];
   const add = (key, name, what, state, note) => out.push({ key, name, what, state, note });
 
@@ -75,6 +75,19 @@ export function health({ crypto, forex, metals, energy, rates, tv }, now = Date.
       + ` · inflation for ${[...cs, ...ms].filter(x => x.infl).length}/${cs.length + ms.length}`);
   }
 
+  // Fuel: weekly pump prices (EU bulletin, UK, US) and US refined spot prices. The EU bulletin comes out a week or two
+  // after the Monday it prices, and the US spot figures a week late, so the limits are in weeks
+  if (fuel !== undefined) {
+    const pump = fuel?.pump || [], spot = fuel?.spot || [], late = [];
+    const eu = pump.filter(p => p.region === 'Europe' && p.id !== 'uk'), uk = pump.find(p => p.id === 'uk'), us = pump.find(p => p.id === 'us');
+    if (!eu.length || ageDays(eu[0].date, now) > 21 || eu.some(p => p.notRefreshed)) late.push('EU');
+    if (!uk || ageDays(uk.date, now) > 10 || uk.notRefreshed) late.push('UK');
+    if (!us || ageDays(us.date, now) > 10 || us.notRefreshed) late.push('US');
+    if (!spot.length || ageDays(spot[0].date, now) > 14) late.push('US spot');
+    add('fuel', 'Fuel prices', 'weekly pump and refined-product prices', !fuel ? 'down' : late.length > 2 ? 'down' : late.length ? 'warn' : 'ok',
+      !fuel ? 'no data' : `${pump.length} countries · EU ${eu[0]?.date ?? '—'} · UK ${uk?.date ?? '—'} · US ${us?.date ?? '—'} · spot ${spot[0]?.date ?? '—'}${late.length ? ` · late: ${late.join(', ')}` : ''}`);
+  }
+
   // TradingView: the chart links, checked in the deploy job
   const n = Object.values(tv?.sym || {}).filter(e => e[0] === 1).length;
   add('tradingview', 'TradingView', 'chart links', tv && now - tv.t < 2 * DAY ? 'ok' : tv ? 'warn' : 'down', tv ? `${n} symbols confirmed` : 'not checked');
@@ -88,8 +101,8 @@ if (IS_NODE && process.argv[1] && import.meta.url.endsWith(process.argv[1].repla
   const { readFile, writeFile } = await import('node:fs/promises');
   const [out = 'health.json', ...files] = process.argv.slice(2);
   const read = async f => { try { return JSON.parse(await readFile(f, 'utf8')); } catch { return null; } };
-  const [crypto, forex, metals, tv, energy = null, rates = null] = await Promise.all(files.map(read));
-  const h = health({ crypto, forex, metals, energy, rates, tv });
+  const [crypto, forex, metals, tv, energy = null, rates = null, fuel = null] = await Promise.all(files.map(read));
+  const h = health({ crypto, forex, metals, energy, rates, fuel, tv });
   await writeFile(out, JSON.stringify(h));
   console.log('Sources: ' + h.sources.map(s => `${s.name} ${s.state === 'ok' ? '✓' : s.state === 'warn' ? '⚠' : '✕'} (${s.note})`).join(' · '));
 }

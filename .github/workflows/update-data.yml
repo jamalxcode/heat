@@ -42,8 +42,8 @@ jobs:
         run: |
           V=${GITHUB_SHA::8}
           sed -i "s#src=\"/app/main.mjs\"#src=\"/app/main.mjs?v=$V\"#" index.html
-          sed -i "s#\(from '[^']*\.mjs\)'#\1?v=$V'#g; s#^\(import '[^']*\.mjs\)'#\1?v=$V'#; s#import('/scripts/build-data.mjs')#import('/scripts/build-data.mjs?v=$V')#; s#import('./rates.mjs')#import('./rates.mjs?v=$V')#" app/*.mjs
-          grep -q "rates.mjs?v=$V" app/main.mjs
+          sed -i "s#\(from '[^']*\.mjs\)'#\1?v=$V'#g; s#^\(import '[^']*\.mjs\)'#\1?v=$V'#; s#import('/scripts/build-data.mjs')#import('/scripts/build-data.mjs?v=$V')#; s#import('./rates.mjs')#import('./rates.mjs?v=$V')#; s#import('./fuel.mjs')#import('./fuel.mjs?v=$V')#" app/*.mjs
+          grep -q "rates.mjs?v=$V" app/main.mjs && grep -q "fuel.mjs?v=$V" app/main.mjs
           grep -q "main.mjs?v=$V" index.html && ! grep -hE "from '|^import '" app/*.mjs | grep -v "?v=$V'" | grep -q .
 
       # Bond yield curves: official sources, some slow (Sweden's request limit, ChinaBond from abroad, a weekly ten-year
@@ -111,6 +111,10 @@ jobs:
           node scripts/market-page.mjs energy _site/energy/index.html
           node scripts/build-energy.mjs _site/energy.json _site/data.json \
             || { echo "::warning::energy build failed, republishing the last energy.json"; curl -sf "$BASE_URL/energy.json" -o _site/energy.json || true; }
+          # the weekly rows under the futures: pump prices by country and US refined-product spot prices (fuel.json),
+          # refetched every 6 hours; converted to US dollars with the forex.json just built
+          PREV_URL="$BASE_URL/fuel.json" node scripts/build-fuel.mjs _site/fuel.json _site/forex.json \
+            || { echo "::warning::fuel build failed, republishing the last fuel.json"; curl -sf "$BASE_URL/fuel.json" -o _site/fuel.json || true; }
 
       # Rates: /rates/ (same page, its own view in app/rates.mjs) and rates.json. The build started in the background at
       # the top of this job (it can take a few minutes, waiting on slow sources); here it's collected. A failure
@@ -136,7 +140,7 @@ jobs:
 
       # Sources health: one footer line on every page saying which data sources are working (from the files just built)
       - name: Sources health
-        run: node scripts/health.mjs _site/health.json _site/data.json _site/forex.json _site/metals.json _site/tv.json _site/energy.json _site/rates.json || echo "::warning::sources health line not built"
+        run: node scripts/health.mjs _site/health.json _site/data.json _site/forex.json _site/metals.json _site/tv.json _site/energy.json _site/rates.json _site/fuel.json || echo "::warning::sources health line not built"
 
       - uses: actions/upload-pages-artifact@v5
         with:
