@@ -29,7 +29,9 @@ const REFETCH = 3 * 36e5;               // every 3 hours
 const SERIES_DAYS = 760;                // ~2 years of daily 10-year and short yields, for the changes
 const LONG_DAYS = 3660;                 // ~10 years of weekly 10-year and short yields, for the slope history and its rank
 const LONG_EVERY = 7 * DAY;             // how often a fetch reaches back that far (in between, the history is carried over)
-const FMT = 1;
+const FMT = 1;                          // the history kept between runs (China's, India's): a change drops it
+const LAYOUT = 2;                       // what each market carries (2: inflation, real yield, ten-year rank): a change
+                                        // rebuilds the file at once instead of reusing the last one for REFETCH
 export const FLAT_PP = 0.5;
 
 // short: the short leg of the slope ('2y', or 'Bank Rate' / '3m' where no 2-year is published); every: hours between
@@ -545,7 +547,7 @@ async function fetchMonthly(fetchFn, today) {
 export async function build({ prev = null, log = console.log, now = Date.now(), fetchFn = fetch, force = false } = {}) {
   const same = prev?.market === 'rates' && prev?.fmt === FMT;
   const ids = COUNTRIES.map(c => c.id).join(',');           // a market added or removed: fetch now, don't wait for REFETCH
-  if (same && !force && prev.ids === ids && now - (prev.fetched || 0) < REFETCH) return { ...prev, generated: now };
+  if (same && !force && prev.ids === ids && prev.layout === LAYOUT && now - (prev.fetched || 0) < REFETCH) return { ...prev, generated: now };
   const today = Math.floor(now / DAY), out = [], failed = [];
   const prevOf = id => same ? prev.countries.find(c => c.id === id) : null;
   // every market at once (each source is a different server); the list keeps COUNTRIES' order
@@ -576,7 +578,7 @@ export async function build({ prev = null, log = console.log, now = Date.now(), 
   monthly = monthly.map(withReal);
   if (!out.length) throw new Error('no yield curve source answered');
   log(`Rates: ${out.map(c => `${c.id} ${c.date} 10y ${c.y10?.toFixed(2)}% slope ${c.slope > 0 ? '+' : ''}${c.slope?.toFixed(2)} (${c.state})`).join(' · ')} · monthly: ${monthly.length} EU countries to ${monthly[0]?.month ?? '—'}${failed.length ? ` · failed: ${failed.join(', ')}` : ''}`);
-  return { v: 1, fmt: FMT, market: 'rates', generated: now, fetched: now, flatPP: FLAT_PP, ids, countries: out, monthly };
+  return { v: 1, fmt: FMT, layout: LAYOUT, market: 'rates', generated: now, fetched: now, flatPP: FLAT_PP, ids, countries: out, monthly };
 }
 
 /* ---------- CLI (Node only) ---------- */

@@ -130,6 +130,8 @@ test('build: reuses the last file between fetches; a source that fails keeps its
   assert.equal(again.fetched, first.fetched, 'within 3 hours: the last file, re-dated');
   assert.equal(again.generated, now + 60e3);
   const listChanged = await build({ prev: { ...first, ids: 'us,ea' }, now: now + 60e3, fetchFn, log: () => {} });
+  const layoutChanged = await build({ prev: { ...first, layout: 1 }, now: now + 60e3, fetchFn, log: () => {} });
+  assert.equal(layoutChanged.fetched, now + 60e3, 'a file from older code: rebuilt at once');
   assert.equal(listChanged.fetched, now + 60e3, 'a market added since the last file: fetched at once');
   const later = await build({ prev: first, now: now + 4 * 36e5, fetchFn: async () => ({ ok: false, status: 500, text: async () => '' }), log: () => {} });
   assert.equal(later.countries[0].notRefreshed, true);
