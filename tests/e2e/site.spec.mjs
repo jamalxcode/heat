@@ -802,7 +802,7 @@ test.describe('rates', () => {
     await it.click();
     const pop = page.locator('#detail');
     await expect(pop).toHaveClass(/pinned/);
-    await expect(pop.locator('h2')).toContainText('Italy: 10-year yield, monthly');
+    await expect(pop.locator('h2')).toContainText('Italy 10-year, monthly');
     await expect(pop.locator('.r-says')).toContainText('above Germany');
     await expect(pop.locator('.r-chart path')).toHaveCount(2);
     await expect(page).toHaveURL(/\/rates\/\?c=it$/);
