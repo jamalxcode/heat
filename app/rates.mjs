@@ -12,7 +12,7 @@ const STATE = {
   flat: { icon: '🟡', label: 'Flat', note: 'long and short rates close together: often a late-cycle sign' },
   inverted: { icon: '🔴', label: 'Inverted', note: 'short-term rates above long-term ones: this has come before most US recessions' },
 };
-const COLORS = { us: '#2f6fd0', ea: '#2f9e6a', uk: '#d0453b', jp: '#c9971a', ca: '#8a5cd0' };
+const COLORS = { us: '#2f6fd0', ea: '#2f9e6a', de: '#8a6a3c', uk: '#d0453b', jp: '#c9971a', ca: '#8a5cd0', au: '#b8862b', ch: '#d0458f', se: '#1aa3b8', no: '#5d6f93', br: '#e0782a', za: '#6aa83a' };
 let R = null, tf = (store.get('hm.ratesTf') || '1d'), sel = null, loadedAt = 0;
 
 const fmtY = v => v == null ? '—' : v.toFixed(2) + '%';
@@ -20,7 +20,8 @@ const fmtBp = v => { if (v == null) return '—'; const r = Math.round(v); retur
 const fmtPP = v => v == null ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(2) + ' pp';
 const dayLabel = iso => iso ? new Date(iso + 'T12:00:00Z').toLocaleDateString([], { day: 'numeric', month: 'short', timeZone: 'UTC' }) : '—';
 const tenorLabel = t => t === 0 ? 'now' : t < 1 ? Math.round(t * 12) + 'm' : (Number.isInteger(t) ? t : t.toFixed(1)) + 'y';
-const shortLabel = c => c.short === 'Bank Rate' ? 'Bank Rate' : '2y';
+const shortLabel = c => c.short || '2y';                                  // the slope's short leg: 2y, Bank Rate (UK) or 3m (South Africa)
+const SHORT_WORDS = { '2y': '2-year', 'Bank Rate': 'Bank of England’s Bank Rate', '3m': '3-month Treasury bill' };
 
 // change in the 10-year yield over k calendar days, in basis points: vs the last observation on or before that day
 // (within 4 days, so a long gap shows no change rather than a misleading one)
@@ -43,7 +44,7 @@ function tileHTML(c) {
   return `<button class="rtile ${heat(bp, tf)}${c.id === sel ? ' sel' : ''}" data-id="${esc(c.id)}" aria-pressed="${c.id === sel}" aria-label="${esc(`${c.name}: 10-year ${fmtY(c.y10)}, ${tf} ${fmtBp(bp)}, curve ${st?.label || 'unknown'}`)}">
     <div class="rt-top"><span class="rt-name">${logoOf(c)}<b>${esc(c.name)}</b></span><span class="rt-chg">${fmtBp(bp)}</span>
       <span class="rt-y"><span class="rt-yl">10-year</span> ${fmtY(c.y10)}</span><span class="rt-date">${c.notRefreshed ? '⚠ ' : ''}${dayLabel(c.date)}</span></div>
-    <div class="rt-bot"><span class="rt-state st-${esc(c.state || 'none')}">${st ? `${st.icon} ${st.label}` : '—'}</span><span class="rt-slope" title="10-year minus ${shortLabel(c)}">10y − ${c.short === 'Bank Rate' ? 'BR' : '2y'} ${fmtPP(c.slope)}</span></div>
+    <div class="rt-bot"><span class="rt-state st-${esc(c.state || 'none')}">${st ? `${st.icon} ${st.label}` : '—'}</span><span class="rt-slope" title="10-year minus ${shortLabel(c)}">10y − ${c.short === 'Bank Rate' ? 'BR' : shortLabel(c)} ${fmtPP(c.slope)}</span></div>
   </button>`;
 }
 
@@ -110,13 +111,13 @@ function detailHTML(c) {
     return `<tr><td>${t === 0 ? 'Bank Rate' : tenorLabel(t)}</td><td>${fmtY(now)}</td><td>${m == null ? '—' : fmtBp((now - m) * 100)}</td><td>${y == null ? '—' : fmtBp((now - y) * 100)}</td></tr>`; }).join('');
   return `<div class="r-head"><h2>${logoOf(c)} ${esc(c.name)}: yield curve</h2>
       <span class="rt-state st-${esc(c.state || 'none')}">${st ? `${st.icon} ${st.label}` : '—'}</span></div>
-    <p class="r-says">${st ? `The 10-year yield is <b>${fmtY(c.y10)}</b> and the ${c.short === 'Bank Rate' ? 'Bank of England’s Bank Rate' : '2-year'} <b>${fmtY(c.yShort)}</b>: a gap of <b>${fmtPP(c.slope)}</b>. ${st.label}: ${st.note}.` : 'No reading yet.'}</p>
+    <p class="r-says">${st ? `The 10-year yield is <b>${fmtY(c.y10)}</b> and the ${SHORT_WORDS[shortLabel(c)] || shortLabel(c)} <b>${fmtY(c.yShort)}</b>: a gap of <b>${fmtPP(c.slope)}</b>. ${st.label}: ${st.note}.` : 'No reading yet.'}</p>
     ${curveChart(lines.map(l => ({ ...l, color: l.faint ? col : l.color, width: l.faint ? 1 : l.width })), `${c.name} yield curve`)}
     <div class="r-keys">${key}</div>
     <h3>10-year minus ${shortLabel(c)}, last two years <span class="r-muted">(shaded: inverted)</span></h3>
     ${slopeChart(c)}
     <details class="r-table"><summary>Every maturity</summary><table><thead><tr><th>Maturity</th><th>Yield</th><th>vs a month ago</th><th>vs a year ago</th></tr></thead><tbody>${rows}</tbody></table></details>
-    <p class="r-src">${c.notRefreshed ? '⚠ The source didn’t answer in the latest check: showing its last curve. ' : ''}Source: <a href="${esc(c.srcUrl)}" target="_blank" rel="noopener">${esc(c.src)}</a>, closing yields of ${dayLabel(c.date)}.${c.id === 'uk' ? ' The free daily series has the 5, 10 and 20-year gilt yields; the short end is the Bank Rate.' : ''}${c.id === 'ea' ? ' The euro area curve is built from AAA-rated government bonds (Germany, the Netherlands and others), not each country’s own.' : ''}</p>`;
+    <p class="r-src">${c.notRefreshed ? '⚠ The source didn’t answer in the latest check: showing its last curve. ' : ''}Source: <a href="${esc(c.srcUrl)}" target="_blank" rel="noopener">${esc(c.src)}</a>, closing yields of ${dayLabel(c.date)}.${c.note ? ' ' + esc(c.note) : ''}</p>`;
 }
 
 function allCurves() {
