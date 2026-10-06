@@ -20,5 +20,3 @@ jobs:
         with:
           node-version: 22
       - run: node --test   # finds tests/*.test.mjs
-      # TEMPORARY (rates branch only): do the official yield sources answer GitHub's servers?
-      - run: node scripts/build-rates.mjs /tmp/rates.json
