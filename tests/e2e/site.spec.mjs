@@ -749,7 +749,7 @@ test.describe('rates', () => {
     await expect(pop.locator('.r-chart')).toHaveCount(2);
     await expect(page.locator('.rtile.sel')).toHaveAttribute('data-id', 'ca');
     await expect(page).toHaveURL(/\/rates\/\?c=ca$/);
-    await page.locator('.rtile[data-id="jp"]').click({ force: true });      // another card: switches, stays open
+    await page.locator('.rtile[data-id="jp"]').dispatchEvent('click');    // another card (under the popup here): switches, stays open
     await expect(pop.locator('h2')).toContainText('Japan');
     await page.keyboard.press('Escape');
     await expect(pop).not.toHaveClass(/pinned/);
