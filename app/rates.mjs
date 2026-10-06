@@ -2,7 +2,7 @@
 // Not a price heatmap like the other pages, so it draws its own view: one tile per market (10-year yield, its change in
 // basis points, the curve's health), every curve on one chart, and the chosen market's curve now vs a week, a month and
 // a year ago plus its slope history. main.mjs starts it instead of the price pipeline (M.custom).
-import { $, $$, esc, logo, M, store } from './core.mjs';
+import { $, $$, esc, logo, M, S, store } from './core.mjs';
 import { renderHealth } from './render.mjs';
 
 const DAY = 864e5, REFRESH = 10 * 60e3;
@@ -41,7 +41,7 @@ const logoOf = c => logo(c, 18);   // the flag (or its country code where the sy
 
 function tileHTML(c) {
   const k = TFS.find(x => x[0] === tf)[1], bp = changeBp(c, k), st = STATE[c.state];
-  return `<button class="rtile ${heat(bp, tf)}${c.id === sel ? ' sel' : ''}" data-id="${esc(c.id)}" aria-pressed="${c.id === sel}" aria-label="${esc(`${c.name}: 10-year ${fmtY(c.y10)}, ${tf} ${fmtBp(bp)}, curve ${st?.label || 'unknown'}`)}">
+  return `<button class="rtile ${heat(bp, tf)}${c.id === sel ? ' sel' : ''}" data-id="${esc(c.id)}" data-coin="1" aria-haspopup="dialog" aria-label="${esc(`${c.name}: 10-year ${fmtY(c.y10)}, ${tf} ${fmtBp(bp)}, curve ${st?.label || 'unknown'}`)}">
     <div class="rt-top"><span class="rt-name">${logoOf(c)}<b>${esc(c.name)}</b></span><span class="rt-chg">${fmtBp(bp)}</span>
       <span class="rt-y"><span class="rt-yl">10-year</span> ${fmtY(c.y10)}</span><span class="rt-date">${c.notRefreshed ? '⚠ ' : ''}${dayLabel(c.date)}</span></div>
     <div class="rt-bot"><span class="rt-state st-${esc(c.state || 'none')}">${st ? `${st.icon} ${st.label}` : '—'}</span><span class="rt-slope" title="10-year minus ${shortLabel(c)}">10y − ${c.short === 'Bank Rate' ? 'BR' : shortLabel(c)} ${fmtPP(c.slope)}</span></div>
@@ -52,7 +52,8 @@ function tileHTML(c) {
 // charts are drawn at their on-screen width (set in render()), so labels stay 10 px on a phone and on a wide screen
 let W = 900, H = 300;
 const PL = 38, PR = 12, PT = 12, PB = 26;
-const xT = t => PL + Math.sqrt(t / 30) * (W - PL - PR);         // square-root maturity axis: the short end gets room
+// square-root maturity axis (the short end gets room), up to the longest maturity on the chart
+const xAxis = tmax => t => PL + Math.sqrt(Math.max(t, 0) / tmax) * (W - PL - PR);
 const TICKS = [0.25, 1, 2, 5, 10, 20, 30];
 function yScale(vals) {
   let lo = Math.min(...vals), hi = Math.max(...vals);
@@ -61,17 +62,18 @@ function yScale(vals) {
 }
 const niceTicks = (lo, hi) => { const step = [0.25, 0.5, 1, 2][[0.25, 0.5, 1, 2].findIndex(s => (hi - lo) / s <= 6)] ?? 2; const out = []; for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) out.push(+v.toFixed(2)); return out; };
 const path = (pts, x, y) => pts.map(([a, b], i) => `${i ? 'L' : 'M'}${x(a).toFixed(1)},${y(b).toFixed(1)}`).join('');
-function frame(sc) {
+function frame(sc, x, tmax) {
   const ys = niceTicks(sc.lo, sc.hi);
   return ys.map(v => `<line x1="${PL}" x2="${W - PR}" y1="${sc.y(v)}" y2="${sc.y(v)}" stroke="var(--grid)"/><text x="${PL - 6}" y="${sc.y(v) + 3.5}" font-size="10" text-anchor="end" fill="var(--muted)">${v}%</text>`).join('')
-    + TICKS.map(t => `<text x="${xT(t)}" y="${H - 8}" font-size="10" text-anchor="middle" fill="var(--muted)">${tenorLabel(t)}</text>`).join('');
+    + TICKS.filter(t => t <= tmax + 0.5).map(t => `<text x="${x(t)}" y="${H - 8}" font-size="10" text-anchor="middle" fill="var(--muted)">${tenorLabel(t)}</text>`).join('');
 }
 // one chart, one line per curve: [{ pts, color, width, dash, label }]
 function curveChart(lines, aria) {
   const vals = lines.flatMap(l => l.pts.map(p => p[1]));
   if (!vals.length) return '';
-  const sc = yScale(vals), x = t => xT(Math.max(t, 0));
-  return `<svg class="r-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(aria)}">${frame(sc)}`
+  const tmax = Math.max(10, ...lines.flatMap(l => l.pts.map(p => p[0])));
+  const sc = yScale(vals), x = xAxis(tmax);
+  return `<svg class="r-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(aria)}">${frame(sc, x, tmax)}`
     + lines.map(l => `<path d="${path(l.pts, x, sc.y)}" fill="none" stroke="${l.color}" stroke-width="${l.width || 2}"${l.dash ? ` stroke-dasharray="${l.dash}"` : ''} stroke-linejoin="round"><title>${esc(l.label)}</title></path>`
       + (l.dots ? l.pts.map(([t, v]) => `<circle cx="${x(t)}" cy="${sc.y(v)}" r="2.6" fill="${l.color}"><title>${esc(`${l.label}: ${tenorLabel(t)} ${v.toFixed(2)}%`)}</title></circle>`).join('') : '')).join('')
     + '</svg>';
@@ -109,7 +111,7 @@ function detailHTML(c) {
   const at = (snap, t) => { const p = snap?.pts; if (!p?.length || t < p[0][0] - 1e-6 || t > p[p.length - 1][0] + 1e-6) return null; const i = p.findIndex(q => q[0] >= t - 1e-6); return Math.abs(p[i][0] - t) < 1e-6 ? p[i][1] : p[i - 1][1] + (p[i][1] - p[i - 1][1]) * (t - p[i - 1][0]) / (p[i][0] - p[i - 1][0]); };
   const rows = tenors.map(t => { const now = at({ pts: c.curve }, t), m = at(c.then?.m1, t), y = at(c.then?.y1, t);
     return `<tr><td>${t === 0 ? 'Bank Rate' : tenorLabel(t)}</td><td>${fmtY(now)}</td><td>${m == null ? '—' : fmtBp((now - m) * 100)}</td><td>${y == null ? '—' : fmtBp((now - y) * 100)}</td></tr>`; }).join('');
-  return `<div class="r-head"><h2>${logoOf(c)} ${esc(c.name)}: yield curve</h2>
+  return `<div class="r-card r-pop" data-country="${esc(c.id)}"><div class="r-head"><h2>${logoOf(c)} ${esc(c.name)}: yield curve</h2>
       <span class="rt-state st-${esc(c.state || 'none')}">${st ? `${st.icon} ${st.label}` : '—'}</span></div>
     <p class="r-says">${st ? `The 10-year yield is <b>${fmtY(c.y10)}</b> and the ${SHORT_WORDS[shortLabel(c)] || shortLabel(c)} <b>${fmtY(c.yShort)}</b>: a gap of <b>${fmtPP(c.slope)}</b>. ${st.label}: ${st.note}.` : 'No reading yet.'}</p>
     ${curveChart(lines.map(l => ({ ...l, color: l.faint ? col : l.color, width: l.faint ? 1 : l.width })), `${c.name} yield curve`)}
@@ -117,13 +119,13 @@ function detailHTML(c) {
     <h3>10-year minus ${shortLabel(c)}, last two years <span class="r-muted">(shaded: inverted)</span></h3>
     ${slopeChart(c)}
     <details class="r-table"><summary>Every maturity</summary><table><thead><tr><th>Maturity</th><th>Yield</th><th>vs a month ago</th><th>vs a year ago</th></tr></thead><tbody>${rows}</tbody></table></details>
-    <p class="r-src">${c.notRefreshed ? '⚠ The source didn’t answer in the latest check: showing its last curve. ' : ''}Source: <a href="${esc(c.srcUrl)}" target="_blank" rel="noopener">${esc(c.src)}</a>, closing yields of ${dayLabel(c.date)}.${c.note ? ' ' + esc(c.note) : ''}</p>`;
+    <p class="r-src">${c.notRefreshed ? '⚠ The source didn’t answer in the latest check: showing its last curve. ' : ''}Source: <a href="${esc(c.srcUrl)}" target="_blank" rel="noopener">${esc(c.src)}</a>, closing yields of ${dayLabel(c.date)}.${c.note ? ' ' + esc(c.note) : ''}</p></div>`;
 }
 
 function allCurves() {
   const cs = R.countries.filter(c => c.curve?.length);
   const lines = cs.map(c => ({ pts: c.curve, color: COLORS[c.id] || 'var(--ink)', width: c.id === sel ? 3 : 1.6, label: `${c.name} (${dayLabel(c.date)})`, dots: c.id === sel }));
-  const key = cs.map(c => `<button class="r-key r-pick${c.id === sel ? ' on' : ''}" data-id="${esc(c.id)}"><svg width="18" height="8" aria-hidden="true"><line x1="0" x2="18" y1="4" y2="4" stroke="${COLORS[c.id]}" stroke-width="3"/></svg>${esc(c.name)}</button>`).join('');
+  const key = cs.map(c => `<button class="r-key r-pick${c.id === sel ? ' on' : ''}" data-id="${esc(c.id)}" data-coin="1" aria-haspopup="dialog"><svg width="18" height="8" aria-hidden="true"><line x1="0" x2="18" y1="4" y2="4" stroke="${COLORS[c.id]}" stroke-width="3"/></svg>${esc(c.name)}</button>`).join('');
   return `<h2>All curves, latest</h2>${curveChart(lines, 'Every market’s latest yield curve')}<div class="r-keys">${key}</div>`;
 }
 
@@ -132,18 +134,35 @@ function render() {
   const grid = $('#grid');
   grid.className = 'grid rgrid';
   grid.innerHTML = R.countries.map(tileHTML).join('');
-  const c = R.countries.find(x => x.id === sel) || R.countries[0];
-  sel = c?.id;
   W = Math.max(300, Math.min(1100, ($('#ratesAll').clientWidth || 900) - 32)); H = W < 600 ? 230 : 300;
   $('#ratesAll').innerHTML = allCurves();
-  $('#ratesDetail').innerHTML = c ? detailHTML(c) : '';
   $$('#rtf button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === tf));
   const t = M.bins[tf];
   $('#rlegend').innerHTML = `${tf} change in the 10-year yield: <span class="scale">${[['h-4', `≤ −${t[3]}`], ['h-2', `−${t[1]}…${t[2]}`], ['h0', `±${t[0]}`], ['h2', `${t[1]}…${t[2]}`], ['h4', `≥ ${t[3]}`]].map(([k, l]) => `<span class="${k}">${l}</span>`).join('')}</span> bp · <b>blue = yields rose</b> (bond prices fell)`;
-  const q = new URLSearchParams();          // only the chosen market: the price pages' settings don't apply here
-  if (sel && sel !== R.countries[0].id) q.set('c', sel); else q.delete('c');
-  const url = location.pathname + (q.toString() ? '?' + q : '');
+  // the address names the open market (?c=jp), so a link opens its curve
+  const url = location.pathname + (sel ? '?c=' + encodeURIComponent(sel) : '');
   if (url !== location.pathname + location.search) history.replaceState(null, '', url);
+}
+
+// A market's curve in the shared popup (#detail): centred over the page, a bottom sheet on a phone (the CSS). The
+// shared handlers close it (×, Escape, the backdrop, a click elsewhere); S.pinned tells them it's open.
+function openPopup(id) {
+  const c = R?.countries.find(x => x.id === id);
+  if (!c) return;
+  sel = id;
+  const box = $('#detail'), body = box.querySelector('.body');
+  box.classList.add('show', 'pinned');
+  $('#scrim').classList.add('show');
+  S.pinned = 'rates:' + id;
+  const keep = [W, H];                      // the charts are drawn at the popup's width, then the page's again
+  W = Math.max(280, (body.clientWidth || 640)); H = W < 600 ? 220 : 270;
+  body.innerHTML = detailHTML(c);
+  [W, H] = keep;
+  const bw = box.offsetWidth, bh = box.offsetHeight;
+  box.style.left = Math.max(12, (innerWidth - bw) / 2) + 'px';
+  box.style.top = Math.max(12, (innerHeight - bh) / 2) + 'px';
+  box.querySelector('.x').focus({ preventScroll: true });
+  render();
 }
 
 function renderFresh() {
@@ -175,13 +194,16 @@ export function start() {
   for (const s of ['#colorBy', '#quote', '#view', '#density', '.controls .ctl', '#legend', '#reset', '#refresh', '#share', '#excluded']) { const el = $(s); if (el) el.hidden = true; }
   const main = $('main');
   main.insertAdjacentHTML('afterbegin', `<div class="r-bar"><div class="seg" id="rtf" role="group" aria-label="Change over">${TFS.map(([v]) => `<button data-v="${v}" aria-pressed="${v === tf}">${v}</button>`).join('')}</div><span id="rlegend" class="leg-item"></span></div>`);
-  $('#grid').insertAdjacentHTML('afterend', `<section id="ratesAll" class="r-card" aria-label="All yield curves"></section><section id="ratesDetail" class="r-card" aria-live="polite"></section>`);
-  sel = new URLSearchParams(location.search).get('c') || null;
+  $('#grid').insertAdjacentHTML('afterend', `<section id="ratesAll" class="r-card" aria-label="All yield curves"></section>`);
+  $('#detail').setAttribute('aria-label', 'Yield curve');
+  const linked = new URLSearchParams(location.search).get('c');
   $('#rtf').addEventListener('click', e => { const b = e.target.closest('button[data-v]'); if (!b) return; tf = b.dataset.v; store.set('hm.ratesTf', tf); render(); });
-  const pick = e => { const b = e.target.closest('[data-id]'); if (!b || !R) return; sel = b.dataset.id; render(); if (e.currentTarget.id === 'grid' && innerWidth < 760) $('#ratesDetail').scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+  const pick = e => { const b = e.target.closest('[data-id]'); if (b && R) openPopup(b.dataset.id); };
   $('#grid').addEventListener('click', pick);
   $('#ratesAll').addEventListener('click', pick);
-  load();
+  // closed by the shared handlers: forget the market (and take it off the address)
+  new MutationObserver(() => { if (sel && !$('#detail').classList.contains('pinned')) { sel = null; render(); } }).observe($('#detail'), { attributes: true, attributeFilter: ['class'] });
+  load().then(() => { if (linked) openPopup(linked); });
   let rz = 0;
   addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(render, 150); });
   setInterval(() => { renderFresh(); if (!document.hidden && Date.now() - loadedAt > REFRESH) load(); }, 30e3);

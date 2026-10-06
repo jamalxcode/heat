@@ -737,19 +737,30 @@ test.describe('rates', () => {
     await expect(page.locator('#rlegend')).toContainText('1m change in the 10-year yield');
   });
 
-  test('picking a market shows its curve now and before, its slope history, and a shareable address', async ({ page }) => {
+  test('a card opens its curve in a popup: now and before, the slope history, a shareable address; closes like the others', async ({ page }) => {
+    const pop = page.locator('#detail');
     await expect(page.locator('#ratesAll .r-chart path')).toHaveCount(12);
-    await expect(page.locator('#ratesDetail h2')).toContainText('United States');
+    await expect(pop).not.toHaveClass(/pinned/);
     await page.locator('.rtile[data-id="ca"]').click();
-    await expect(page.locator('#ratesDetail h2')).toContainText('Canada');
-    await expect(page.locator('#ratesDetail .r-says')).toContainText('Inverted');
-    await expect(page.locator('#ratesDetail .r-keys')).toContainText('A year ago');
-    await expect(page.locator('#ratesDetail .r-chart')).toHaveCount(2);
+    await expect(pop).toHaveClass(/pinned/);
+    await expect(pop.locator('h2')).toContainText('Canada');
+    await expect(pop.locator('.r-says')).toContainText('Inverted');
+    await expect(pop.locator('.r-keys')).toContainText('A year ago');
+    await expect(pop.locator('.r-chart')).toHaveCount(2);
+    await expect(page.locator('.rtile.sel')).toHaveAttribute('data-id', 'ca');
     await expect(page).toHaveURL(/\/rates\/\?c=ca$/);
-    await page.reload();
-    await expect(page.locator('#ratesDetail h2')).toContainText('Canada');
-    await page.locator('#ratesAll .r-pick[data-id="jp"]').click();
-    await expect(page.locator('#ratesDetail h2')).toContainText('Japan');
+    await page.locator('.rtile[data-id="jp"]').dispatchEvent('click');    // another card (under the popup here): switches, stays open
+    await expect(pop.locator('h2')).toContainText('Japan');
+    await page.keyboard.press('Escape');
+    await expect(pop).not.toHaveClass(/pinned/);
+    await expect(page).toHaveURL(/\/rates\/$/);
+    await page.goto('/rates/?c=ca');                                         // a shared link opens that curve
+    await expect(pop).toHaveClass(/pinned/);
+    await expect(pop.locator('h2')).toContainText('Canada');
+    await pop.locator('.x').click();
+    await expect(pop).not.toHaveClass(/pinned/);
+    await page.locator('#ratesAll .r-pick[data-id="jp"]').click();          // the chart's legend opens it too
+    await expect(pop.locator('h2')).toContainText('Japan');
   });
 });
 
