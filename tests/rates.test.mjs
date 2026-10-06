@@ -1,12 +1,13 @@
 // Unit tests for the rates page data (scripts/build-rates.mjs). Run: node --test tests/
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { COUNTRIES, interp, parseUS, parseECB, parseBoE, parseMOF, parseBoC, parseRBA, parseBBK, parseSNB, parseNB, mergeSeries, mergeSARB, parseTesouro, summarize, slopeState, build } from '../scripts/build-rates.mjs';
+import { COUNTRIES, interp, parseUS, parseECB, parseBoE, parseMOF, parseBoC, parseRBA, parseBBK, parseSNB, parseNB, mergeSeries, mergeSARB, parseTesouro, parseChinaBond, parseFBIL, unzipEntries, parseIRS, summarizeMonthly, daysFromSummary, EU_MONTHLY, summarize, slopeState, build } from '../scripts/build-rates.mjs';
 import { health } from '../scripts/health.mjs';
 import { dayNum, DAY } from '../scripts/build-forex.mjs';
+import { deflateRawSync } from 'node:zlib';
 
-test('the twelve markets; the UK slope uses Bank Rate, South Africa the 3-month bill', () => {
-  assert.deepEqual(COUNTRIES.map(c => c.id), ['us', 'ea', 'de', 'uk', 'jp', 'ca', 'au', 'ch', 'se', 'no', 'br', 'za']);
+test('the fourteen markets; the UK slope uses Bank Rate, South Africa the 3-month bill', () => {
+  assert.deepEqual(COUNTRIES.map(c => c.id), ['us', 'ea', 'de', 'uk', 'jp', 'ca', 'au', 'ch', 'se', 'no', 'br', 'cn', 'in', 'za']);
   assert.equal(COUNTRIES.find(c => c.id === 'za').short, '3m');
   assert.equal(COUNTRIES.find(c => c.id === 'uk').short, 'Bank Rate');
   assert.ok(COUNTRIES.every(c => c.src && c.srcUrl.startsWith('https://')));
@@ -146,4 +147,82 @@ test('health: bond yields current, partly late, or missing', () => {
   assert.equal(row({ countries: [c('US', '2026-10-05', { notRefreshed: true })] }).state, 'down');
   assert.equal(row(null).state, 'down');
   assert.equal(health({}, now).sources.find(s => s.key === 'yields'), undefined);
+});
+
+// a minimal .xlsx (a zip of XML files, deflated) like FBIL's: shared strings with the date, a G-Sec sheet keyed by
+// ISIN strings, and the Par Yield sheet (tenor | yield rows)
+function zip(files) {
+  const enc = new TextEncoder(), parts = [], central = [];
+  let off = 0;
+  for (const [name, text] of Object.entries(files)) {
+    const n = enc.encode(name), data = deflateRawSync(enc.encode(text)), h = Buffer.alloc(30);
+    h.writeUInt32LE(0x04034b50, 0); h.writeUInt16LE(8, 8); h.writeUInt32LE(data.length, 18); h.writeUInt16LE(n.length, 26);
+    const c = Buffer.alloc(46);
+    c.writeUInt32LE(0x02014b50, 0); c.writeUInt16LE(8, 10); c.writeUInt32LE(data.length, 20); c.writeUInt16LE(n.length, 28); c.writeUInt32LE(off, 42);
+    parts.push(h, n, data); central.push(c, n); off += 30 + n.length + data.length;
+  }
+  const cd = Buffer.concat(central), e = Buffer.alloc(22);
+  e.writeUInt32LE(0x06054b50, 0); e.writeUInt16LE(Object.keys(files).length, 8); e.writeUInt16LE(Object.keys(files).length, 10); e.writeUInt32LE(cd.length, 12); e.writeUInt32LE(off, 16);
+  return Buffer.concat([...parts, cd, e]);
+}
+
+test('China and India: ChinaBond chart data and FBIL’s daily file, thinned to the usual maturities', async () => {
+  const series = Array.from({ length: 501 }, (_, i) => [i / 10, +(1 + i / 500).toFixed(4)]);
+  const cn = parseChinaBond([{ worktime: '2026-09-30', seriesData: series }, { worktime: '2026-09-29', seriesData: [] }]);
+  assert.deepEqual([...cn.keys()], [dayNum('2026-09-30')], 'a day without data is skipped');
+  const p = cn.get(dayNum('2026-09-30'));
+  assert.deepEqual(p.map(x => x[0]), [0.25, 0.5, 1, 2, 3, 5, 7, 10, 15, 20, 30, 40, 50]);
+  assert.equal(interp(p, 10), 1.2);
+
+  const row = (r, a, b, aStr) => `<row r="${r}"><c r="A${r}"${aStr ? ' t="s"' : ''}><v>${a}</v></c><c r="B${r}"><v>${b}</v></c></row>`;
+  const tenors = [0.25, 0.5, 1, 2, 3, 5, 7, 10, 15, 20, 30, 40];
+  const buf = zip({
+    'xl/sharedStrings.xml': '<sst><si><t>FBIL GSec Base/Par Yield</t></si><si><t>29-Sep-2026</t></si><si><t>IN0020230119</t></si></sst>',
+    'xl/worksheets/sheet1.xml': `<worksheet><sheetData>${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(r => row(r, 2, 101.5, true)).join('')}</sheetData></worksheet>`,
+    'xl/worksheets/sheet2.xml': `<worksheet><sheetData>${row(1, 0, 0, true)}${tenors.map((t, i) => row(i + 6, t, (5.4 + t * 0.05).toFixed(2))).join('')}</sheetData></worksheet>`,
+  });
+  const files = await unzipEntries(buf, n => n.endsWith('sheet2.xml'));
+  assert.deepEqual(Object.keys(files), ['xl/worksheets/sheet2.xml']);
+  const fb = await parseFBIL(buf);
+  assert.equal(fb.day, dayNum('2026-09-29'), 'the date from the file');
+  assert.equal(interp(fb.pts, 10), 5.9);
+  assert.equal(interp(fb.pts, 2), 5.5);
+  assert.equal(await parseFBIL(zip({ 'xl/sharedStrings.xml': '<sst></sst>' })), null);
+});
+
+test('history kept between runs (India): the daily 10-year and 2-year points, and the whole curves', () => {
+  const c = COUNTRIES.find(x => x.id === 'in'), from = dayNum('2026-01-05');
+  const full = new Map([[from, [[0.25, 5], [2, 5.5], [10, 6]]], [from + 20, [[0.25, 5.05], [2, 5.55], [10, 6.1]]], [from + 27, [[0.25, 5.1], [2, 5.6], [10, 6.2]]]]);
+  const s = summarize(c, full, (from + 27) * DAY);
+  const back = daysFromSummary(c, s);
+  assert.deepEqual(back.get(from), [[2, 5.5], [10, 6]], 'a past day: just its 10-year and 2-year');
+  assert.deepEqual(back.get(from + 20), [[0.25, 5.05], [2, 5.55], [10, 6.1]], 'the week-ago comparison: the whole curve');
+  assert.deepEqual(back.get(from + 27), [[0.25, 5.1], [2, 5.6], [10, 6.2]], 'the latest: the whole curve');
+  assert.deepEqual(summarize(c, back, (from + 27) * DAY).series, s.series, 'nothing lost on the way round');
+});
+
+test('Europe, monthly: the ECB 10-year per country, change on the month and year, and the gap to Germany', () => {
+  const months = Array.from({ length: 25 }, (_, i) => `${2024 + Math.floor((7 + i) / 12)}-${String((7 + i) % 12 + 1).padStart(2, '0')}`);
+  const csv = 'KEY,FREQ,REF_AREA,TIME_PERIOD,OBS_VALUE\n' + months.flatMap((m, i) => [`x,M,IT,${m},${(3 + i * 0.01).toFixed(3)}`, `x,M,DE,${m},${(2.5 + i * 0.01).toFixed(3)}`, `x,M,PL,${m},${(5 + i * 0.02).toFixed(3)}`]).join('\n');
+  const by = parseIRS(csv);
+  assert.equal(by.IT.length, 25);
+  const ms = summarizeMonthly(by);
+  assert.deepEqual(ms.map(m => m.id), ['it', 'pl'], 'only the countries with data, in the list order');
+  const it = ms[0];
+  assert.equal(it.month, '2026-08');
+  assert.equal(it.y10, 3.24);
+  assert.equal(it.chg1m, 1);
+  assert.equal(it.chg12m, 12);
+  assert.equal(it.vsDE, 0.5);
+  assert.equal(it.de.length, 25);
+  assert.equal(ms[1].vsDE, null, 'Poland is not in the euro: no gap to Germany');
+  assert.equal(EU_MONTHLY.length, 15);
+});
+
+test('health: the monthly figures count as late 75 days after their month began', () => {
+  const now = Date.parse('2026-10-06T10:00:00Z'), countries = [{ badge: 'US', date: '2026-10-05' }];
+  const row = month => health({ rates: { countries, monthly: [{ month }] } }, now).sources.find(s => s.key === 'yields');
+  assert.equal(row('2026-08').state, 'ok');
+  assert.match(row('2026-08').note, /Europe monthly to 2026-08$/);
+  assert.equal(row('2026-06').state, 'warn');
 });

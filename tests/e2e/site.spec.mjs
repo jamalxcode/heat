@@ -702,16 +702,16 @@ test.describe('energy', () => {
   });
 });
 
-// Rates: the same page at /rates/, drawing its own view from rates.json (tests/e2e/fixtures.mjs: twelve markets, Canada
+// Rates: the same page at /rates/, drawing its own view from rates.json (tests/e2e/fixtures.mjs: fourteen daily markets and 15 monthly European ones, Canada
 // inverted, the euro area flat)
 test.describe('rates', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/rates/');
-    await expect(page.locator('#status')).toContainText('12 markets · 1 inverted');
+    await expect(page.locator('#status')).toContainText('14 markets · 1 inverted · 15 monthly');
   });
 
   test('its own view: a tile per market, no price controls, its own search tags, nothing from outside', async ({ page }) => {
-    await expect(page.locator('#grid .rtile')).toHaveCount(12);
+    await expect(page.locator('#grid .rtile')).toHaveCount(14);
     await expect(page.locator('#grid .tile')).toHaveCount(0);
     await expect(page).toHaveTitle(/Government Bond Yield Curves/);
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://heat.sala.company/rates/');
@@ -739,7 +739,7 @@ test.describe('rates', () => {
 
   test('a card opens its curve in a popup: now and before, the slope history, a shareable address; closes like the others', async ({ page }) => {
     const pop = page.locator('#detail');
-    await expect(page.locator('#ratesAll .r-chart path')).toHaveCount(12);
+    await expect(page.locator('#ratesAll .r-chart path')).toHaveCount(14);
     await expect(pop).not.toHaveClass(/pinned/);
     await page.locator('.rtile[data-id="ca"]').click();
     await expect(pop).toHaveClass(/pinned/);
@@ -761,6 +761,26 @@ test.describe('rates', () => {
     await expect(pop).not.toHaveClass(/pinned/);
     await page.locator('#ratesAll .r-pick[data-id="jp"]').click();          // the chart's legend opens it too
     await expect(pop.locator('h2')).toContainText('Japan');
+  });
+
+  test('Europe, monthly: its own labelled row; a tile opens the monthly chart with Germany for comparison', async ({ page }) => {
+    const row = page.locator('#ratesMonthly');
+    await expect(row).toBeVisible();
+    await expect(row.locator('h2')).toContainText('Europe, monthly');
+    await expect(row.locator('h2')).toContainText('August 2026');
+    await expect(row.locator('.mtile')).toHaveCount(15);
+    const it = row.locator('.mtile[data-id="it"]');
+    await expect(it.locator('.rt-date')).toHaveText('Aug 2026');
+    await expect(it.locator('.rt-bot')).toContainText('+0.85 pp');
+    await expect(row.locator('.mtile[data-id="pl"] .rt-bot')).toContainText('not in the euro');
+    await it.click();
+    const pop = page.locator('#detail');
+    await expect(pop).toHaveClass(/pinned/);
+    await expect(pop.locator('h2')).toContainText('Italy: 10-year yield, monthly');
+    await expect(pop.locator('.r-says')).toContainText('above Germany');
+    await expect(pop.locator('.r-chart path')).toHaveCount(2);
+    await expect(page).toHaveURL(/\/rates\/\?c=it$/);
+    await expect(page.locator('#fresh')).toContainText('Europe monthly: Aug 2026');
   });
 });
 
