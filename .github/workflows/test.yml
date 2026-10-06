@@ -20,5 +20,3 @@ jobs:
         with:
           node-version: 22
       - run: node --test   # finds tests/*.test.mjs
-      # TEMPORARY (energy-fuel branch only): do the fuel sources answer GitHub's servers?
-      - run: curl -s https://heat.sala.company/forex.json -o /tmp/forex.json && node scripts/build-fuel.mjs /tmp/fuel.json /tmp/forex.json
