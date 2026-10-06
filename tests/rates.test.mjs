@@ -264,3 +264,16 @@ test('summarize: ten years of weekly history, today’s slope ranked against it,
   assert.equal(uk.y3m, null, 'not for a curve whose short end is the Bank Rate');
   assert.equal(uk.slopePct, null, 'too little history to rank');
 });
+
+test('build: a market whose inflation source fails keeps its figure from the last file', async () => {
+  const now = Date.parse('2026-10-06T10:00:00Z');
+  const usCsv = 'Date,"3 Mo","2 Yr","5 Yr","10 Yr","30 Yr"\n10/05/2026,4.2,4.8,5.0,5.3,5.6\n';
+  const only = ok => async url => url.includes('treasury.gov') ? { ok: true, text: async () => usCsv }
+    : ok && url.includes('oecd.org') ? { ok: true, text: async () => 'DATAFLOW,REF_AREA,FREQ,TIME_PERIOD,OBS_VALUE\nx,USA,M,2026-08,3.4\n' }
+    : { ok: false, status: 500, text: async () => '' };
+  const first = await build({ now, fetchFn: only(true), log: () => {} });
+  assert.equal(first.countries[0].infl.v, 3.4);
+  const later = await build({ prev: first, now: now + 4 * 36e5, fetchFn: only(false), log: () => {} });
+  assert.equal(later.countries[0].infl.v, 3.4, 'the OECD failed: the last figure is kept');
+  assert.equal(later.countries[0].real, 1.9);
+});

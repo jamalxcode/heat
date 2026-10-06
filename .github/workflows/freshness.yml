@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  actions: write      # to cancel a deploy GitHub left stuck (below)
 
 jobs:
   check:
@@ -21,4 +22,21 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
+      # GitHub sometimes leaves a deploy "waiting" on its Pages environment for hours (no reviewers, no timer: a
+      # GitHub-side hang, seen on 5 and 6 Oct 2026). While it waits, every newer update queued behind it in the "pages"
+      # group is cancelled, so the site stops updating. A deploy still waiting or queued after 25 minutes is cancelled
+      # here, and the next scheduled update goes through.
+      - name: Cancel deploys stuck in waiting
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cutoff=$(date -u -d "25 minutes ago" +%s)
+          gh run list -R "$GITHUB_REPOSITORY" --workflow update-data.yml --limit 40 --json databaseId,status,createdAt \
+            --jq '.[] | select(.status == "waiting" or .status == "queued") | "\(.databaseId) \(.createdAt)"' |
+          while read -r id at; do
+            if [ "$(date -u -d "$at" +%s)" -lt "$cutoff" ]; then
+              echo "::warning::deploy run $id stuck since $at: cancelling it so the updates behind it can run"
+              gh run cancel "$id" -R "$GITHUB_REPOSITORY" || true
+            fi
+          done
       - run: node scripts/check-fresh.mjs https://heat.sala.company
