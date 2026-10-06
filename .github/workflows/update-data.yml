@@ -46,6 +46,18 @@ jobs:
           grep -q "rates.mjs?v=$V" app/main.mjs
           grep -q "main.mjs?v=$V" index.html && ! grep -hE "from '|^import '" app/*.mjs | grep -v "?v=$V'" | grep -q .
 
+      # Bond yield curves: official sources, some slow (Sweden's request limit, ChinaBond from abroad, a weekly ten-year
+      # fetch), so the build runs in the background while the prices are fetched; "Collect bond yield curves" waits for it
+      - name: Start bond yield curves (in the background)
+        env:
+          PREV_URL: ${{ steps.pages.outputs.base_url }}/rates.json
+          BASE_URL: ${{ steps.pages.outputs.base_url }}
+        run: |
+          mkdir -p _site
+          ( timeout 330 node scripts/build-rates.mjs _site/rates.json > rates.log 2>&1 \
+              || { echo "::warning::rates build failed, republishing the last rates.json" >> rates.log; rm -f _site/rates.json; curl -sf "$BASE_URL/rates.json" -o _site/rates.json || true; }
+            touch rates.done ) &
+
       - name: Fetch market data
         env:
           PREV_URL: ${{ steps.pages.outputs.base_url }}/data.json
@@ -100,17 +112,16 @@ jobs:
           node scripts/build-energy.mjs _site/energy.json _site/data.json \
             || { echo "::warning::energy build failed, republishing the last energy.json"; curl -sf "$BASE_URL/energy.json" -o _site/energy.json || true; }
 
-      # Rates: /rates/ (same page, its own view in app/rates.mjs) and rates.json: official government bond yield curves.
-      # The sources publish once a business day, so the build reuses the last file and refetches every 3 hours.
-      # A failure republishes the last good file and never blocks the rest of the deploy.
-      - name: Fetch bond yield curves
-        env:
-          PREV_URL: ${{ steps.pages.outputs.base_url }}/rates.json
-          BASE_URL: ${{ steps.pages.outputs.base_url }}
+      # Rates: /rates/ (same page, its own view in app/rates.mjs) and rates.json. The build started in the background at
+      # the top of this job (it can take a few minutes, waiting on slow sources); here it's collected. A failure
+      # republishes the last good file and never blocks the rest of the deploy.
+      - name: Collect bond yield curves
         run: |
           node scripts/market-page.mjs rates _site/rates/index.html
-          timeout 150 node scripts/build-rates.mjs _site/rates.json \
-            || { echo "::warning::rates build failed, republishing the last rates.json"; curl -sf "$BASE_URL/rates.json" -o _site/rates.json || true; }
+          for i in $(seq 1 360); do [ -f rates.done ] && break; sleep 1; done
+          cat rates.log || true
+          [ -f rates.done ] || echo "::warning::rates build still running after the wait: republishing the last rates.json"
+          [ -s _site/rates.json ] || curl -sf "${{ steps.pages.outputs.base_url }}/rates.json" -o _site/rates.json || true
 
       # TradingView chart links: check which symbols exist there (cached in tv.json, so only new or expired ones are
       # looked up), so the popup never links to a "symbol not found" page. A failure keeps the last tv.json.

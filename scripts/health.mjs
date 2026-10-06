@@ -71,7 +71,8 @@ export function health({ crypto, forex, metals, energy, rates, tv }, now = Date.
     const state = !cs.length ? 'down' : old.length ? (old.length < cs.length ? 'warn' : 'down') : mLate ? 'warn' : 'ok';
     add('yields', 'Bond yields', 'official yield curves', state,
       !cs.length ? 'no data' : `${cs.length - old.length}/${cs.length} markets current${oldest ? ` · oldest ${oldest.badge} ${oldest.date}` : ''}${old.length ? ` · late: ${old.map(c => c.badge).join(', ')}` : ''}`
-      + (ms.length ? ` · Europe monthly to ${ms[0].month}${mLate ? ' (late)' : ''}` : ''));
+      + (ms.length ? ` · Europe monthly to ${ms[0].month}${mLate ? ' (late)' : ''}` : '')
+      + ` · inflation for ${[...cs, ...ms].filter(x => x.infl).length}/${cs.length + ms.length}`);
   }
 
   // TradingView: the chart links, checked in the deploy job

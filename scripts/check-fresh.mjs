@@ -16,6 +16,8 @@ export const CHECKS = [
   ['energy.json', d => Date.now() - (d.sources?.at || 0), 3 * DAY + 6 * HOUR, 'newest energy futures quote'],   // Fri 21:00 UTC → Mon 03:00, or a holiday
   ['rates.json', d => Date.now() - d.generated, HOUR, 'rates file last built'],
   ['rates.json', d => Date.now() - Date.parse(d.countries.map(c => c.date).sort().at(-1) + 'T22:00:00Z'), 4 * DAY + 6 * HOUR, 'newest official yield curve'],   // Fri close → Tue morning, or a holiday
+  // a source that has kept failing for a day (a site redesign, a changed file): caught the same day, not when the data goes quiet
+  ['rates.json', d => Math.max(0, ...[...d.countries, ...(d.monthly || [])].map(c => c.failedSince ? Date.now() - c.failedSince : 0)), DAY, 'longest-failing bond yield source'],
   ['scorecard.json', d => Date.now() - d.generated, 30 * HOUR, 'crypto scorecard'],
   ['forex-scorecard.json', d => Date.now() - d.generated, 30 * HOUR, 'forex scorecard'],
 ];

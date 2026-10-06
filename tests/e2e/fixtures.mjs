@@ -176,5 +176,8 @@ export function makeRatesFixture(now = Date.now()) {
   const months = Array.from({ length: 25 }, (_, i) => { const t = 2024 * 12 + 7 + i; return `${Math.floor(t / 12)}-${String(t % 12 + 1).padStart(2, '0')}`; });
   const by = { DE: months.map((m, i) => [m, +(2.5 + i * 0.01).toFixed(3)]) };
   EU_MONTHLY.forEach((c, k) => { by[c.code] = months.map((m, i) => [m, +(2.5 + (c.code === 'IT' ? 0.8 : 0.1 + k * 0.05) + i * 0.012).toFixed(3)]); });
-  return { v: 1, fmt: 1, market: 'rates', generated: now, fetched: now, flatPP: 0.5, countries, monthly: summarizeMonthly(by) };
+  // inflation for all but Switzerland (so one card shows no real yield); Japan's curve is a week old (a greyed date)
+  const infl = x => x.id === 'ch' ? x : { ...x, infl: { v: 2.5, month: '2026-08', src: 'Test' }, real: +(x.y10 - 2.5).toFixed(4) };
+  const daily = countries.map(infl).map(c => c.id === 'jp' ? { ...c, date: new Date((today - 8) * DAY).toISOString().slice(0, 10) } : c);
+  return { v: 1, fmt: 1, market: 'rates', generated: now, fetched: now, flatPP: 0.5, countries: daily, monthly: summarizeMonthly(by).map(infl) };
 }

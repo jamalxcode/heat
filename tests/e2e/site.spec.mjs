@@ -731,8 +731,8 @@ test.describe('rates', () => {
     await expect(us.locator('.rt-state')).toHaveText(/Normal/);
     await expect(page.locator('.rtile[data-id="ca"] .rt-state')).toHaveText(/Inverted/);
     await expect(page.locator('.rtile[data-id="ea"] .rt-state')).toHaveText(/Flat/);
-    await expect(page.locator('.rtile[data-id="uk"] .rt-slope')).toContainText('10y − BR');
-    await expect(page.locator('.rtile[data-id="za"] .rt-slope')).toContainText('10y − 3m');
+    await expect(page.locator('.rtile[data-id="uk"] .rt-slope')).toContainText('10y−BR');
+    await expect(page.locator('.rtile[data-id="za"] .rt-slope')).toContainText('10y−3m');
     await page.locator('#rtf button[data-v="1m"]').click();
     await expect(page.locator('#rlegend')).toContainText('1m change in the 10-year yield');
   });
@@ -746,8 +746,8 @@ test.describe('rates', () => {
     await expect(pop.locator('h2')).toContainText('Canada');
     await expect(pop.locator('.r-says')).toContainText('Inverted');
     await expect(pop.locator('.r-keys')).toContainText('A year ago');
-    await expect(pop.locator('.r-chart')).toHaveCount(2);
-    await expect(pop.locator('.r-mini')).toContainText('10y');
+    await expect(pop.locator('.r-chart')).toHaveCount(1);                   // one chart at a time (Curve | History)
+    await expect(pop.locator('.r-mini').first()).toContainText('10y');
     const card = await page.locator('.rtile[data-id="ca"]').boundingBox(), box = await pop.boundingBox();
     expect(Math.abs(box.width - (card.width * 2 + 8))).toBeLessThan(3);       // about two cards wide …
     expect(box.height).toBeLessThanOrEqual(card.height * 2 + 10);           // … and at most two cards tall
@@ -766,6 +766,61 @@ test.describe('rates', () => {
     await expect(pop).not.toHaveClass(/pinned/);
     await page.locator('.mtile[data-id="it"]').click();                    // a monthly card opens its own
     await expect(pop.locator('h2')).toContainText('Italy');
+  });
+
+  test('cards: a sketch of each curve, the real yield and inflation; a date more than 2 business days old is greyed', async ({ page }) => {
+    await expect(page.locator('#grid .rt-spark')).toHaveCount(14);
+    const us = page.locator('.rtile[data-id="us"]');
+    await expect(us.locator('.rt-real')).toContainText('real');
+    await expect(us.locator('.rt-real')).toContainText('inflation 2.5% (Aug 2026)');
+    await expect(page.locator('.rtile[data-id="ch"] .rt-real')).toContainText('real —');
+    await expect(page.locator('.rtile[data-id="jp"] .rt-date')).toHaveClass(/old/);
+    await expect(us.locator('.rt-date')).not.toHaveClass(/old/);
+    await expect(page.locator('#ratesMonthly .rt-spark')).toHaveCount(15);
+    await expect(page.locator('#ratesMonthly h2')).toContainText('doesn’t apply');
+  });
+
+  test('sort, group by region, table view; each remembered', async ({ page }) => {
+    await page.locator('#rsort').selectOption('state');
+    await expect(page.locator('#grid .rtile').first()).toHaveAttribute('data-id', 'ca');   // the inverted curve first
+    await page.locator('#rgroup').selectOption('region');
+    await expect(page.locator('.r-group h3')).toHaveText(['Americas', 'Europe', 'Asia-Pacific', 'Africa']);
+    await page.reload();
+    await expect(page.locator('#rsort')).toHaveValue('state');
+    await expect(page.locator('.r-group h3').first()).toHaveText('Americas');
+    await page.locator('#rview button[data-v="table"]').click();
+    await expect(page.locator('#ratesTable')).toBeVisible();
+    await expect(page.locator('#grid')).toBeHidden();
+    await expect(page.locator('#ratesTable tbody tr')).toHaveCount(29);
+    await expect(page.locator('#ratesTable tbody tr').first()).toHaveAttribute('data-id', 'ca');
+    await page.locator('#ratesTable tr[data-id="no"]').click();
+    await expect(page.locator('#detail')).toHaveClass(/pinned/);
+    await expect(page.locator('#detail h2')).toContainText('Norway');
+    await page.keyboard.press('Escape');
+    await page.locator('#rview button[data-v="cards"]').click();
+    await page.locator('#rsort').selectOption('default');
+    await page.locator('#rgroup').selectOption('none');
+    await expect(page.locator('#grid .rtile').first()).toHaveAttribute('data-id', 'us');
+  });
+
+  test('popup: real yield, rank against its own history, and a Curve | History switch; "How to read" explains the terms', async ({ page }) => {
+    await page.locator('.rtile[data-id="us"]').click();
+    const pop = page.locator('#detail');
+    await expect(pop.locator('.r-mini').nth(1)).toContainText('real');
+    await expect(pop.locator('.r-mini').nth(1)).toContainText('steeper than');
+    await expect(pop.locator('.r-mini').first()).toContainText('10y−3m');
+    await expect(pop.locator('[data-rtab="curve"]')).toHaveAttribute('aria-pressed', 'true');
+    await pop.locator('[data-rtab="history"]').click();
+    await expect(pop.locator('[data-rtab="history"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(pop.locator('.r-keys')).toContainText('10-year minus 2y');
+    await expect(pop).toHaveClass(/pinned/);
+    await pop.locator('[data-rtab="curve"]').click();
+    await expect(pop.locator('.r-keys')).toContainText('A year ago');
+    await page.keyboard.press('Escape');
+    await page.locator('#rhelpBtn').click();
+    await expect(page.locator('#rhelp')).toBeVisible();
+    await expect(page.locator('#rhelp')).toContainText('Real yield');
+    await expect(page.locator('#rhelp')).toContainText('basis point');
   });
 
   test('mouse: resting on a card previews its curve beside it; moving away closes it; a click pins it in place', async ({ page }) => {
@@ -797,8 +852,8 @@ test.describe('rates', () => {
     await expect(row.locator('.mtile')).toHaveCount(15);
     const it = row.locator('.mtile[data-id="it"]');
     await expect(it.locator('.rt-date')).toHaveText('Aug 2026');
-    await expect(it.locator('.rt-bot')).toContainText('+0.85 pp');
-    await expect(row.locator('.mtile[data-id="pl"] .rt-bot')).toContainText('not in the euro');
+    await expect(it.locator('.rt-bot').first()).toContainText('+0.85 pp');
+    await expect(row.locator('.mtile[data-id="pl"] .rt-bot').first()).toContainText('not in the euro');
     await it.click();
     const pop = page.locator('#detail');
     await expect(pop).toHaveClass(/pinned/);
