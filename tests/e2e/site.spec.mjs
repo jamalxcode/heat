@@ -771,9 +771,10 @@ test.describe('rates', () => {
   test('cards: a sketch of each curve, the real yield and inflation; a date more than 2 business days old is greyed', async ({ page }) => {
     await expect(page.locator('#grid .rt-spark')).toHaveCount(14);
     const us = page.locator('.rtile[data-id="us"]');
-    await expect(us.locator('.rt-real')).toContainText('real');
-    await expect(us.locator('.rt-real')).toContainText('inflation 2.5% (Aug 2026)');
-    await expect(page.locator('.rtile[data-id="ch"] .rt-real')).toContainText('real —');
+    await expect(us.locator('.rt-real .r-real')).toContainText('Real yield');
+    await expect(us.locator('.rt-real .r-real')).toHaveClass(/pos/);           // green above zero
+    await expect(us.locator('.rt-real .r-infl')).toHaveText('CPI 2.5% · Aug');
+    await expect(page.locator('.rtile[data-id="ch"] .rt-real .r-real')).toContainText('Real yield —');
     await expect(page.locator('.rtile[data-id="jp"] .rt-date')).toHaveClass(/old/);
     await expect(us.locator('.rt-date')).not.toHaveClass(/old/);
     await expect(page.locator('#ratesMonthly .rt-spark')).toHaveCount(15);
@@ -806,7 +807,7 @@ test.describe('rates', () => {
   test('popup: real yield, rank against its own history, and a Curve | History switch; "How to read" explains the terms', async ({ page }) => {
     await page.locator('.rtile[data-id="us"]').click();
     const pop = page.locator('#detail');
-    await expect(pop.locator('.r-mini').nth(1)).toContainText('real');
+    await expect(pop.locator('.r-mini').nth(1)).toContainText('Real yield');
     await expect(pop.locator('.r-mini').nth(1)).toContainText('steeper than');
     await expect(pop.locator('.r-mini').first()).toContainText('10y−3m');
     await expect(pop.locator('[data-rtab="curve"]')).toHaveAttribute('aria-pressed', 'true');
