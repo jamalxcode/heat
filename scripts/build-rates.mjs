@@ -13,7 +13,7 @@
 //   Sweden     Riksbank: Treasury bills and government bonds (3 months … 10 years); its open API allows a few requests a minute
 //   Norway     Norges Bank generic government rates (3 months … 10 years)
 //   Brazil     National Treasury, Tesouro Direto fixed-rate bonds by maturity date (one ~15 MB file, fetched every 12 hours)
-//   China      ChinaBond government bond yield curve (chart data, many dates per request; fetched every 12 hours)
+//   China      ChinaBond government bond yield curve (chart data; slow from abroad, so a few missing dates per run)
 //   India      FBIL par yield curve, one Excel file per day (read with a small built-in .xlsx reader), a few days per run
 //   S. Africa  Reserve Bank: Treasury bill tenders (3 … 12 months) and average bond yields by maturity band (5–10, 10+ years)
 //   Europe     monthly only: the ECB's 10-year yield per EU country (France, Italy, Spain … 15), shown in their own row
@@ -50,7 +50,7 @@ export const COUNTRIES = [
   { id: 'no', name: 'Norway', flag: '🇳🇴', badge: 'NO', src: 'Norges Bank', srcUrl: 'https://www.norges-bank.no/en/topics/Statistics/Interest-rates/Government-debt-securities/', short: '2y' },
   { id: 'br', name: 'Brazil', flag: '🇧🇷', badge: 'BR', src: 'Tesouro Nacional (Tesouro Direto rates)', srcUrl: 'https://www.tesourotransparente.gov.br/ckan/dataset/taxas-dos-titulos-ofertados-pelo-tesouro-direto', short: '2y', every: 12,
     note: 'Fixed-rate bonds offered to savers through Tesouro Direto (Prefixado, with and without coupons): the National Treasury’s own daily rates, close to the market’s. Maturities are fixed dates, so the points move a little each day.' },
-  { id: 'cn', name: 'China', flag: '🇨🇳', badge: 'CN', src: 'ChinaBond (China Central Depository & Clearing)', srcUrl: 'https://yield.chinabond.com.cn/cbweb-mn/yield_main?locale=en_US', short: '2y', every: 12,
+  { id: 'cn', name: 'China', flag: '🇨🇳', badge: 'CN', src: 'ChinaBond (China Central Depository & Clearing)', srcUrl: 'https://yield.chinabond.com.cn/cbweb-mn/yield_main?locale=en_US', short: '2y',
     note: 'ChinaBond’s government bond yield curve, the benchmark for Chinese government bonds; before the last month the history is weekly.' },
   { id: 'in', name: 'India', flag: '🇮🇳', badge: 'IN', src: 'Financial Benchmarks India (FBIL)', srcUrl: 'https://www.fbil.org.in/#/benchmark/gsec', short: '2y', perDay: true,
     note: 'FBIL’s daily par yield curve for government securities (G-secs), published as one file per day; the history is filled in weekly points at first, then daily.' },
@@ -324,21 +324,31 @@ const FETCH = {
     // one file with every day since 2002 (~15 MB): fetched at most every 12 hours (`every`), only the last two years kept
     return parseTesouro(await getText('https://www.tesourotransparente.gov.br/ckan/dataset/df56aa42-484a-4a59-8184-7676580c81e3/resource/796d2059-14e9-44e3-80c9-2d9e30b405c1/download/precotaxatesourodireto.csv', fetchFn, { timeout: 120e3 }), today - SERIES_DAYS - 10);
   },
-  async cn(fetchFn, today) {
-    // every weekday of the last six weeks, then one a week back two years: ~140 dates, 40 per request
-    const dates = [];
-    for (let d = today; d >= today - SERIES_DAYS; d--) {
-      const wd = new Date(d * DAY).getUTCDay();
-      if (wd !== 0 && wd !== 6 && (d >= today - 42 || wd === 3)) dates.push(isoDay(d));
+  // China: ChinaBond answers slowly from abroad, so like India its history is kept in rates.json and each run asks
+  // only for missing dates (up to 30, ten per request): weekdays of the last six weeks, the exact week / month /
+  // year-ago days, and one a week back two years. The first few runs fill it in; after that, a date or two a run.
+  async cn(fetchFn, today, { prev, log } = {}) {
+    const c = COUNTRIES.find(x => x.id === 'cn'), days = daysFromSummary(c, prev);
+    const weekday = d => { const w = new Date(d * DAY).getUTCDay(); return w === 6 ? d - 1 : w === 0 ? d - 2 : d; };
+    const full = d => { for (let j = d; j >= d - 3; j--) if (days.get(j)?.length > 2) return true; return false; };
+    const any = d => { for (let j = d; j >= d - 3; j--) if (days.has(j)) return true; return false; };
+    const latest = weekday(today), want = [];
+    for (const d of [latest, latest - 7, latest - 30, latest - 365].map(weekday)) if (!full(d)) want.push(d);
+    for (let d = latest - 1; d >= latest - 42; d--) if (weekday(d) === d && !any(d)) want.push(d);
+    for (let k = 49; k <= SERIES_DAYS; k += 7) { const d = weekday(latest - k); if (!any(d)) want.push(d); }
+    const todo = [...new Set(want)].slice(0, 30);
+    let got = 0;
+    for (let i = 0; i < todo.length; i += 10) {
+      const url = `https://yield.chinabond.com.cn/cbweb-mn/yc/searchYc?xyzSelect=txy&&workTimes=${todo.slice(i, i + 10).map(isoDay).join(',')}&&dxbj=0&&qxll=0,&&yqqxN=N&&yqqxK=K&&ycDefIds=2c9081e50a2f9606010a3068cae70001,&&wrjxCBFlag=0&&locale=en_US`;
+      try {
+        const r = await fetchFn(url, { method: 'POST', headers: { 'user-agent': 'Mozilla/5.0 (heat.sala.company)' }, signal: AbortSignal.timeout(40e3) });
+        if (!r.ok) break;
+        for (const [d, p] of parseChinaBond(await r.json())) { days.set(d, p); got++; }
+      } catch { break; }                                  // slow or unreachable: keep what we have, ask again next run
     }
-    const out = new Map();
-    for (let i = 0; i < dates.length; i += 40) {
-      const url = `https://yield.chinabond.com.cn/cbweb-mn/yc/searchYc?xyzSelect=txy&&workTimes=${dates.slice(i, i + 40).join(',')}&&dxbj=0&&qxll=0,&&yqqxN=N&&yqqxK=K&&ycDefIds=2c9081e50a2f9606010a3068cae70001,&&wrjxCBFlag=0&&locale=en_US`;
-      const r = await fetchFn(url, { method: 'POST', headers: { 'user-agent': 'Mozilla/5.0 (heat.sala.company)' }, signal: AbortSignal.timeout(60e3) });
-      if (!r.ok) throw new Error(`HTTP ${r.status} for ChinaBond`);
-      for (const [d, p] of parseChinaBond(await r.json())) out.set(d, p);
-    }
-    return out;
+    if (todo.length) log?.(`Rates: ChinaBond ${got} of ${todo.length} dates fetched`);
+    if (!days.size) throw new Error('ChinaBond did not answer');
+    return days;
   },
   // India: one file per day, so its history is kept in rates.json and only new days are asked for (a few per run):
   // the latest, the last two weeks, the exact week / month / year-ago comparison days, and weekly points back a year
