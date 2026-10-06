@@ -5,6 +5,7 @@
 // separate row has the European countries the ECB covers only monthly. main.mjs starts it instead of the price pipeline.
 import { $, $$, esc, logo, M, S, store } from './core.mjs';
 import { renderHealth } from './render.mjs';
+import { chartUrl, pick } from '/scripts/tradingview.mjs';
 
 const DAY = 864e5, REFRESH = 10 * 60e3;
 const TFS = [['1d', 1], ['1w', 7], ['1m', 30]];
@@ -38,6 +39,12 @@ const shortLabel = c => c.short || '2y';                                  // the
 const shortTag = c => c.short === 'Bank Rate' ? 'BR' : shortLabel(c);
 const SHORT_WORDS = { '2y': '2-year', 'Bank Rate': 'Bank of England’s Bank Rate', '3m': '3-month Treasury bill' };
 const logoOf = c => logo(c, 18);   // the flag (or its country code where the system has no flag emoji)
+// TradingView: the market's 10-year yield chart (live there), linked from the popup's name and a small "TradingView ↗",
+// as on the other pages; only symbols the deploy job confirmed exist (tv.json), so never a "symbol not found" page
+let TV = null;
+const tvSym = x => pick(x, null, 'rates', TV);
+const tvLink = (x, inner) => { const s = tvSym(x); return s ? `<a class="tv" href="${chartUrl(s)}" target="_blank" rel="noopener noreferrer" title="Open the ${esc(s)} chart on TradingView">${inner}</a>` : inner; };
+const tvGo = x => { const s = tvSym(x); return s ? `<a class="tv tv-go" href="${chartUrl(s)}" target="_blank" rel="noopener noreferrer" title="${esc(s)} on TradingView: the 10-year yield, live">TradingView ↗</a>` : ''; };
 
 // change in the 10-year yield over k calendar days, in basis points: vs the last observation on or before that day
 // (within 4 days, so a long gap shows no change rather than a misleading one)
@@ -201,7 +208,7 @@ function detailHTML(c) {
     ? `${slopeChart(c)}<div class="r-keys"><span class="r-key">10-year minus ${esc(shortLabel(c))}${since ? `, weekly since ${since}` : ''} · shaded: inverted</span></div>`
     : `${curveChart(lines, `${c.name} yield curve`)}<div class="r-keys">${lines.map(l => keyOf(l.label, l.color, l.width, l.dash, l.faint)).join('')}</div>`;
   // small enough to sit beside the card: the key numbers and a chart first, the explanation and the maturities below
-  return `<div class="r-card r-pop" data-country="${esc(c.id)}"><div class="r-head"><h2>${logoOf(c)} ${esc(c.name)} <span class="r-muted">yield curve</span></h2>
+  return `<div class="r-card r-pop" data-country="${esc(c.id)}"><div class="r-head"><h2>${tvLink(c, `${logoOf(c)} ${esc(c.name)}`)} <span class="r-muted">yield curve</span>${tvGo(c)}</h2>
       <span class="rt-state st-${esc(c.state || 'none')}">${st ? `<span class="st-ico" aria-hidden="true">${st.icon}</span> ${st.label}` : '—'}</span></div>
     <div class="r-mini">10y <b>${fmtY(c.y10)}</b> · ${shortLabel(c)} <b>${fmtY(c.yShort)}</b> · gap <b>${fmtPP(c.slope)}</b>${c.slope3m != null && c.short !== '3m' ? ` · 10y−3m <b>${fmtPP(c.slope3m)}</b>` : ''} · ${dayLabel(c.date)}</div>
     <div class="r-mini r-mini2">${realPill(c)}${inflTag(c)}${rank ? `<span>${rank}</span>` : ''}</div>
@@ -213,7 +220,7 @@ function detailHTML(c) {
     <p class="r-src">${c.notRefreshed ? '⚠ The source didn’t answer in the latest check: showing its last curve. ' : ''}Source: <a href="${esc(c.srcUrl)}" target="_blank" rel="noopener">${esc(c.src)}</a>, closing yields of ${dayLabel(c.date)}.${c.note ? ' ' + esc(c.note) : ''}${c.infl ? ` Inflation: ${esc(c.infl.src)}, yearly change in consumer prices.` : ''}</p></div></div>`;
 }
 function monthHTML(m) {
-  return `<div class="r-card r-pop" data-country="${esc(m.id)}"><div class="r-head"><h2>${logoOf(m)} ${esc(m.name)} <span class="r-muted">10-year, monthly</span></h2><span class="r-muted">📅 monthly</span></div>
+  return `<div class="r-card r-pop" data-country="${esc(m.id)}"><div class="r-head"><h2>${tvLink(m, `${logoOf(m)} ${esc(m.name)}`)} <span class="r-muted">10-year, monthly</span>${tvGo(m)}</h2><span class="r-muted">📅 monthly</span></div>
     <div class="r-mini">${monthLabel(m.month)} <b>${fmtY(m.y10)}</b> · month <b>${fmtBp(m.chg1m)}</b> · year <b>${fmtBp(m.chg12m)}</b>${m.vsDE != null ? ` · vs Germany <b>${fmtPP(m.vsDE)}</b>` : ''}</div>
     <div class="r-mini r-mini2">${realPill(m)}${inflTag(m)}</div>
     ${monthChart(m)}
@@ -340,6 +347,7 @@ async function load() {
 }
 
 export function start() {
+  fetch('/tv.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).then(j => { TV = j?.sym || null; }).catch(() => {});
   document.body.classList.add('rates-page');
   // this page has none of the price controls: no filters, views, tile styles, quote switch, legend or refresh button
   for (const s of ['#colorBy', '#quote', '#view', '#density', '.controls .ctl', '#legend', '#reset', '#refresh', '#share', '#excluded']) { const el = $(s); if (el) el.hidden = true; }

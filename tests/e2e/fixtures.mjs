@@ -126,6 +126,7 @@ export function makeTvFixture(now = Date.now()) {
     'FX_IDC:USDJPY': [1, now, 'U.S. DOLLAR / JAPANESE YEN'], 'FX_IDC:JPYUSD': [1, now, 'JAPANESE YEN / U.S. DOLLAR'],
     'TVC:GOLD': [1, now, 'Gold'],
     'NYMEX:CL1!': [1, now, 'Crude Oil Futures'],
+    'TVC:US10Y': [1, now, 'United States 10 Year Government Bonds Yield'], 'TVC:IT10Y': [1, now, 'Italy 10 Year Government Bonds Yield'],
   } };
 }
 
