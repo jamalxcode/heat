@@ -95,6 +95,7 @@ for (const [k, v] of Object.entries(LINKED)) if (v != null) S[k] = v;
 export const linkedCoin = fromUrl('coin', v => /^[a-z0-9._-]{1,80}$/i.test(v));
 if (!M.scorecard && S.view === 'score') S.view = 'grid';   // metals has no Scorecard view
 export function syncURL() {
+  if (M.custom) return;                                    // the rates page keeps its own address (?c=)
   const q = new URLSearchParams();
   if (S.filter && S.filter !== 'all') q.set('f', S.filter);
   if (S.heat) q.set('heat', S.heat);
