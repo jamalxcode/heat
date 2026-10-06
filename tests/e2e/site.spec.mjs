@@ -831,6 +831,25 @@ test.describe('rates', () => {
     await expect(page.locator('#rhelp')).toContainText('basis point');
   });
 
+  test('colour by: change (a week by default), the curve or the real yield; the corner number follows; remembered', async ({ page }) => {
+    await expect(page.locator('#rtf button[aria-pressed="true"]')).toHaveText('1w');
+    await expect(page.locator('#rlegend')).toContainText('1w change in the 10-year yield');
+    await page.locator('#rcolor button[data-v="curve"]').click();
+    await expect(page.locator('#rtf')).toBeHidden();
+    await expect(page.locator('#rlegend')).toContainText('the curve');
+    const ca = page.locator('.rtile[data-id="ca"]');
+    await expect(ca.locator('.rt-chg')).toContainText('−0.');                  // the inverted gap, in pp
+    await expect(ca).toHaveClass(/h-\d/);                                       // the red side of the scale
+    await expect(page.locator('.mtile').first()).toHaveClass(/ h0/);            // no curve for the monthly cards
+    await page.locator('#rcolor button[data-v="real"]').click();
+    await expect(page.locator('.rtile[data-id="us"] .rt-chg')).toContainText('%');
+    await expect(page.locator('#rlegend')).toContainText('real yield');
+    await page.reload();
+    await expect(page.locator('#rcolor button[aria-pressed="true"]')).toHaveText('Real yield');
+    await page.locator('#rcolor button[data-v="change"]').click();
+    await expect(page.locator('#rtf')).toBeVisible();
+  });
+
   test('mouse: resting on a card previews its curve beside it; moving away closes it; a click pins it in place', async ({ page }) => {
     const pop = page.locator('#detail'), card = page.locator('.rtile[data-id="ca"]');
     await card.hover();
