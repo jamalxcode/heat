@@ -1,12 +1,13 @@
 // Unit tests for the rates page data (scripts/build-rates.mjs). Run: node --test tests/
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { COUNTRIES, interp, parseUS, parseECB, parseBoE, parseMOF, parseBoC, summarize, slopeState, build } from '../scripts/build-rates.mjs';
+import { COUNTRIES, interp, parseUS, parseECB, parseBoE, parseMOF, parseBoC, parseBBK, parseSNB, parseNB, mergeSeries, mergeSARB, parseTesouro, summarize, slopeState, build } from '../scripts/build-rates.mjs';
 import { health } from '../scripts/health.mjs';
 import { dayNum, DAY } from '../scripts/build-forex.mjs';
 
-test('the markets: US, euro area, UK, Japan, Canada; the UK slope uses Bank Rate', () => {
-  assert.deepEqual(COUNTRIES.map(c => c.id), ['us', 'ea', 'uk', 'jp', 'ca']);
+test('the eleven markets; the UK slope uses Bank Rate, South Africa the 3-month bill', () => {
+  assert.deepEqual(COUNTRIES.map(c => c.id), ['us', 'ea', 'de', 'uk', 'jp', 'ca', 'ch', 'se', 'no', 'br', 'za']);
+  assert.equal(COUNTRIES.find(c => c.id === 'za').short, '3m');
   assert.equal(COUNTRIES.find(c => c.id === 'uk').short, 'Bank Rate');
   assert.ok(COUNTRIES.every(c => c.src && c.srcUrl.startsWith('https://')));
 });
@@ -49,6 +50,39 @@ test('parsers: each official format to curves by day (tenors in years)', () => {
 
   const boc = parseBoC({ observations: [{ d: '2026-10-02', 'BD.CDN.2YR.DQ.YLD': { v: '3.25' }, 'BD.CDN.5YR.DQ.YLD': { v: '3.5' }, 'BD.CDN.10YR.DQ.YLD': { v: '3.93' }, 'BD.CDN.LONG.DQ.YLD': { v: '4.2' } }] });
   assert.deepEqual(boc.get(dayNum('2026-10-02')), [[2, 3.25], [5, 3.5], [10, 3.93], [30, 4.2]]);
+});
+
+test('parsers for the newer sources: Bundesbank, SNB, Norges Bank, Riksbank, Reserve Bank (SA), Tesouro Direto', () => {
+  const bbk = parseBBK('DATAFLOW;BBK_SEIS_MATURITY;TIME_PERIOD;OBS_VALUE\n' + ['01;2.91', '02;3.02', '05;3.2', '10;3.51', '30;3.9'].map(s => { const [m, v] = s.split(';'); return `BBK;R${m}XX;2026-10-05;${v}`; }).join('\n') + '\nBBK;R10XX;2026-10-04;.\n');
+  assert.deepEqual(bbk.get(dayNum('2026-10-05')).map(p => p[0]), [1, 2, 5, 10, 30]);
+  assert.equal(bbk.has(dayNum('2026-10-04')), false, "'.' is no value");
+
+  const snb = parseSNB('"CubeId";"rendeiduebd"\n\n"Date";"D0";"D1";"Value"\n' + ['1J;0.17', '2J;0.287', '5J;0.453', '10J;0.586', '30J;0.553'].map(s => { const [t, v] = s.split(';'); return `"2026-09-30";"CHF";"${t}";"${v}"`; }).join('\n') + '\n"2026-09-30";"EUR";"10J";\n');
+  assert.equal(interp(snb.get(dayNum('2026-09-30')), 10), 0.586);
+  assert.equal(snb.get(dayNum('2026-09-30')).length, 5, 'only the Confederation (CHF) rows');
+
+  const nb = parseNB('FREQ;Frequency;TENOR;Tenor;INSTRUMENT_TYPE;Instrument Type;TIME_PERIOD;OBS_VALUE\n' + ['3M;4.458', '12M;4.741', '3Y;4.791', '10Y;4.588'].map(s => { const [t, v] = s.split(';'); return `B;Business;${t};x;GBON;x;2026-10-02;${v}`; }).join('\n'));
+  assert.deepEqual(nb.get(dayNum('2026-10-02')), [[0.25, 4.458], [1, 4.741], [3, 4.791], [10, 4.588]]);
+
+  const se = mergeSeries([[0.25, [{ date: '2026-10-02', value: 2.1 }]], [2, [{ date: '2026-10-02', value: 2.66 }]], [5, [{ date: '2026-10-02', value: 2.9 }]], [10, [{ date: '2026-10-02', value: 3.14 }, { date: '2026-10-01', value: 3.2 }]]], 4);
+  assert.deepEqual(se.get(dayNum('2026-10-02')), [[0.25, 2.1], [2, 2.66], [5, 2.9], [10, 3.14]]);
+  assert.equal(se.has(dayNum('2026-10-01')), false, 'a day with too few maturities is skipped');
+
+  const P = (d, v) => ({ Period: d + 'T00:00:00', Value: v });
+  const za = mergeSARB([[0.25, [P('2026-09-25', 6.9)]], [1, [P('2026-09-25', 7.5)]]], [[7.5, [P('2026-10-02', 8.83), P('2026-09-01', 8.5)]], [15, [P('2026-10-02', 9.07), P('2026-09-01', 8.8)]]]);
+  assert.deepEqual(za.get(dayNum('2026-10-02')), [[0.25, 6.9], [1, 7.5], [7.5, 8.83], [15, 9.07]], "last week's bill tender carried to the bond day");
+  assert.equal(za.has(dayNum('2026-09-01')), false, 'no bill tender within 10 days before: skipped');
+
+  const csv = ['Tipo Titulo;Data Vencimento;Data Base;Taxa Compra Manha;Taxa Venda Manha',
+    'Tesouro Selic;01/03/2031;02/10/2026;0,09;0,10',
+    ...['01/01/2027;13,10', '01/01/2029;13,50', '01/01/2032;13,90', '01/01/2037;14,20'].map(s => { const [v, r] = s.split(';'); return `Tesouro Prefixado com Juros Semestrais;${v};02/10/2026;${r};0`; }),
+    'Tesouro Prefixado;01/11/2026;02/10/2026;12,90;0', 'Tesouro Prefixado;01/01/2020;31/12/2018;6,5;0'].join('\n');
+  const br = parseTesouro(csv, dayNum('2024-01-01'));
+  assert.equal(br.size, 1, 'only days from `since` on');
+  const pts = br.get(dayNum('2026-10-02'));
+  assert.equal(pts.length, 4, 'Selic (floating) and bonds under 2 months to maturity left out');
+  assert.equal(pts[0][1], 13.1);
+  assert.ok(Math.abs(pts.at(-1)[0] - 10.25) < 0.01, 'years to maturity');
 });
 
 // curves by day: a gently steepening curve, 10-year at 4% + i * 0.001
