@@ -609,12 +609,12 @@ test.describe('metals', () => {
     await expect(page.locator('#status')).toContainText(`${N}/${N} assets with indicators`);
   });
 
-  test('loads its own data and search tags; no scorecard, no pegged checkbox; the switch links all four pages', async ({ page }) => {
+  test('loads its own data and search tags; no scorecard, no pegged checkbox; the switch links all five pages', async ({ page }) => {
     await expect(tiles(page)).toHaveCount(N);
     await expect(page).toHaveTitle(/Precious Metals Heatmap/);
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://heat.sala.company/metals/');
     await expect(page.locator('#market a[aria-current="page"]')).toHaveText(/Metals/);
-    await expect(page.locator('#market a')).toHaveCount(4);
+    await expect(page.locator('#market a')).toHaveCount(5);
     await expect(page.locator('#market a[data-m="forex"]')).toHaveAttribute('href', '/forex/');
     await expect(page.locator('#view [data-v="score"]')).toBeHidden();
     await expect(page.locator('#pegged')).toBeHidden();
@@ -702,6 +702,56 @@ test.describe('energy', () => {
   });
 });
 
+// Rates: the same page at /rates/, drawing its own view from rates.json (tests/e2e/fixtures.mjs: six markets, Canada
+// inverted, the euro area flat)
+test.describe('rates', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/rates/');
+    await expect(page.locator('#status')).toContainText('6 markets · 1 inverted');
+  });
+
+  test('its own view: a tile per market, no price controls, its own search tags, nothing from outside', async ({ page }) => {
+    await expect(page.locator('#grid .rtile')).toHaveCount(6);
+    await expect(page.locator('#grid .tile')).toHaveCount(0);
+    await expect(page).toHaveTitle(/Government Bond Yield Curves/);
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://heat.sala.company/rates/');
+    await expect(page.locator('#market a[aria-current="page"]')).toHaveText(/Rates/);
+    for (const s of ['#colorBy', '#view', '#density', '#legend', '#refresh', '#reset']) await expect(page.locator(s)).toBeHidden();
+    await expect(page.locator('#fresh')).toContainText('Official closing yields');
+    const ld = JSON.parse(await page.locator('script[type="application/ld+json"]').textContent());
+    const faq = ld['@graph'].find(x => x['@type'] === 'FAQPage').mainEntity.map(q => q.name);
+    expect(await page.locator('footer .about h3').allTextContents()).toEqual(faq);
+    expect(external).toEqual([]);
+  });
+
+  test('tiles: 10-year yield, change in basis points, the curve reading; the UK slope uses Bank Rate', async ({ page }) => {
+    const us = page.locator('.rtile[data-id="us"]');
+    await expect(us.locator('.rt-chg')).toHaveText('+4 bp');
+    await expect(us.locator('.rt-y')).toContainText(/\d\.\d\d%/);
+    await expect(us.locator('.rt-state')).toHaveText(/Normal/);
+    await expect(page.locator('.rtile[data-id="ca"] .rt-state')).toHaveText(/Inverted/);
+    await expect(page.locator('.rtile[data-id="ea"] .rt-state')).toHaveText(/Flat/);
+    await expect(page.locator('.rtile[data-id="uk"] .rt-slope')).toContainText('10y − BR');
+    await page.locator('#rtf button[data-v="1m"]').click();
+    await expect(page.locator('#rlegend')).toContainText('1m change in the 10-year yield');
+  });
+
+  test('picking a market shows its curve now and before, its slope history, and a shareable address', async ({ page }) => {
+    await expect(page.locator('#ratesAll .r-chart path')).toHaveCount(6);
+    await expect(page.locator('#ratesDetail h2')).toContainText('United States');
+    await page.locator('.rtile[data-id="ca"]').click();
+    await expect(page.locator('#ratesDetail h2')).toContainText('Canada');
+    await expect(page.locator('#ratesDetail .r-says')).toContainText('Inverted');
+    await expect(page.locator('#ratesDetail .r-keys')).toContainText('A year ago');
+    await expect(page.locator('#ratesDetail .r-chart')).toHaveCount(2);
+    await expect(page).toHaveURL(/\/rates\/\?c=ca$/);
+    await page.reload();
+    await expect(page.locator('#ratesDetail h2')).toContainText('Canada');
+    await page.locator('#ratesAll .r-pick[data-id="jp"]').click();
+    await expect(page.locator('#ratesDetail h2')).toContainText('Japan');
+  });
+});
+
 test.describe('phone', () => {
   test.use({ viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true });
 
@@ -716,10 +766,10 @@ test.describe('phone', () => {
     await expect(popup).not.toHaveClass(/show/);
   });
 
-  test('every page fits the screen with the four-way market switch', async ({ page }) => {
-    for (const url of ['/', '/forex/', '/metals/', '/energy/']) {
+  test('every page fits the screen with the five-way market switch', async ({ page }) => {
+    for (const url of ['/', '/forex/', '/metals/', '/energy/', '/rates/']) {
       await page.goto(url);
-      await expect(tiles(page).first()).toBeVisible();
+      await expect(page.locator('#grid .tile, #grid .rtile').first()).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), url).toBe(true);
     }
   });

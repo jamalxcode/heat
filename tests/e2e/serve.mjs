@@ -1,11 +1,11 @@
 // Local server for the site: serves the repo, with data.json / scorecard.json and forex.json / forex-scorecard.json
-// metals.json and energy.json from the test fixtures (always fresh), and /forex/, /metals/ and /energy/ made from index.html like the deploy job.
+// metals.json, energy.json and rates.json from the test fixtures (always fresh), and /forex/, /metals/, /energy/ and /rates/ made from index.html like the deploy job.
 // Browser tests use it (playwright.config.mjs); it's also a handy local preview: node tests/e2e/serve.mjs
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { makeFixtures, makeForexFixtures, makeMetalsFixtures, makeEnergyFixtures, makeTvFixture, makeHealthFixture } from './fixtures.mjs';
+import { makeFixtures, makeForexFixtures, makeMetalsFixtures, makeEnergyFixtures, makeRatesFixture, makeTvFixture, makeHealthFixture } from './fixtures.mjs';
 import { marketPage, PAGES } from '../../scripts/market-page.mjs';
 
 const root = normalize(fileURLToPath(new URL('../../', import.meta.url)));
@@ -14,10 +14,10 @@ const TYPES = { '.png': 'image/png', '.txt': 'text/plain', '.html': 'text/html; 
 
 let cache = { at: 0 };
 const fixtures = () => {
-  if (Date.now() - cache.at > 60e3) { const fx = makeForexFixtures(), base = makeFixtures(); cache = { at: Date.now(), ...base, fxData: fx.data, fxScorecard: fx.scorecard, metals: makeMetalsFixtures(base.data), energy: makeEnergyFixtures(base.data), tv: makeTvFixture(), health: makeHealthFixture() }; }
+  if (Date.now() - cache.at > 60e3) { const fx = makeForexFixtures(), base = makeFixtures(); cache = { at: Date.now(), ...base, fxData: fx.data, fxScorecard: fx.scorecard, metals: makeMetalsFixtures(base.data), energy: makeEnergyFixtures(base.data), rates: makeRatesFixture(), tv: makeTvFixture(), health: makeHealthFixture() }; }
   return cache;
 };
-const JSON_ROUTES = { '/data.json': 'data', '/scorecard.json': 'scorecard', '/forex.json': 'fxData', '/forex-scorecard.json': 'fxScorecard', '/metals.json': 'metals', '/energy.json': 'energy', '/tv.json': 'tv', '/health.json': 'health' };
+const JSON_ROUTES = { '/data.json': 'data', '/scorecard.json': 'scorecard', '/forex.json': 'fxData', '/forex-scorecard.json': 'fxScorecard', '/metals.json': 'metals', '/energy.json': 'energy', '/rates.json': 'rates', '/tv.json': 'tv', '/health.json': 'health' };
 
 http.createServer(async (req, res) => {
   const path = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);

@@ -49,7 +49,7 @@ Click the popup (or the tile) to pin it open, and click outside it to close it. 
 
 **Filters.** The filter buttons (Oversold, Overbought, Uptrend, Downtrend, 🛑 Past stop, and under **More ▾** Beating BTC, Volume surge and Recent cross; on phones all of them sit in one swipeable row) show only the matching coins, in both grid and table. Each button shows its count. **All coins** (or clicking the active button again) brings everything back. **Color scale:** click a range on the scale (e.g. "≤ −10" or "±1") to show only the coins in that color band. It combines with the filter buttons; click the range again, or **All coins**, to show everything.
 
-**Sources health.** A line at the foot of every page shows which data sources are working: CoinGecko (crypto prices and rankings), the exchanges (daily candles and volume), the ECB, exchange-api, Swissquote (with the metals cross-check), Yahoo Finance (energy futures) and TradingView (chart links). ✓ working, ⚠ working on a backup, partly or a bit late, ✕ not working; hover for details. It is built at the end of every deploy from the files just made (`scripts/health.mjs` → `health.json`), so it costs no extra requests.
+**Sources health.** A line at the foot of every page shows which data sources are working: CoinGecko (crypto prices and rankings), the exchanges (daily candles and volume), the ECB, exchange-api, Swissquote (with the metals cross-check), Yahoo Finance (energy futures), the official bond yield sources and TradingView (chart links). ✓ working, ⚠ working on a backup, partly or a bit late, ✕ not working; hover for details. It is built at the end of every deploy from the files just made (`scripts/health.mjs` → `health.json`), so it costs no extra requests.
 
 **Heatmap | Detailed.** In grid view, the default **Heatmap** tiles are filled with their heat colour and show just the symbol, the change and the price, like a classic market heatmap (3 per row on a phone, about 8 on a laptop); the ⚠ caution and a 🛑 for a close past a stop stay, and hover or tap opens the chart card with every reading. **Detailed** shows the full tiles (RSI, trend, relative strength, volume, stops). The choice is remembered, and links carry `d=detailed` / `d=heatmap`. Heat colours: blue up, red down, a soft grey for flat, stronger shades for bigger moves (in dark mode, deep for small moves and bright for big ones). The page uses the Inter typeface, hosted on the site itself (no calls to Google), and a tile blinks once when its price changes.
 
@@ -89,9 +89,9 @@ Statistics cap moves at ±30% a day (wider for 3 and 7 days), so a bad price pri
 
 ## Forex: heat.sala.company/forex/
 
-The same heatmap for **48 currencies against the US dollar**. The **🪙 Crypto | 💱 Forex | 🥇 Metals | 🛢️ Energy** switch at the start of the controls row moves between the pages.
+The same heatmap for **48 currencies against the US dollar**. The **🪙 Crypto | 💱 Forex | 🥇 Metals | 🛢️ Energy | 📈 Rates** switch at the start of the controls row moves between the pages.
 
-- **It's the same page.** `/forex/` (and `/metals/`, `/energy/`) is made from `index.html` at deploy (`scripts/market-page.mjs`), with only the search tags, the About/FAQ text and the source credits swapped in (`seo/forex-*.html`, `seo/metals-*.html`, `seo/energy-*.html`). The page picks its market from its address, and everything market-specific sits in one `MARKETS` settings block at the top of the page script. So any change to tiles, popups, filters, the scorecard or the engine shows on every page.
+- **It's the same page.** `/forex/` (and `/metals/`, `/energy/`, `/rates/`) is made from `index.html` at deploy (`scripts/market-page.mjs`), with only the search tags, the About/FAQ text and the source credits swapped in (`seo/forex-*.html`, `seo/metals-*.html`, `seo/energy-*.html`, `seo/rates-*.html`). The page picks its market from its address, and everything market-specific sits in one `MARKETS` settings block at the top of the page script. So any change to tiles, popups, filters, the scorecard or the engine shows on every page.
 - **Rates:** official **ECB euro reference rates** (via the Frankfurter API) for 29 currencies, set once per business day around 14:15 Frankfurt time, with history back to 1999. Currencies the ECB doesn't publish (the ruble, the Gulf and other Arab currencies, the rial, the Syrian pound) come from the public-domain **exchange-api** feed and get the **?** mark. ECB rates get **✓**. Weekends have no rates, so charts and indicators use business days.
 - **Quoting:** every pair **dollar first** by default (USD/EUR, USD/GBP, USD/JPY…), so all tiles read the same way: blue means the dollar gained against that currency. The **USD/… | …/USD** switch flips every pair to **currency first** (EUR/USD, GBP/USD, JPY/USD…), where blue means that currency gained. Rates, charts, stops and 🚀/😢 are all recalculated from the flipped history. `forex.json` and the Scorecard are always USD/… (the Scorecard says so in the …/USD view). Note that brokers quote EUR, GBP, AUD and NZD currency first (EUR/USD) and most other currencies dollar first (USD/JPY).
 - **Flags:** real flag emoji on phones and Macs; on Windows, which has none, a small country-code badge (EU, JP …) instead.
@@ -122,6 +122,16 @@ Oil, refined products and natural gas, from the futures markets where their pric
 - **No scorecard and no tuner** (six assets); the crypto signal settings are used, as on the metals page.
 - `scripts/build-energy.mjs` fetches the full two-year history hourly and only the last 5 days in between (6 small requests per build). A contract Yahoo doesn't answer for keeps its last price with a **?** ("not refreshed"); if Yahoo fails altogether, the last good `energy.json` is republished. The sources health line has a Yahoo Finance entry, judged by the newest quote's age while the markets trade.
 
+## Rates: heat.sala.company/rates/
+
+Government bond **yield curves** for the **United States, euro area, United Kingdom, Japan, Canada and Morocco**: each market's 10-year yield and its change in basis points (1d / 1w / 1m), whether its curve is healthy, every curve on one chart, and the chosen market's curve now vs a week, a month and a year ago with two years of slope history.
+
+- **Official sources only,** published once a business day after the close (some a few days late, so each market shows its own date): US Treasury par yield curve, ECB curve of AAA-rated euro area government bonds, Bank of England (Bank Rate plus the 5, 10 and 20-year gilt yields, the free daily series), Japan's Ministry of Finance, Bank of Canada benchmark yields, and Bank Al-Maghrib's daily reference curve for Moroccan Treasury bonds. Live yields exist only on unofficial feeds whose terms don't allow republishing, so they aren't used.
+- **Healthy or not:** the slope, 10-year minus 2-year (the UK: minus Bank Rate). **🟢 Normal** at +0.5 pp or more, **🟡 Flat** between 0 and +0.5, **🔴 Inverted** below zero (short rates above long ones; an inverted US curve has come before most US recessions, with varying lead times and no guarantee).
+- **Not included:** the Gulf states (their central banks publish auction results, not a daily curve), China and India (no free official daily feed).
+- **Its own view:** this page isn't a price heatmap, so `app/rates.mjs` draws it (tiles, plain-SVG charts sized to the screen, a `?c=` address for the chosen market); `main.mjs` starts it instead of the price pipeline. Tile colors use the shared scale, in basis points: blue = yields rose.
+- `scripts/build-rates.mjs` runs in the deploy job but refetches only every 3 hours (the sources change once a day). Morocco's past curves are fetched a few dates per run (weekly points back a year) and kept in `rates.json`; from then on it adds each day. A source that fails keeps its last curve, marked late; the sources health line has a **Bond yields** entry.
+
 ## TradingView chart links
 
 In the popup, the logo and name (and a small **TradingView ↗**) open that asset's TradingView chart in a new tab: the exchange pair its candles came from for coins (e.g. `BINANCE:ETHUSDT`), `FX_IDC:USDJPY` or `FX_IDC:JPYUSD` for currencies (following the quote switch), `TVC:GOLD`, `SILVER`, `PLATINUM`, `PALLADIUM` for metals, and the continuous front-month contract for energy (`NYMEX:CL1!`, `ICEEUR:BRN1!`, `NYMEX:HO1!`, `NYMEX:RB1!`, `NYMEX:NG1!`, `ICEENDEX:TFM1!`).
@@ -150,15 +160,16 @@ GitHub Actions: daily 00:20 UTC (via cron-job.org)
 |---|---|
 | `index.html` | The page: HTML, CSS, and its search and link-preview tags |
 | `app/` | The page script, as ES modules: `markets.mjs` (everything market-specific, one adapter per market), `core.mjs` (helpers and state), `data.mjs` (indicators per tile), `render.mjs` (tiles, legend, table), `scorecard.mjs`, `interact.mjs` (popup, hover, clicks, switches) and `main.mjs` (loading and refresh; it starts the page) |
-| `og-image.png`, `og-image-forex.png`, `og-image-metals.png`, `og-image-energy.png`, `robots.txt` | The link-preview images (crypto, forex, metals and energy) and the robots file, published with the site (the deploy job also writes `sitemap.xml`) |
+| `og-image.png`, `og-image-forex.png`, `og-image-metals.png`, `og-image-energy.png`, `og-image-rates.png`, `robots.txt` | The link-preview images (crypto, forex, metals, energy and rates) and the robots file, published with the site (the deploy job also writes `sitemap.xml`) |
 | `scripts/build-forex.mjs` | Builds `forex.json`: the currency list, both rate sources, business-day closes. Reuses the last file and refetches hourly |
 | `scripts/score-forex.mjs` | Daily forex scorecard and weekly tuning |
 | `scripts/build-metals.mjs` | Builds `metals.json` in the deploy job: gold, silver, platinum and palladium (exchange-api history refetched hourly, Swissquote current prices and a daily cross-check every build) plus PAXG, XAUT and Bitcoin copied from `data.json` |
 | `scripts/build-energy.mjs` | Builds `energy.json` in the deploy job: six front-month energy futures from Yahoo Finance (full history hourly, the latest days every build) |
+| `scripts/build-rates.mjs`, `app/rates.mjs` | Builds `rates.json` (official yield curves, refetched every 3 hours) and draws the rates page |
 | `scripts/health.mjs` | Builds `health.json`, the sources health line in every page's footer |
 | `scripts/backfill-universe.mjs`, `data/backfill-cache.json` | One-off: rebuilds the daily top-100 lists before recording began, gently (10 CoinGecko requests a minute, capped, resumable) |
 | `scripts/tradingview.mjs` | TradingView chart links: candidate symbols per asset, checked in the deploy job and cached in `tv.json`; the page imports it to pick the link |
-| `scripts/market-page.mjs`, `seo/` | Makes `/forex/`, `/metals/` and `/energy/` from `index.html`, swapping in each market's search tags, About/FAQ and source credits |
+| `scripts/market-page.mjs`, `seo/` | Makes `/forex/`, `/metals/`, `/energy/` and `/rates/` from `index.html`, swapping in each market's search tags, About/FAQ and source credits |
 | `params-forex.json`, `data/forex-scorecard.json`, `data/forex-extras.json` | Forex signal settings, the latest forex scorecard, and the cached extra-feed rates |
 | `signals.mjs` | The shared signal engine: indicators, 🚀/😢 rules, relative strength and volume, scoring stats, tuner. Used by the page, the scorer and the tuner, so they always agree. |
 | `tests/signals.test.mjs` | Unit tests: RSI against the StockCharts worked example, Bollinger/SMA against hand-computed values, scoring and tuning sanity checks |
@@ -171,7 +182,7 @@ GitHub Actions: daily 00:20 UTC (via cron-job.org)
 | `.github/workflows/update-data.yml` | Builds `data.json` and deploys the site to GitHub Pages every 10 minutes and on every push to `main` |
 | `.github/workflows/score-signals.yml` | Daily scoring (plus Sunday tuning). It commits the results, which also keeps the schedules from being paused for inactivity. |
 | `.github/workflows/test.yml` | Runs the unit tests on every push to any branch |
-| `.github/workflows/freshness.yml`, `scripts/check-fresh.mjs` | **Hourly freshness check** of the live site: fails (and GitHub emails you) if `data.json`, `forex.json`, `metals.json`, `energy.json` or a scorecard stops updating, even when every other job "succeeds" |
+| `.github/workflows/freshness.yml`, `scripts/check-fresh.mjs` | **Hourly freshness check** of the live site: fails (and GitHub emails you) if `data.json`, `forex.json`, `metals.json`, `energy.json`, `rates.json` or a scorecard stops updating, even when every other job "succeeds" |
 | `data/universe-history.json` | Each day's top-100 list, for the point-in-time scorecard |
 | `.github/workflows/e2e.yml` | **Browser tests** (Playwright, headless Chrome) on every push to any branch: no outside API calls, filters, both stop states, the popup (fits a 13-inch screen, opens only on a resting mouse, closes when moving away, stays put when moving onto it, pins and closes), the phone bottom sheet, and the Scorecard view |
 | `tests/e2e/` | The browser tests, deterministic test data (`fixtures.mjs`) and a local server (`serve.mjs`, also `npm run dev`) |

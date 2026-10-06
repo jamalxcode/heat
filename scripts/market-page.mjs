@@ -7,7 +7,7 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 const root = new URL('../', import.meta.url);
-export const PAGES = ['forex', 'metals', 'energy'];   // markets with their own page; crypto is index.html itself
+export const PAGES = ['forex', 'metals', 'energy', 'rates'];   // markets with their own page; crypto is index.html itself
 
 // Replace the block between <!-- NAME:start … --> and <!-- NAME:end --> (markers included) with `block`
 export function swap(html, name, block) {
