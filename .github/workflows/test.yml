@@ -20,3 +20,7 @@ jobs:
         with:
           node-version: 22
       - run: node --test   # finds tests/*.test.mjs
+      # TEMPORARY (rates-more branch only): do the yield sources answer GitHub's servers?
+      - run: |
+          time node scripts/build-rates.mjs /tmp/rates.json
+          curl -s -o /dev/null -w "RBA %{http_code}\n" -A "Mozilla/5.0" https://www.rba.gov.au/statistics/tables/csv/f2.1-data.csv || true
