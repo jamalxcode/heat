@@ -254,6 +254,39 @@ button.sc-chip:hover, button.sc-chip[aria-expanded="true"] { box-shadow: inset 0
 .metal-diesel { background: radial-gradient(circle at 35% 30%, #ffe08a, #e0a526 60%, #a36d0b); font-size: 7.5px; }
 .metal-gasoline { background: radial-gradient(circle at 35% 30%, #ffb3a6, #e0533d 60%, #a32a17); color: #fff; font-size: 7.5px; }
 .metal-natgas, .metal-ttf { background: radial-gradient(circle at 35% 30%, #bfe3ff, #3d8fe0 60%, #1b5ea3); color: #fff; font-size: 7.5px; }
+/* rates page (app/rates.mjs): yield tiles, curve charts and the chosen market's card */
+.r-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 0 0 10px; font-size: 12px; color: var(--ink-2); }
+.r-bar .scale span { display: inline-block; padding: 1px 6px; border-radius: 4px; background: var(--tint, var(--neutral)); color: var(--tint-ink, var(--ink)); margin: 0 1px; }
+.rgrid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr)); }
+.rtile { all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; border-radius: 12px; overflow: hidden; background: var(--surface); box-shadow: inset 0 0 0 1px var(--border); transition: transform .12s; }
+.rtile:hover { transform: translateY(-1px); }
+.rtile:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.rtile.sel { box-shadow: inset 0 0 0 2px var(--ink); }
+.rt-top { background: var(--tint, var(--neutral)); color: var(--tint-ink, var(--ink)); padding: 10px 12px 9px; display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: baseline; }
+.rt-name { display: flex; align-items: center; gap: 6px; font-size: 15px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rt-chg { font-weight: 800; font-size: 17px; font-variant-numeric: tabular-nums; }
+.rt-y { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.rt-yl { font-size: 11px; font-weight: 600; opacity: .75; }
+.rt-date { font-size: 11px; opacity: .75; text-align: right; }
+.rt-bot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 8px; padding: 8px 12px; font-size: 12px; color: var(--ink-2); }
+.rt-state { font-weight: 700; color: var(--ink); white-space: nowrap; }
+.rt-slope { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.r-card { margin-top: 14px; border-radius: 12px; box-shadow: inset 0 0 0 1px var(--border); background: var(--surface); padding: 14px 16px; }
+.r-card h2 { font-size: 16px; margin: 0 0 8px; display: flex; align-items: center; gap: 8px; }
+.r-card h3 { font-size: 13px; margin: 14px 0 4px; }
+.r-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.r-says { margin: 4px 0 8px; font-size: 13px; line-height: 1.5; }
+.r-chart { width: 100%; height: auto; display: block; }
+.r-keys { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink-2); margin-top: 6px; }
+.r-key { display: inline-flex; align-items: center; gap: 6px; }
+.r-pick { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; padding: 2px 6px; border-radius: 6px; }
+.r-pick.on { background: var(--neutral); color: var(--ink); font-weight: 700; }
+.r-muted { color: var(--muted); font-weight: 400; font-size: 12px; }
+.r-src { font-size: 12px; color: var(--ink-2); margin: 10px 0 0; }
+.r-table table { border-collapse: collapse; font-size: 12px; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.r-table th, .r-table td { padding: 3px 10px 3px 0; text-align: right; }
+.r-table th:first-child, .r-table td:first-child { text-align: left; }
+.r-table summary { cursor: pointer; font-size: 12px; margin-top: 10px; color: var(--ink-2); }
 .flag-code { flex: none; display: inline-grid; place-items: center; min-width: 20px; height: 15px; padding: 0 2px; border-radius: 3px; font-size: 9px; font-weight: 800; letter-spacing: .02em; line-height: 1; color: var(--ink); background: color-mix(in oklab, var(--surface) 70%, transparent); box-shadow: inset 0 0 0 1px var(--axis); }   /* where flag emoji are missing (Windows) */
 .chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .chip { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 3px 7px; cursor: pointer; font-size: 12.5px; color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; }
@@ -288,6 +321,9 @@ button.sc-chip:hover, button.sc-chip[aria-expanded="true"] { box-shadow: inset 0
 /* phones: filter chips become one swipeable row, and the top bar, controls and scale tighten up */
 @media (max-width: 640px) {
   .controls .ctl { flex: 1 1 100%; min-width: 0; }
+  .seg.market { max-width: 100%; overflow-x: auto; scrollbar-width: none; }   /* five markets: swipe sideways if they don't fit */
+  .seg.market::-webkit-scrollbar { display: none; }
+  .seg.market a { flex: none; }
   .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
   .chips::-webkit-scrollbar { display: none; }
   .chip { flex: none; }
@@ -541,6 +577,7 @@ footer .about p { margin: 0; }
       <a href="/forex/" data-m="forex">💱 Forex</a>
       <a href="/metals/" data-m="metals">🥇 Metals</a>
       <a href="/energy/" data-m="energy">🛢️ Energy</a>
+      <a href="/rates/" data-m="rates">📈 Rates</a>
     </nav>
     <div class="seg" id="colorBy" role="group" aria-label="Color by">
       <button data-v="24h" aria-pressed="true" title="Color by 24h change">24h</button>

@@ -125,6 +125,14 @@ MARKETS.energy = {
     + (late ? ' · <b>⚠ this update is running late</b>' : '') + '</span>' + linkYahoo,
 };
 
-export const MARKET = ['forex', 'metals', 'energy'].find(m => location.pathname.startsWith('/' + m)) || 'crypto';
+// Rates: government bond yield curves (scripts/build-rates.mjs). Not prices, so the page draws its own view (app/rates.mjs)
+// instead of the tile pipeline; these settings only label the shared controls and set the color scale (in basis points).
+MARKETS.rates = {
+  ...MARKETS.metals,
+  key: 'rates', data: '/rates.json', custom: true, noun: 'markets', one: 'market', nameCol: 'Market',
+  bins: { '1d': [2, 5, 10, 20], '1w': [5, 12, 25, 40], '1m': [10, 25, 50, 80] },
+};
+
+export const MARKET = ['forex', 'metals', 'energy', 'rates'].find(m => location.pathname.startsWith('/' + m)) || 'crypto';
 export const M = MARKETS[MARKET];
 export const TF = tf => M.label[tf];                       // what a timeframe is called on this market (24h / 1d …)

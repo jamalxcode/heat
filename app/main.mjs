@@ -140,9 +140,14 @@ export async function run() {
     tick();
   }
 }
-run();
-// TradingView symbols known to exist (checked at deploy by scripts/tradingview.mjs), for the popup's chart link.
-// Without it the popup just has no link.
-fetch('/tv.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).then(j => { S.tv = j?.sym || null; }).catch(() => {});
-setInterval(tick, 1000);
-document.addEventListener('visibilitychange', tick);
+if (M.custom) {
+  // the rates page has its own view (app/rates.mjs): none of the price pipeline below runs there
+  import('./rates.mjs').then(r => r.start());
+} else {
+  run();
+  // TradingView symbols known to exist (checked at deploy by scripts/tradingview.mjs), for the popup's chart link.
+  // Without it the popup just has no link.
+  fetch('/tv.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).then(j => { S.tv = j?.sym || null; }).catch(() => {});
+  setInterval(tick, 1000);
+  document.addEventListener('visibilitychange', tick);
+}
