@@ -124,13 +124,13 @@ Oil, refined products and natural gas, from the futures markets where their pric
 
 ## Rates: heat.sala.company/rates/
 
-Government bond **yield curves** for the **United States, euro area, United Kingdom, Japan, Canada and Morocco**: each market's 10-year yield and its change in basis points (1d / 1w / 1m), whether its curve is healthy, every curve on one chart, and the chosen market's curve now vs a week, a month and a year ago with two years of slope history.
+Government bond **yield curves** for the **United States, euro area, United Kingdom, Japan and Canada**: each market's 10-year yield and its change in basis points (1d / 1w / 1m), whether its curve is healthy, every curve on one chart, and the chosen market's curve now vs a week, a month and a year ago with two years of slope history.
 
-- **Official sources only,** published once a business day after the close (some a few days late, so each market shows its own date): US Treasury par yield curve, ECB curve of AAA-rated euro area government bonds, Bank of England (Bank Rate plus the 5, 10 and 20-year gilt yields, the free daily series), Japan's Ministry of Finance, Bank of Canada benchmark yields, and Bank Al-Maghrib's daily reference curve for Moroccan Treasury bonds. Live yields exist only on unofficial feeds whose terms don't allow republishing, so they aren't used.
+- **Official sources only,** published once a business day after the close (some a few days late, so each market shows its own date): US Treasury par yield curve, ECB curve of AAA-rated euro area government bonds, Bank of England (Bank Rate plus the 5, 10 and 20-year gilt yields, the free daily series), Japan's Ministry of Finance and Bank of Canada benchmark yields. Live yields exist only on unofficial feeds whose terms don't allow republishing, so they aren't used.
 - **Healthy or not:** the slope, 10-year minus 2-year (the UK: minus Bank Rate). **🟢 Normal** at +0.5 pp or more, **🟡 Flat** between 0 and +0.5, **🔴 Inverted** below zero (short rates above long ones; an inverted US curve has come before most US recessions, with varying lead times and no guarantee).
-- **Not included:** the Gulf states (their central banks publish auction results, not a daily curve), China and India (no free official daily feed).
+- **Not included:** the Gulf states (their central banks publish auction results, not a daily curve), China and India (no free official daily feed), Morocco (Bank Al-Maghrib publishes a daily curve, but its website refuses requests from cloud servers such as GitHub's).
 - **Its own view:** this page isn't a price heatmap, so `app/rates.mjs` draws it (tiles, plain-SVG charts sized to the screen, a `?c=` address for the chosen market); `main.mjs` starts it instead of the price pipeline. Tile colors use the shared scale, in basis points: blue = yields rose.
-- `scripts/build-rates.mjs` runs in the deploy job but refetches only every 3 hours (the sources change once a day). Morocco's past curves are fetched a few dates per run (weekly points back a year) and kept in `rates.json`; from then on it adds each day. A source that fails keeps its last curve, marked late; the sources health line has a **Bond yields** entry.
+- `scripts/build-rates.mjs` runs in the deploy job but refetches only every 3 hours (the sources change once a day). A source that fails keeps its last curve, marked late; the sources health line has a **Bond yields** entry.
 
 ## TradingView chart links
 

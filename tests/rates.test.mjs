@@ -1,12 +1,12 @@
 // Unit tests for the rates page data (scripts/build-rates.mjs). Run: node --test tests/
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { COUNTRIES, interp, parseUS, parseECB, parseBoE, parseMOF, parseBoC, parseBAM, summarize, slopeState, build } from '../scripts/build-rates.mjs';
+import { COUNTRIES, interp, parseUS, parseECB, parseBoE, parseMOF, parseBoC, summarize, slopeState, build } from '../scripts/build-rates.mjs';
 import { health } from '../scripts/health.mjs';
 import { dayNum, DAY } from '../scripts/build-forex.mjs';
 
-test('the markets: US, euro area, UK, Japan, Canada, Morocco; the UK slope uses Bank Rate', () => {
-  assert.deepEqual(COUNTRIES.map(c => c.id), ['us', 'ea', 'uk', 'jp', 'ca', 'ma']);
+test('the markets: US, euro area, UK, Japan, Canada; the UK slope uses Bank Rate', () => {
+  assert.deepEqual(COUNTRIES.map(c => c.id), ['us', 'ea', 'uk', 'jp', 'ca']);
   assert.equal(COUNTRIES.find(c => c.id === 'uk').short, 'Bank Rate');
   assert.ok(COUNTRIES.every(c => c.src && c.srcUrl.startsWith('https://')));
 });
@@ -49,14 +49,6 @@ test('parsers: each official format to curves by day (tenors in years)', () => {
 
   const boc = parseBoC({ observations: [{ d: '2026-10-02', 'BD.CDN.2YR.DQ.YLD': { v: '3.25' }, 'BD.CDN.5YR.DQ.YLD': { v: '3.5' }, 'BD.CDN.10YR.DQ.YLD': { v: '3.93' }, 'BD.CDN.LONG.DQ.YLD': { v: '4.2' } }] });
   assert.deepEqual(boc.get(dayNum('2026-10-02')), [[2, 3.25], [5, 3.5], [10, 3.93], [30, 4.2]]);
-
-  const row = (mat, y) => `<tr><td>${mat}</td><td><span class="number">0,00</sapn>&nbsp;</td><td><span class="number">${y}</sapn>&nbsp;<span class="symbol">%</span></td><td>05/10/2026</td></tr>`;
-  const bam = parseBAM(`<table>${row('16/11/2026', '2,130')}${row('15/02/2027', '2,210')}${row('14/02/2028', '2,430')}${row('18/06/2035', '3,280')}${row('19/04/2055', '4,280')}</table>`);
-  assert.equal(bam.day, dayNum('2026-10-05'));
-  assert.equal(bam.pts.length, 5);
-  assert.equal(bam.pts[0][1], 2.13);
-  assert.ok(Math.abs(bam.pts.at(-1)[0] - 28.54) < 0.01, 'years to maturity');
-  assert.equal(parseBAM('<p>Aucun enregistrement trouvé.</p>'), null);
 });
 
 // curves by day: a gently steepening curve, 10-year at 4% + i * 0.001

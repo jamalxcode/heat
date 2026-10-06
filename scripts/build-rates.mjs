@@ -7,9 +7,8 @@
 //   UK         Bank of England: Bank Rate plus the 5, 10 and 20-year nominal par gilt yields (the free daily series)
 //   Japan      Ministry of Finance JGB yields (1 … 40 years): the full history file plus this month's file
 //   Canada     Bank of Canada benchmark bond yields (2 … 30 years)
-//   Morocco    Bank Al-Maghrib's reference curve of Treasury bonds (3 months … 30 years), one page per date: today,
-//              plus weekly dates back a year, a few per run, kept in rates.json so they're fetched once
-// Not included: the Gulf states publish auction results, not a daily curve; China and India have no free official feed.
+// Not included: the Gulf states publish auction results, not a daily curve; China and India have no free official feed;
+// Morocco's Bank Al-Maghrib publishes a daily curve, but its website refuses requests from cloud servers like GitHub's.
 // Health: the curve's slope, 10-year minus 2-year (UK: minus Bank Rate). Long rates normally sit above short ones; an
 // inverted curve (short above long) has come before most US recessions. ≥ 0.5 pp normal, 0 to 0.5 flat, < 0 inverted.
 import { isoDay, dayNum, DAY } from './build-forex.mjs';
@@ -25,7 +24,6 @@ export const COUNTRIES = [
   { id: 'uk', name: 'United Kingdom', flag: '🇬🇧', badge: 'GB', src: 'Bank of England', srcUrl: 'https://www.bankofengland.co.uk/boeapps/database/', short: 'Bank Rate' },
   { id: 'jp', name: 'Japan', flag: '🇯🇵', badge: 'JP', src: 'Ministry of Finance Japan', srcUrl: 'https://www.mof.go.jp/english/policy/jgbs/reference/interest_rate/index.htm', short: '2y' },
   { id: 'ca', name: 'Canada', flag: '🇨🇦', badge: 'CA', src: 'Bank of Canada', srcUrl: 'https://www.bankofcanada.ca/rates/interest-rates/canadian-bonds/', short: '2y' },
-  { id: 'ma', name: 'Morocco', flag: '🇲🇦', badge: 'MA', src: 'Bank Al-Maghrib', srcUrl: 'https://www.bkam.ma/Marches/Principaux-indicateurs/Marche-obligataire/Marche-des-bons-de-tresor/Marche-secondaire/Taux-de-reference-des-bons-du-tresor', short: '2y' },
 ];
 
 /* ---------- helpers ---------- */
@@ -106,21 +104,6 @@ export function parseBoC(json) {
   }
   return out;
 }
-// Bank Al-Maghrib page: rows of maturity date, volume, "2,130 %", value date (DD/MM/YYYY). Tenor = years to maturity.
-export function parseBAM(html) {
-  const text = String(html).replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ');
-  const re = /(\d\d)\/(\d\d)\/(\d{4}) [\d\s.,]*? (\d+,\d+) ?% (\d\d)\/(\d\d)\/(\d{4})/g, pts = new Map();
-  let m, day = null;
-  while ((m = re.exec(text))) {
-    const mat = dayNum(`${m[3]}-${m[2]}-${m[1]}`), val = dayNum(`${m[7]}-${m[6]}-${m[5]}`);
-    if (!(mat > val)) continue;
-    day ??= val;
-    if (val !== day) continue;
-    pts.set((mat - val) / 365.25, +m[4].replace(',', '.'));
-  }
-  const p = sortPts(pts);
-  return day != null && p.length >= 5 ? { day, pts: p } : null;
-}
 
 /* ---------- fetchers ---------- */
 const FETCH = {
@@ -150,13 +133,6 @@ const FETCH = {
     return parseBoC(JSON.parse(await getText(`https://www.bankofcanada.ca/valet/observations/group/bond_yields_benchmark/json?start_date=${isoDay(today - SERIES_DAYS - 10)}`, fetchFn)));
   },
 };
-const BAM_URL = COUNTRIES.find(c => c.id === 'ma').srcUrl;
-const BAM_BLOCK = 'e1d6b9bbf87f86f8ba53e8518e882982';
-const ddmmyyyy = d => { const [y, m, dd] = isoDay(d).split('-'); return `${dd}%2F${m}%2F${y}`; };
-export async function fetchBAM(day, fetchFn) {
-  const html = await getText(day == null ? BAM_URL : `${BAM_URL}?date=${ddmmyyyy(day)}&block=${BAM_BLOCK}`, fetchFn);
-  return parseBAM(html);
-}
 
 /* ---------- from curves by day to what the page shows ---------- */
 // short leg of the slope: the 2-year (interpolated), or the UK's Bank Rate (tenor 0)
@@ -187,42 +163,6 @@ export function summarize(c, days, now) {
     series: { t0: ds[0] * DAY, d, y10, ys },
   };
 }
-// back from a summary to curves by day (only the days kept: the series' 10-year and short points, plus the snapshots)
-// — used for Morocco, whose history is built up run by run
-function daysFromSummary(c, s) {
-  const days = new Map();
-  if (!s?.series) return days;
-  const d0 = Math.floor(s.series.t0 / DAY), shortT = c.short === 'Bank Rate' ? 0 : 2;
-  s.series.d.forEach((o, i) => { const p = [[10, s.series.y10[i]]]; if (s.series.ys[i] != null) p.unshift([shortT, s.series.ys[i]]); days.set(d0 + o, p); });
-  for (const snap of [s.curve && { date: s.date, pts: s.curve }, ...Object.values(s.then || {})]) if (snap) days.set(dayNum(snap.date), snap.pts);
-  return days;
-}
-
-const BAM_PER_RUN = 8;                  // past dates asked per run (2 a week, for a year: done within a few hours)
-async function moroccoDays(prev, fetchFn, today, log) {
-  const c = COUNTRIES.find(x => x.id === 'ma');
-  const days = daysFromSummary(c, prev);
-  const latest = await fetchBAM(null, fetchFn);
-  if (latest) days.set(latest.day, latest.pts);
-  // weekly dates back a year, plus the exact 1-week, 1-month and 1-year comparison dates, oldest gaps first
-  // (the page has nothing for a weekend or a holiday: weekends move to the Friday, a holiday to the day before)
-  const anchor = latest?.day ?? today;
-  const weekday = d => { const w = new Date(d * DAY).getUTCDay(); return w === 6 ? d - 1 : w === 0 ? d - 2 : d; };
-  const want = new Set([anchor - 7, anchor - 30, anchor - 365].map(weekday));
-  for (let k = 7; k <= 371; k += 7) want.add(weekday(anchor - k));
-  const have = d => { for (let j = d; j >= d - 3; j--) if (days.has(j) && days.get(j).length > 2) return true; return false; };
-  const missing = [...want].filter(d => !have(d)).sort((a, b) => b - a).slice(0, BAM_PER_RUN);
-  let got = 0;
-  for (const d of missing) {
-    try {
-      const r = await fetchBAM(d, fetchFn) || await fetchBAM(weekday(d - 1), fetchFn);
-      if (r) { days.set(r.day, r.pts); got++; }
-    } catch { break; }
-  }
-  if (missing.length) log(`Rates: Bank Al-Maghrib ${got}/${missing.length} past dates fetched`);
-  return days;
-}
-
 export async function build({ prev = null, log = console.log, now = Date.now(), fetchFn = fetch, force = false } = {}) {
   const same = prev?.market === 'rates' && prev?.fmt === FMT;
   if (same && !force && now - (prev.fetched || 0) < REFETCH) return { ...prev, generated: now };
@@ -230,7 +170,7 @@ export async function build({ prev = null, log = console.log, now = Date.now(), 
   const prevOf = id => same ? prev.countries.find(c => c.id === id) : null;
   for (const c of COUNTRIES) {
     try {
-      const days = c.id === 'ma' ? await moroccoDays(prevOf('ma'), fetchFn, today, log) : await FETCH[c.id](fetchFn, today);
+      const days = await FETCH[c.id](fetchFn, today);
       const s = summarize(c, days, now);
       if (!s) throw new Error('no data');
       out.push(s);

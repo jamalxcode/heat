@@ -12,7 +12,7 @@ const STATE = {
   flat: { icon: '🟡', label: 'Flat', note: 'long and short rates close together: often a late-cycle sign' },
   inverted: { icon: '🔴', label: 'Inverted', note: 'short-term rates above long-term ones: this has come before most US recessions' },
 };
-const COLORS = { us: '#2f6fd0', ea: '#2f9e6a', uk: '#d0453b', jp: '#c9971a', ca: '#8a5cd0', ma: '#e0782a' };
+const COLORS = { us: '#2f6fd0', ea: '#2f9e6a', uk: '#d0453b', jp: '#c9971a', ca: '#8a5cd0' };
 let R = null, tf = (store.get('hm.ratesTf') || '1d'), sel = null, loadedAt = 0;
 
 const fmtY = v => v == null ? '—' : v.toFixed(2) + '%';
@@ -104,7 +104,7 @@ function detailHTML(c) {
   ].filter(Boolean);
   const key = lines.map(l => `<span class="r-key"><svg width="22" height="8" aria-hidden="true"><line x1="0" x2="22" y1="4" y2="4" stroke="${l.color}" stroke-width="${l.width}"${l.dash && l.dash !== '1 0' ? ` stroke-dasharray="${l.dash}"` : ''}${l.faint ? ' opacity=".55"' : ''}/></svg>${esc(l.label)}</span>`).join('');
   const tenors = c.curve.map(p => p[0]);
-  // the yield at maturity t on a curve, straight line between its points (Morocco's maturities shift a little day to day)
+  // the yield at maturity t on a curve, straight line between its points (in case a past curve lacks one of today's maturities)
   const at = (snap, t) => { const p = snap?.pts; if (!p?.length || t < p[0][0] - 1e-6 || t > p[p.length - 1][0] + 1e-6) return null; const i = p.findIndex(q => q[0] >= t - 1e-6); return Math.abs(p[i][0] - t) < 1e-6 ? p[i][1] : p[i - 1][1] + (p[i][1] - p[i - 1][1]) * (t - p[i - 1][0]) / (p[i][0] - p[i - 1][0]); };
   const rows = tenors.map(t => { const now = at({ pts: c.curve }, t), m = at(c.then?.m1, t), y = at(c.then?.y1, t);
     return `<tr><td>${t === 0 ? 'Bank Rate' : tenorLabel(t)}</td><td>${fmtY(now)}</td><td>${m == null ? '—' : fmtBp((now - m) * 100)}</td><td>${y == null ? '—' : fmtBp((now - y) * 100)}</td></tr>`; }).join('');
