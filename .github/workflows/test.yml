@@ -22,10 +22,3 @@ jobs:
       - run: node --test   # finds tests/*.test.mjs
       # TEMPORARY (rates branch only): do the official yield sources answer GitHub's servers?
       - run: node scripts/build-rates.mjs /tmp/rates.json
-      - run: |
-          U="https://www.bkam.ma/Marches/Principaux-indicateurs/Marche-obligataire/Marche-des-bons-de-tresor/Marche-secondaire/Taux-de-reference-des-bons-du-tresor"
-          curl -s -o /dev/null -w "plain UA %{http_code}\n" -A "Mozilla/5.0" "$U" || true
-          curl -s -o /dev/null -w "full browser headers %{http_code}\n" -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36" -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" -H "Accept-Language: fr-FR,fr;q=0.9,en;q=0.8" "$U" || true
-          curl -s -o /dev/null -w "english page %{http_code}\n" -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36" -H "Accept: text/html" "https://www.bkam.ma/en" || true
-          curl -s -o /dev/null -w "home %{http_code}\n" "https://www.bkam.ma/" || true
-          curl -s -D - -o /dev/null -A "Mozilla/5.0" "$U" | head -12 || true
