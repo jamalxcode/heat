@@ -7,6 +7,7 @@
 //   UK         Bank of England: Bank Rate plus the 5, 10 and 20-year nominal par gilt yields (the free daily series)
 //   Japan      Ministry of Finance JGB yields (1 … 40 years): the full history file plus this month's file
 //   Canada     Bank of Canada benchmark bond yields (2 … 30 years)
+//   Australia  Reserve Bank table F2: government bond yields at 2, 3, 5 and 10 years
 //   Germany    Bundesbank fitted curve of listed federal securities (1 … 30 years)
 //   Switzerl.  Swiss National Bank spot rates of Confederation bonds (1 … 30 years)
 //   Sweden     Riksbank: Treasury bills and government bonds (3 months … 10 years); its open API allows a few requests a minute
@@ -14,8 +15,8 @@
 //   Brazil     National Treasury, Tesouro Direto fixed-rate bonds by maturity date (one ~15 MB file, fetched every 12 hours)
 //   S. Africa  Reserve Bank: Treasury bill tenders (3 … 12 months) and average bond yields by maturity band (5–10, 10+ years)
 // Not included: the Gulf states publish auction results, not a daily curve; China, India, France, Italy and Spain have no
-// free official daily feed; Australia's central bank and Morocco's Bank Al-Maghrib (which does publish a daily curve)
-// refuse requests from cloud servers like GitHub's.
+// free official daily feed; Morocco's Bank Al-Maghrib publishes a daily curve, but its website refuses requests from
+// cloud servers like GitHub's. (The RBA's site is the other way round: it blocks home connections, not GitHub's.)
 // Health: the curve's slope, 10-year minus 2-year (UK: minus Bank Rate; South Africa: minus the 3-month bill). Long
 // rates normally sit above short ones; an inverted curve (short above long) has come before most US recessions.
 // ≥ 0.5 pp normal, 0 to 0.5 flat, < 0 inverted.
@@ -38,6 +39,8 @@ export const COUNTRIES = [
     note: 'The free daily series has the 5, 10 and 20-year gilt yields; the short end is the Bank Rate.' },
   { id: 'jp', name: 'Japan', flag: '🇯🇵', badge: 'JP', src: 'Ministry of Finance Japan', srcUrl: 'https://www.mof.go.jp/english/policy/jgbs/reference/interest_rate/index.htm', short: '2y' },
   { id: 'ca', name: 'Canada', flag: '🇨🇦', badge: 'CA', src: 'Bank of Canada', srcUrl: 'https://www.bankofcanada.ca/rates/interest-rates/canadian-bonds/', short: '2y' },
+  { id: 'au', name: 'Australia', flag: '🇦🇺', badge: 'AU', src: 'Reserve Bank of Australia', srcUrl: 'https://www.rba.gov.au/statistics/tables/#interest-rates', short: '2y',
+    note: 'The Reserve Bank publishes the 2, 3, 5 and 10-year government bond yields.' },
   { id: 'ch', name: 'Switzerland', flag: '🇨🇭', badge: 'CH', src: 'Swiss National Bank', srcUrl: 'https://data.snb.ch/en/topics/ziredev', short: '2y',
     note: 'Spot rates of Swiss Confederation bonds.' },
   { id: 'se', name: 'Sweden', flag: '🇸🇪', badge: 'SE', src: 'Sveriges Riksbank', srcUrl: 'https://www.riksbank.se/en-gb/statistics/interest-rates-and-exchange-rates/', short: '2y' },
@@ -164,6 +167,17 @@ export function mergeSARB(bills, bonds) {
   }
   return out;
 }
+// RBA table F2 csv: title rows, then 'Series ID', then DD-Mon-YYYY,2y,3y,5y,10y,indexed (the indexed bond is left out)
+export function parseRBA(text) {
+  const lines = String(text).replace(/^\uFEFF/, '').split(/\r?\n/), hi = lines.findIndex(l => l.startsWith('Series ID'));
+  if (hi < 0) return new Map();
+  const tenors = [2, 3, 5, 10], rows = [];
+  for (const l of lines.slice(hi + 1)) {
+    const [date, ...v] = l.split(','), d = Math.floor(Date.parse(date.replace(/-/g, ' ') + ' UTC') / DAY);
+    tenors.forEach((t, i) => rows.push([d, t, v[i] === '' || v[i] == null ? NaN : +v[i]]));
+  }
+  return byDay(rows, 4);
+}
 // Tesouro Direto csv: Tipo Titulo;Data Vencimento;Data Base;Taxa Compra Manha;… (dates DD/MM/YYYY, decimal commas).
 // The fixed-rate bonds only (Prefixado, with and without coupons), as years to maturity; from day `since` on
 export function parseTesouro(text, since = 0) {
@@ -218,6 +232,10 @@ const FETCH = {
   async de(fetchFn, today) {
     const keys = ['01', '02', '03', '05', '07', '10', '15', '20', '30'].map(n => `R${n}XX`).join('+');
     return parseBBK(await getText(`https://api.statistiken.bundesbank.de/rest/data/BBSIS/D.I.ZST.ZI.EUR.S1311.B.A604.${keys}.R.A.A._Z._Z.A?startPeriod=${isoDay(today - SERIES_DAYS - 10)}&format=sdmx_csv`, fetchFn, { timeout: 90e3 }));
+  },
+  async au(fetchFn, today) {
+    const all = parseRBA(await getText('https://www.rba.gov.au/statistics/tables/csv/f2-data.csv', fetchFn, { timeout: 60e3 }));
+    return new Map([...all].filter(([d]) => d >= today - SERIES_DAYS - 10));
   },
   async ch(fetchFn, today) {
     return parseSNB(await getText(`https://data.snb.ch/api/cube/rendeiduebd/data/csv/en?fromDate=${isoDay(today - SERIES_DAYS - 10)}&dimSel=D0(CHF)`, fetchFn, { timeout: 60e3 }));

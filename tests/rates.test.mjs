@@ -1,12 +1,12 @@
 // Unit tests for the rates page data (scripts/build-rates.mjs). Run: node --test tests/
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { COUNTRIES, interp, parseUS, parseECB, parseBoE, parseMOF, parseBoC, parseBBK, parseSNB, parseNB, mergeSeries, mergeSARB, parseTesouro, summarize, slopeState, build } from '../scripts/build-rates.mjs';
+import { COUNTRIES, interp, parseUS, parseECB, parseBoE, parseMOF, parseBoC, parseRBA, parseBBK, parseSNB, parseNB, mergeSeries, mergeSARB, parseTesouro, summarize, slopeState, build } from '../scripts/build-rates.mjs';
 import { health } from '../scripts/health.mjs';
 import { dayNum, DAY } from '../scripts/build-forex.mjs';
 
-test('the eleven markets; the UK slope uses Bank Rate, South Africa the 3-month bill', () => {
-  assert.deepEqual(COUNTRIES.map(c => c.id), ['us', 'ea', 'de', 'uk', 'jp', 'ca', 'ch', 'se', 'no', 'br', 'za']);
+test('the twelve markets; the UK slope uses Bank Rate, South Africa the 3-month bill', () => {
+  assert.deepEqual(COUNTRIES.map(c => c.id), ['us', 'ea', 'de', 'uk', 'jp', 'ca', 'au', 'ch', 'se', 'no', 'br', 'za']);
   assert.equal(COUNTRIES.find(c => c.id === 'za').short, '3m');
   assert.equal(COUNTRIES.find(c => c.id === 'uk').short, 'Bank Rate');
   assert.ok(COUNTRIES.every(c => c.src && c.srcUrl.startsWith('https://')));
@@ -52,7 +52,11 @@ test('parsers: each official format to curves by day (tenors in years)', () => {
   assert.deepEqual(boc.get(dayNum('2026-10-02')), [[2, 3.25], [5, 3.5], [10, 3.93], [30, 4.2]]);
 });
 
-test('parsers for the newer sources: Bundesbank, SNB, Norges Bank, Riksbank, Reserve Bank (SA), Tesouro Direto', () => {
+test('parsers for the newer sources: RBA, Bundesbank, SNB, Norges Bank, Riksbank, Reserve Bank (SA), Tesouro Direto', () => {
+  const rba = parseRBA('\uFEFFF2 CAPITAL MARKET YIELDS\nTitle,2 year,3 year,5 year,10 year,Indexed\nSeries ID,FCMYGBAG2D,FCMYGBAG3D,FCMYGBAG5D,FCMYGBAG10D,FCMYGBAGID\n20-May-2013,,,,3.229,1.2\n02-Oct-2026,3.61,3.7,3.92,4.38,2.1\n');
+  assert.deepEqual(rba.get(dayNum('2026-10-02')), [[2, 3.61], [3, 3.7], [5, 3.92], [10, 4.38]], 'the indexed bond left out');
+  assert.equal(rba.has(dayNum('2013-05-20')), false, 'only the 10-year that day');
+
   const bbk = parseBBK('DATAFLOW;BBK_SEIS_MATURITY;TIME_PERIOD;OBS_VALUE\n' + ['01;2.91', '02;3.02', '05;3.2', '10;3.51', '30;3.9'].map(s => { const [m, v] = s.split(';'); return `BBK;R${m}XX;2026-10-05;${v}`; }).join('\n') + '\nBBK;R10XX;2026-10-04;.\n');
   assert.deepEqual(bbk.get(dayNum('2026-10-05')).map(p => p[0]), [1, 2, 5, 10, 30]);
   assert.equal(bbk.has(dayNum('2026-10-04')), false, "'.' is no value");

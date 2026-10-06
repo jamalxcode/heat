@@ -12,7 +12,7 @@ const STATE = {
   flat: { icon: '🟡', label: 'Flat', note: 'long and short rates close together: often a late-cycle sign' },
   inverted: { icon: '🔴', label: 'Inverted', note: 'short-term rates above long-term ones: this has come before most US recessions' },
 };
-const COLORS = { us: '#2f6fd0', ea: '#2f9e6a', de: '#8a6a3c', uk: '#d0453b', jp: '#c9971a', ca: '#8a5cd0', ch: '#d0458f', se: '#1aa3b8', no: '#5d6f93', br: '#e0782a', za: '#6aa83a' };
+const COLORS = { us: '#2f6fd0', ea: '#2f9e6a', de: '#8a6a3c', uk: '#d0453b', jp: '#c9971a', ca: '#8a5cd0', au: '#b8862b', ch: '#d0458f', se: '#1aa3b8', no: '#5d6f93', br: '#e0782a', za: '#6aa83a' };
 let R = null, tf = (store.get('hm.ratesTf') || '1d'), sel = null, loadedAt = 0;
 
 const fmtY = v => v == null ? '—' : v.toFixed(2) + '%';

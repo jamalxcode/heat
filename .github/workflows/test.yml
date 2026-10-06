@@ -20,9 +20,5 @@ jobs:
         with:
           node-version: 22
       - run: node --test   # finds tests/*.test.mjs
-      # TEMPORARY (rates-more branch only): what do the RBA yield files look like?
-      - run: |
-          for f in f2.1 f2 f1.1; do
-            curl -s -A "Mozilla/5.0" "https://www.rba.gov.au/statistics/tables/csv/$f-data.csv" -o /tmp/$f.csv
-            echo "=== $f $(wc -c < /tmp/$f.csv) bytes"; head -13 /tmp/$f.csv | cut -c1-500; echo ...; tail -3 /tmp/$f.csv | cut -c1-500
-          done
+      # TEMPORARY (rates-more branch only): do all the yield sources answer GitHub's servers?
+      - run: time node scripts/build-rates.mjs /tmp/rates.json

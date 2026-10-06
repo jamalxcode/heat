@@ -156,13 +156,13 @@ export function makeEnergyFixtures(cryptoData, now = Date.now()) {
   return snap;
 }
 
-// rates.json: the eleven markets over ~2 years of weekdays. Canada's curve is inverted, the euro area's flat, the rest normal;
+// rates.json: the twelve markets over ~2 years of weekdays. Canada's curve is inverted, the euro area's flat, the rest normal;
 // the US 10-year rose 4 bp on the last day
 export function makeRatesFixture(now = Date.now()) {
   const today = Math.floor(now / DAY), weekdays = [];
   for (let d = today - 1; weekdays.length < 520; d--) if (![0, 6].includes(new Date(d * DAY).getUTCDay())) weekdays.unshift(d);
-  const slope = { us: 1, ea: 0.3, de: 0.8, uk: 1.2, jp: 1.1, ca: -0.4, ch: 0.7, se: 0.9, no: 0.6, br: 1.5, za: 2 };
-  const level = { us: 4.3, ea: 2.8, de: 2.7, uk: 4.0, jp: 1.5, ca: 3.4, ch: 0.3, se: 2.5, no: 4.0, br: 13, za: 7 };
+  const slope = { us: 1, ea: 0.3, de: 0.8, uk: 1.2, jp: 1.1, ca: -0.4, au: 0.9, ch: 0.7, se: 0.9, no: 0.6, br: 1.5, za: 2 };
+  const level = { us: 4.3, ea: 2.8, de: 2.7, uk: 4.0, jp: 1.5, ca: 3.4, au: 3.6, ch: 0.3, se: 2.5, no: 4.0, br: 13, za: 7 };
   const countries = RATE_MARKETS.map((c, k) => {
     const w = walk(61 + k, weekdays.length, 0, c.id === 'us' ? 0 : 0.004), days = new Map();   // the US flat until its last day
     weekdays.forEach((d, i) => {

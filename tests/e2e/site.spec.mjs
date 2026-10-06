@@ -702,16 +702,16 @@ test.describe('energy', () => {
   });
 });
 
-// Rates: the same page at /rates/, drawing its own view from rates.json (tests/e2e/fixtures.mjs: eleven markets, Canada
+// Rates: the same page at /rates/, drawing its own view from rates.json (tests/e2e/fixtures.mjs: twelve markets, Canada
 // inverted, the euro area flat)
 test.describe('rates', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/rates/');
-    await expect(page.locator('#status')).toContainText('11 markets · 1 inverted');
+    await expect(page.locator('#status')).toContainText('12 markets · 1 inverted');
   });
 
   test('its own view: a tile per market, no price controls, its own search tags, nothing from outside', async ({ page }) => {
-    await expect(page.locator('#grid .rtile')).toHaveCount(11);
+    await expect(page.locator('#grid .rtile')).toHaveCount(12);
     await expect(page.locator('#grid .tile')).toHaveCount(0);
     await expect(page).toHaveTitle(/Government Bond Yield Curves/);
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://heat.sala.company/rates/');
@@ -738,7 +738,7 @@ test.describe('rates', () => {
   });
 
   test('picking a market shows its curve now and before, its slope history, and a shareable address', async ({ page }) => {
-    await expect(page.locator('#ratesAll .r-chart path')).toHaveCount(11);
+    await expect(page.locator('#ratesAll .r-chart path')).toHaveCount(12);
     await expect(page.locator('#ratesDetail h2')).toContainText('United States');
     await page.locator('.rtile[data-id="ca"]').click();
     await expect(page.locator('#ratesDetail h2')).toContainText('Canada');
