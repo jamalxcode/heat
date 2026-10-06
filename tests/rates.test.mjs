@@ -105,7 +105,7 @@ test('summarize: 10-year, slope and its reading, the curve a week / month / year
   assert.equal(s.series.y10.length, s.series.d.length);
   const inv = summarize(COUNTRIES[0], days(30, from, t => 5 - t * 0.05), (from + 29) * DAY);
   assert.equal(inv.state, 'inverted');
-  const uk = summarize(COUNTRIES[2], new Map([[from, [[0, 4], [5, 4.2], [10, 4.6], [20, 5]]]]), from * DAY);
+  const uk = summarize(COUNTRIES.find(c => c.id === 'uk'), new Map([[from, [[0, 4], [5, 4.2], [10, 4.6], [20, 5]]]]), from * DAY);
   assert.equal(uk.yShort, 4, 'UK: Bank Rate is the short leg');
   assert.ok(Math.abs(uk.slope - 0.6) < 1e-9);
 });
