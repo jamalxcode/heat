@@ -10,11 +10,12 @@ const DAY = 864e5, REFRESH = 10 * 60e3;
 const TFS = [['1d', 1], ['1w', 7], ['1m', 30]];
 const REGIONS = ['Americas', 'Europe', 'Asia-Pacific', 'Africa'];
 const SORTS = [['default', 'Default'], ['state', 'Inverted first'], ['y10', '10-year yield'], ['real', 'Real yield'], ['move', 'Biggest move']];
-// what each reading means. The recession record is a US finding, so only the US gets it
+// what each reading means, with an arrow for the curve's slope (shape, not just colour: readable without telling red
+// from green). The recession record is a US finding, so only the US gets it
 const STATE = {
-  normal: { icon: '🟢', label: 'Normal', note: 'long-term rates above short-term ones, the usual shape' },
-  flat: { icon: '🟡', label: 'Flat', note: 'long and short rates close together: markets see little change in rates ahead, which is often late in an economic cycle' },
-  inverted: { icon: '🔴', label: 'Inverted', note: 'short-term rates above long-term ones: markets expect rates to fall, often because they expect a slowdown' },
+  normal: { icon: '↗︎', label: 'Normal', note: 'long-term rates above short-term ones, the usual shape' },
+  flat: { icon: '→︎', label: 'Flat', note: 'long and short rates close together: markets see little change in rates ahead, which is often late in an economic cycle' },
+  inverted: { icon: '↘︎', label: 'Inverted', note: 'short-term rates above long-term ones: markets expect rates to fall, often because they expect a slowdown' },
 };
 const US_INVERTED = ' In the US an inverted curve has come before most recessions since the 1960s, from months to two years ahead, though not every time and not on a fixed timetable.';
 const COLORS = { us: '#2f6fd0', ea: '#2f9e6a', de: '#8a6a3c', uk: '#d0453b', jp: '#c9971a', ca: '#8a5cd0', au: '#b8862b', ch: '#d0458f', se: '#1aa3b8', no: '#5d6f93', br: '#e0782a', cn: '#c8102e', in: '#ff9933', za: '#6aa83a' };
@@ -60,8 +61,9 @@ export function bizDaysSince(iso, now = Date.now()) {
   return n;
 }
 const inflNote = x => x.infl ? `inflation ${x.infl.v.toFixed(1)}% (${monthLabel(x.infl.month)})` : 'inflation —';
-// the real yield as a coloured pill (green above zero, red below) and inflation as a quiet grey note, so they can't be confused
-const realPill = x => `<span class="r-real ${x.real == null ? '' : x.real >= 0 ? 'pos' : 'neg'}" title="Real yield: the 10-year yield minus the latest yearly inflation">Real yield <b>${fmtReal(x.real)}</b></span>`;
+// the real yield as a pill (▲ on blue above zero, ▼ on orange below: shape and colour-blind-safe colours) and
+// inflation as a quiet grey note, so they can't be confused
+const realPill = x => `<span class="r-real ${x.real == null ? '' : x.real >= 0 ? 'pos' : 'neg'}" title="Real yield: the 10-year yield minus the latest yearly inflation">${x.real == null ? '' : `<span aria-hidden="true">${x.real >= 0 ? '▲' : '▼'}</span>`}Real yield <b>${fmtReal(x.real)}</b></span>`;
 const inflTag = x => `<span class="r-infl" title="Latest yearly consumer-price inflation${x.infl ? ` (${monthLabel(x.infl.month, true)}, ${esc(x.infl.src)})` : ''}">CPI ${x.infl ? x.infl.v.toFixed(1) + '%' : '—'}${x.infl ? ` · ${monthLabel(x.infl.month).split(' ')[0]}` : ''}</span>`;
 const rankNote = c => c.slopePct == null ? null : `steeper than ${c.slopePct}% of the last ${c.longYears >= 9.5 ? '10' : Math.max(1, Math.round(c.longYears))} years`;
 
@@ -80,7 +82,7 @@ function tileHTML(c) {
   return `<button class="rtile ${heat(bp, tf)}${c.id === sel ? ' sel' : ''}" data-id="${esc(c.id)}" data-coin="1" aria-haspopup="dialog" aria-label="${esc(`${c.name}: 10-year ${fmtY(c.y10)}, ${tf} ${fmtBp(bp)}, curve ${st?.label || 'unknown'}, real yield ${fmtReal(c.real)}`)}">
     <div class="rt-top"><span class="rt-name">${logoOf(c)}<b>${esc(c.name)}</b></span><span class="rt-chg">${fmtBp(bp)}</span>
       <span class="rt-y"><span class="rt-yl">10-year</span> ${fmtY(c.y10)}</span><span class="rt-date${old ? ' old' : ''}"${old ? ' title="More than 2 business days old: this source publishes late, or didn’t update"' : ''}>${c.notRefreshed ? '⚠ ' : ''}${dayLabel(c.date)}</span></div>
-    <div class="rt-bot"><span class="rt-state st-${esc(c.state || 'none')}">${st ? `${st.icon} ${st.label}` : '—'}</span>${curveSpark(c)}<span class="rt-slope" title="10-year minus ${shortLabel(c)}, in percentage points">10y−${shortTag(c)} ${fmtPP(c.slope).replace(' pp', '')}</span></div>
+    <div class="rt-bot"><span class="rt-state st-${esc(c.state || 'none')}">${st ? `<span class="st-ico" aria-hidden="true">${st.icon}</span> ${st.label}` : '—'}</span>${curveSpark(c)}<span class="rt-slope" title="10-year minus ${shortLabel(c)}, in percentage points">10y−${shortTag(c)} ${fmtPP(c.slope).replace(' pp', '')}</span></div>
     <div class="rt-bot rt-real">${realPill(c)}${inflTag(c)}</div>
   </button>`;
 }
@@ -114,7 +116,7 @@ function tableHTML(cs, ms) {
   const k = TFS.map(t => t[1]);
   const daily = cs.map(c => `<tr class="r-row" data-id="${esc(c.id)}" data-coin="1" tabindex="0"><th scope="row">${logoOf(c)} ${esc(c.name)}</th>
     <td class="${bizDaysSince(c.date) > 2 ? 'old' : ''}">${dayLabel(c.date)}</td><td><b>${fmtY(c.y10)}</b></td><td>${fmtY(c.yShort)} <span class="r-muted">${shortTag(c)}</span></td>
-    <td>${fmtPP(c.slope)}</td><td>${c.short === '3m' ? '—' : fmtPP(c.slope3m)}</td><td>${STATE[c.state] ? `${STATE[c.state].icon} ${STATE[c.state].label}` : '—'}</td>
+    <td>${fmtPP(c.slope)}</td><td>${c.short === '3m' ? '—' : fmtPP(c.slope3m)}</td><td>${STATE[c.state] ? `<span class="rt-state st-${esc(c.state)}"><span class="st-ico" aria-hidden="true">${STATE[c.state].icon}</span> ${STATE[c.state].label}</span>` : '—'}</td>
     <td>${c.slopePct == null ? '—' : c.slopePct + '%'}</td><td>${c.infl ? c.infl.v.toFixed(1) + '%' : '—'}</td><td>${fmtReal(c.real)}</td>
     ${k.map(d => `<td>${fmtBp(changeBp(c, d))}</td>`).join('')}</tr>`).join('');
   const monthly = ms.map(m => `<tr class="r-row" data-id="${esc(m.id)}" data-coin="1" tabindex="0"><th scope="row">${logoOf(m)} ${esc(m.name)}</th>
@@ -163,7 +165,7 @@ function slopeChart(c) {
   for (let yr = 0; yr <= years + 0.01; yr += every) { const d = d0 + yr * 365.25; ticks.push(`<text x="${x(d)}" y="${H - 8}" font-size="10" text-anchor="${yr === 0 ? 'start' : 'middle'}" fill="var(--muted)">${new Date(s.t0 + (d - d0) * DAY).toLocaleDateString([], every < 1 ? { month: 'short', year: '2-digit', timeZone: 'UTC' } : { year: 'numeric', timeZone: 'UTC' })}</text>`); }
   return `<svg class="r-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(`${c.name}: 10-year minus ${shortLabel(c)} over time`)}">`
     + niceTicks(sc.lo, sc.hi).map(v => `<line x1="${PL}" x2="${W - PR}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${PL - 6}" y="${y(v) + 3.5}" font-size="10" text-anchor="end" fill="var(--muted)">${v}</text>`).join('')
-    + `<path d="${area}" fill="var(--dn, #d0453b)" opacity=".22"/><line x1="${PL}" x2="${W - PR}" y1="${zero}" y2="${zero}" stroke="var(--ink-2)" stroke-width="1"/>`
+    + `<path d="${area}" fill="#e08a1e" opacity=".28"/><line x1="${PL}" x2="${W - PR}" y1="${zero}" y2="${zero}" stroke="var(--ink-2)" stroke-width="1"/>`
     + `<path d="${path(pts, x, y)}" fill="none" stroke="${COLORS[c.id] || 'var(--ink)'}" stroke-width="1.6"/>` + ticks.join('') + '</svg>';
 }
 // two years of monthly 10-year yields, with Germany's for the euro members
@@ -200,7 +202,7 @@ function detailHTML(c) {
     : `${curveChart(lines, `${c.name} yield curve`)}<div class="r-keys">${lines.map(l => keyOf(l.label, l.color, l.width, l.dash, l.faint)).join('')}</div>`;
   // small enough to sit beside the card: the key numbers and a chart first, the explanation and the maturities below
   return `<div class="r-card r-pop" data-country="${esc(c.id)}"><div class="r-head"><h2>${logoOf(c)} ${esc(c.name)} <span class="r-muted">yield curve</span></h2>
-      <span class="rt-state st-${esc(c.state || 'none')}">${st ? `${st.icon} ${st.label}` : '—'}</span></div>
+      <span class="rt-state st-${esc(c.state || 'none')}">${st ? `<span class="st-ico" aria-hidden="true">${st.icon}</span> ${st.label}` : '—'}</span></div>
     <div class="r-mini">10y <b>${fmtY(c.y10)}</b> · ${shortLabel(c)} <b>${fmtY(c.yShort)}</b> · gap <b>${fmtPP(c.slope)}</b>${c.slope3m != null && c.short !== '3m' ? ` · 10y−3m <b>${fmtPP(c.slope3m)}</b>` : ''} · ${dayLabel(c.date)}</div>
     <div class="r-mini r-mini2">${realPill(c)}${inflTag(c)}${rank ? `<span>${rank}</span>` : ''}</div>
     <div class="seg r-tabs" role="group" aria-label="Chart"><button data-rtab="curve" aria-pressed="${popTab === 'curve'}">Curve</button><button data-rtab="history" aria-pressed="${popTab === 'history'}">History</button></div>
@@ -225,7 +227,7 @@ function monthHTML(m) {
 const HELP = `<div class="r-help" id="rhelp" hidden>
   <p><b>10-year yield:</b> what the government pays a year to borrow for ten years. <b>bp</b> = basis point, 0.01 percentage point (+25 bp: from 4.00% to 4.25%). <b>pp</b> = percentage point.</p>
   <p><b>Card colour:</b> the change in the 10-year yield over 1 day, 1 week or 1 month (the switch). Blue: yields rose, so bond prices fell; red: yields fell. The monthly European cards always show the change on the month.</p>
-  <p><b>The reading</b> compares long and short rates: 10-year minus 2-year (UK: minus the Bank Rate, BR; South Africa: minus the 3-month bill). 🟢 Normal: +0.5 pp or more. 🟡 Flat: 0 to +0.5. 🔴 Inverted: below zero. “Steeper than 85% of the last 10 years” compares today’s gap with that country’s own history, which matters more than the fixed bands for a country whose curve is usually steep or usually flat. The popup also gives the 10-year minus 3-month gap where it exists.</p>
+  <p><b>The reading</b> compares long and short rates: 10-year minus 2-year (UK: minus the Bank Rate, BR; South Africa: minus the 3-month bill). ↗ Normal: +0.5 pp or more. → Flat: 0 to +0.5. ↘ Inverted: below zero (the arrow shows which way the curve slopes). “Steeper than 85% of the last 10 years” compares today’s gap with that country’s own history, which matters more than the fixed bands for a country whose curve is usually steep or usually flat. The popup also gives the 10-year minus 3-month gap where it exists.</p>
   <p><b>Real yield:</b> the 10-year yield minus the latest yearly inflation: roughly what a lender earns after rising prices. It makes Brazil’s 14% and Switzerland’s 0.6% comparable.</p>
   <p><b>The sketch</b> on each card is the shape of today’s curve, short maturities on the left; on the monthly cards it is the 10-year over the last year. A greyed date is more than 2 business days old.</p>
   <p><b>Europe, monthly:</b> countries with no free daily source, from the ECB’s monthly averages (no curve, so no reading), with the gap to Germany for euro members.</p>
