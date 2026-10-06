@@ -12,7 +12,7 @@ const STATE = {
   flat: { icon: '🟡', label: 'Flat', note: 'long and short rates close together: often a late-cycle sign' },
   inverted: { icon: '🔴', label: 'Inverted', note: 'short-term rates above long-term ones: this has come before most US recessions' },
 };
-const COLORS = { us: '#2f6fd0', ea: '#2f9e6a', de: '#8a6a3c', uk: '#d0453b', jp: '#c9971a', ca: '#8a5cd0', au: '#b8862b', ch: '#d0458f', se: '#1aa3b8', no: '#5d6f93', br: '#e0782a', za: '#6aa83a' };
+const COLORS = { us: '#2f6fd0', ea: '#2f9e6a', de: '#8a6a3c', uk: '#d0453b', jp: '#c9971a', ca: '#8a5cd0', au: '#b8862b', ch: '#d0458f', se: '#1aa3b8', no: '#5d6f93', br: '#e0782a', cn: '#c8102e', in: '#ff9933', za: '#6aa83a' };
 let R = null, tf = (store.get('hm.ratesTf') || '1d'), sel = null, loadedAt = 0;
 
 const fmtY = v => v == null ? '—' : v.toFixed(2) + '%';
@@ -129,11 +129,47 @@ function allCurves() {
   return `<h2>All curves, latest</h2>${curveChart(lines, 'Every market’s latest yield curve')}<div class="r-keys">${key}</div>`;
 }
 
+/* ---------- Europe, monthly (ECB): 10-year yields only, one value a month ---------- */
+const monthLabel = (ym, long) => ym ? new Date(ym + '-15T12:00:00Z').toLocaleDateString([], { month: long ? 'long' : 'short', year: 'numeric', timeZone: 'UTC' }) : '—';
+function mTileHTML(m) {
+  return `<button class="rtile mtile ${heat(m.chg1m, '1m')}${m.id === sel ? ' sel' : ''}" data-id="${esc(m.id)}" data-coin="1" aria-haspopup="dialog" aria-label="${esc(`${m.name}: 10-year ${fmtY(m.y10)} in ${monthLabel(m.month, true)}, ${fmtBp(m.chg1m)} on the month`)}">
+    <div class="rt-top"><span class="rt-name">${logoOf(m)}<b>${esc(m.name)}</b></span><span class="rt-chg">${fmtBp(m.chg1m)}</span>
+      <span class="rt-y"><span class="rt-yl">10-year</span> ${fmtY(m.y10)}</span><span class="rt-date">${m.notRefreshed ? '⚠ ' : ''}${monthLabel(m.month)}</span></div>
+    <div class="rt-bot"><span>${m.vsDE != null ? `vs 🇩🇪 ${fmtPP(m.vsDE)}` : 'not in the euro'}</span><span class="rt-slope">1y ${fmtBp(m.chg12m)}</span></div>
+  </button>`;
+}
+// two years of monthly 10-year yields, with Germany's for the euro members
+function monthChart(m) {
+  const lines = [m.de && { s: m.de, color: COLORS.de, width: 1.4, dash: '5 4', label: 'Germany' }, { s: m.series, color: 'var(--blue, #2f6fd0)', width: 2.4, label: m.name }].filter(Boolean);
+  const months = m.series.map(p => p[0]), idx = new Map(months.map((ym, i) => [ym, i]));
+  const vals = lines.flatMap(l => l.s.filter(p => idx.has(p[0])).map(p => p[1]));
+  if (months.length < 2 || !vals.length) return '';
+  const H2 = W < 600 ? 170 : 200, sc = yScale(vals), y = v => PT + (sc.hi - v) / (sc.hi - sc.lo) * (H2 - PT - PB);
+  const x = i => PL + i / (months.length - 1) * (W - PL - PR);
+  return `<svg class="r-chart" viewBox="0 0 ${W} ${H2}" role="img" aria-label="${esc(`${m.name}: monthly 10-year yield`)}">`
+    + niceTicks(sc.lo, sc.hi).map(v => `<line x1="${PL}" x2="${W - PR}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/><text x="${PL - 6}" y="${y(v) + 3.5}" font-size="10" text-anchor="end" fill="var(--muted)">${v}%</text>`).join('')
+    + months.map((ym, i) => i % 6 === 0 || i === months.length - 1 ? `<text x="${x(i)}" y="${H2 - 8}" font-size="10" text-anchor="${i === months.length - 1 ? 'end' : i === 0 ? 'start' : 'middle'}" fill="var(--muted)">${monthLabel(ym)}</text>` : '').join('')
+    + lines.map(l => `<path d="${l.s.filter(p => idx.has(p[0])).map((p, k) => `${k ? 'L' : 'M'}${x(idx.get(p[0])).toFixed(1)},${y(p[1]).toFixed(1)}`).join('')}" fill="none" stroke="${l.color}" stroke-width="${l.width}"${l.dash ? ` stroke-dasharray="${l.dash}"` : ''}><title>${esc(l.label)}</title></path>`).join('')
+    + '</svg>';
+}
+function monthHTML(m) {
+  const key = [`<span class="r-key"><svg width="22" height="8" aria-hidden="true"><line x1="0" x2="22" y1="4" y2="4" stroke="var(--blue, #2f6fd0)" stroke-width="2.4"/></svg>${esc(m.name)}</span>`,
+    m.de ? `<span class="r-key"><svg width="22" height="8" aria-hidden="true"><line x1="0" x2="22" y1="4" y2="4" stroke="${COLORS.de}" stroke-width="1.4" stroke-dasharray="5 4"/></svg>Germany</span>` : ''].join('');
+  return `<div class="r-card r-pop" data-country="${esc(m.id)}"><div class="r-head"><h2>${logoOf(m)} ${esc(m.name)}: 10-year yield, monthly</h2><span class="r-muted">📅 monthly</span></div>
+    <p class="r-says">${esc(m.name)}’s 10-year government bond yield averaged <b>${fmtY(m.y10)}</b> in ${monthLabel(m.month, true)}: <b>${fmtBp(m.chg1m)}</b> on the month and <b>${fmtBp(m.chg12m)}</b> on the year${m.vsDE != null ? `, <b>${fmtPP(m.vsDE)}</b> above Germany’s (the gap investors watch as a measure of risk in the euro area)` : ''}.</p>
+    ${monthChart(m)}
+    <div class="r-keys">${key}</div>
+    <p class="r-src">${m.notRefreshed ? '⚠ The source didn’t answer in the latest check: showing the last figures. ' : ''}Source: <a href="https://data.ecb.europa.eu/data/datasets/IRS" target="_blank" rel="noopener">European Central Bank</a>, long-term interest rates for convergence purposes: the monthly average of the country’s benchmark 10-year government bond yield, published early the next month. No free source has these countries’ daily yields or whole curves, so there is no curve or normal / flat / inverted reading here.</p></div>`;
+}
+
 function render() {
   if (!R) return;
   const grid = $('#grid');
   grid.className = 'grid rgrid';
   grid.innerHTML = R.countries.map(tileHTML).join('');
+  const ms = R.monthly || [];
+  $('#ratesMonthly').hidden = !ms.length;
+  if (ms.length) $('#ratesMonthly').innerHTML = `<h2>Europe, monthly <span class="r-muted">📅 10-year yields only, the average of ${monthLabel(ms[0].month, true)} (ECB, published early each month): no free daily source has these countries. Colour: change on the month.</span></h2><div class="grid rgrid">${ms.map(mTileHTML).join('')}</div>`;
   W = Math.max(300, Math.min(1100, ($('#ratesAll').clientWidth || 900) - 32)); H = W < 600 ? 230 : 300;
   $('#ratesAll').innerHTML = allCurves();
   $$('#rtf button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === tf));
@@ -147,8 +183,8 @@ function render() {
 // A market's curve in the shared popup (#detail): centred over the page, a bottom sheet on a phone (the CSS). The
 // shared handlers close it (×, Escape, the backdrop, a click elsewhere); S.pinned tells them it's open.
 function openPopup(id) {
-  const c = R?.countries.find(x => x.id === id);
-  if (!c) return;
+  const c = R?.countries.find(x => x.id === id), m = !c && R?.monthly?.find(x => x.id === id);
+  if (!c && !m) return;
   sel = id;
   const box = $('#detail'), body = box.querySelector('.body');
   box.classList.add('show', 'pinned');
@@ -156,7 +192,7 @@ function openPopup(id) {
   S.pinned = 'rates:' + id;
   const keep = [W, H];                      // the charts are drawn at the popup's width, then the page's again
   W = Math.max(280, (body.clientWidth || 640)); H = W < 600 ? 220 : 270;
-  body.innerHTML = detailHTML(c);
+  body.innerHTML = c ? detailHTML(c) : monthHTML(m);
   [W, H] = keep;
   const bw = box.offsetWidth, bh = box.offsetHeight;
   box.style.left = Math.max(12, (innerWidth - bw) / 2) + 'px';
@@ -169,7 +205,8 @@ function renderFresh() {
   if (!R) return;
   const mins = Math.floor((Date.now() - R.generated) / 60e3), ago = mins < 1 ? 'just now' : mins < 120 ? `${mins} min ago` : `${Math.floor(mins / 60)} h ago`;
   const latest = R.countries.map(c => `${c.badge} ${dayLabel(c.date)}`).join(' · ');
-  const html = `<span>🕒 <b>Official closing yields</b>, published once a business day · <b>not real-time</b> · latest: ${latest} · checked ${ago}</span>`;
+  const eu = R.monthly?.length ? ` · Europe monthly: ${monthLabel(R.monthly[0].month)}` : '';
+  const html = `<span>🕒 <b>Official closing yields</b>, published once a business day · <b>not real-time</b> · latest: ${latest}${eu} · checked ${ago}</span>`;
   if ($('#fresh').innerHTML !== html) $('#fresh').innerHTML = html;
 }
 
@@ -181,7 +218,7 @@ async function load() {
     if (d?.market !== 'rates' || !d.countries?.length) throw new Error('no yield curves');
     R = d; loadedAt = Date.now();
     render(); renderFresh();
-    $('#status').innerHTML = `<span class="dot live"></span>${R.countries.length} markets · ${R.countries.filter(c => c.state === 'inverted').length} inverted`;
+    $('#status').innerHTML = `<span class="dot live"></span>${R.countries.length} markets · ${R.countries.filter(c => c.state === 'inverted').length} inverted${R.monthly?.length ? ` · ${R.monthly.length} monthly` : ''}`;
   } catch (e) {
     $('#status').innerHTML = `<span class="dot"></span>${esc(e.message)}. Retrying automatically.`;
   }
@@ -194,13 +231,14 @@ export function start() {
   for (const s of ['#colorBy', '#quote', '#view', '#density', '.controls .ctl', '#legend', '#reset', '#refresh', '#share', '#excluded']) { const el = $(s); if (el) el.hidden = true; }
   const main = $('main');
   main.insertAdjacentHTML('afterbegin', `<div class="r-bar"><div class="seg" id="rtf" role="group" aria-label="Change over">${TFS.map(([v]) => `<button data-v="${v}" aria-pressed="${v === tf}">${v}</button>`).join('')}</div><span id="rlegend" class="leg-item"></span></div>`);
-  $('#grid').insertAdjacentHTML('afterend', `<section id="ratesAll" class="r-card" aria-label="All yield curves"></section>`);
+  $('#grid').insertAdjacentHTML('afterend', `<section id="ratesMonthly" class="r-month" aria-label="Europe, monthly 10-year yields" hidden></section><section id="ratesAll" class="r-card" aria-label="All yield curves"></section>`);
   $('#detail').setAttribute('aria-label', 'Yield curve');
   const linked = new URLSearchParams(location.search).get('c');
   $('#rtf').addEventListener('click', e => { const b = e.target.closest('button[data-v]'); if (!b) return; tf = b.dataset.v; store.set('hm.ratesTf', tf); render(); });
   const pick = e => { const b = e.target.closest('[data-id]'); if (b && R) openPopup(b.dataset.id); };
   $('#grid').addEventListener('click', pick);
   $('#ratesAll').addEventListener('click', pick);
+  $('#ratesMonthly').addEventListener('click', pick);
   // closed by the shared handlers: forget the market (and take it off the address)
   new MutationObserver(() => { if (sel && !$('#detail').classList.contains('pinned')) { sel = null; render(); } }).observe($('#detail'), { attributes: true, attributeFilter: ['class'] });
   load().then(() => { if (linked) openPopup(linked); });

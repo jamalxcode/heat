@@ -66,8 +66,12 @@ export function health({ crypto, forex, metals, energy, rates, tv }, now = Date.
   if (rates !== undefined) {
     const cs = rates?.countries || [], old = cs.filter(c => c.notRefreshed || ageDays(c.date, now) > 7);
     const oldest = cs.reduce((a, c) => !a || c.date < a.date ? c : a, null);
-    add('yields', 'Bond yields', 'official yield curves', !cs.length ? 'down' : old.length ? (old.length < cs.length ? 'warn' : 'down') : 'ok',
-      !cs.length ? 'no data' : `${cs.length - old.length}/${cs.length} markets current${oldest ? ` · oldest ${oldest.badge} ${oldest.date}` : ''}${old.length ? ` · late: ${old.map(c => c.badge).join(', ')}` : ''}`);
+    // the ECB's monthly European figures: month M's average comes out early in M+1, so a month 75+ days old is late
+    const ms = rates?.monthly || [], mLate = ms.length && (ms.some(m => m.notRefreshed) || ageDays(ms[0].month + '-01', now) > 75);
+    const state = !cs.length ? 'down' : old.length ? (old.length < cs.length ? 'warn' : 'down') : mLate ? 'warn' : 'ok';
+    add('yields', 'Bond yields', 'official yield curves', state,
+      !cs.length ? 'no data' : `${cs.length - old.length}/${cs.length} markets current${oldest ? ` · oldest ${oldest.badge} ${oldest.date}` : ''}${old.length ? ` · late: ${old.map(c => c.badge).join(', ')}` : ''}`
+      + (ms.length ? ` · Europe monthly to ${ms[0].month}${mLate ? ' (late)' : ''}` : ''));
   }
 
   // TradingView: the chart links, checked in the deploy job

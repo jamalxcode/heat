@@ -13,9 +13,12 @@
 //   Sweden     Riksbank: Treasury bills and government bonds (3 months … 10 years); its open API allows a few requests a minute
 //   Norway     Norges Bank generic government rates (3 months … 10 years)
 //   Brazil     National Treasury, Tesouro Direto fixed-rate bonds by maturity date (one ~15 MB file, fetched every 12 hours)
+//   China      ChinaBond government bond yield curve (chart data, many dates per request; fetched every 12 hours)
+//   India      FBIL par yield curve, one Excel file per day (read with a small built-in .xlsx reader), a few days per run
 //   S. Africa  Reserve Bank: Treasury bill tenders (3 … 12 months) and average bond yields by maturity band (5–10, 10+ years)
-// Not included: the Gulf states publish auction results, not a daily curve; China, India, France, Italy and Spain have no
-// free official daily feed; Morocco's Bank Al-Maghrib publishes a daily curve, but its website refuses requests from
+//   Europe     monthly only: the ECB's 10-year yield per EU country (France, Italy, Spain … 15), shown in their own row
+// Not included: the Gulf states publish auction results, not a daily curve, and have no free official daily feed;
+// Morocco's Bank Al-Maghrib publishes a daily curve, but its website refuses requests from
 // cloud servers like GitHub's. (The RBA's site is the other way round: it blocks home connections, not GitHub's.)
 // Health: the curve's slope, 10-year minus 2-year (UK: minus Bank Rate; South Africa: minus the 3-month bill). Long
 // rates normally sit above short ones; an inverted curve (short above long) has come before most US recessions.
@@ -47,6 +50,10 @@ export const COUNTRIES = [
   { id: 'no', name: 'Norway', flag: '🇳🇴', badge: 'NO', src: 'Norges Bank', srcUrl: 'https://www.norges-bank.no/en/topics/Statistics/Interest-rates/Government-debt-securities/', short: '2y' },
   { id: 'br', name: 'Brazil', flag: '🇧🇷', badge: 'BR', src: 'Tesouro Nacional (Tesouro Direto rates)', srcUrl: 'https://www.tesourotransparente.gov.br/ckan/dataset/taxas-dos-titulos-ofertados-pelo-tesouro-direto', short: '2y', every: 12,
     note: 'Fixed-rate bonds offered to savers through Tesouro Direto (Prefixado, with and without coupons): the National Treasury’s own daily rates, close to the market’s. Maturities are fixed dates, so the points move a little each day.' },
+  { id: 'cn', name: 'China', flag: '🇨🇳', badge: 'CN', src: 'ChinaBond (China Central Depository & Clearing)', srcUrl: 'https://yield.chinabond.com.cn/cbweb-mn/yield_main?locale=en_US', short: '2y', every: 12,
+    note: 'ChinaBond’s government bond yield curve, the benchmark for Chinese government bonds; before the last month the history is weekly.' },
+  { id: 'in', name: 'India', flag: '🇮🇳', badge: 'IN', src: 'Financial Benchmarks India (FBIL)', srcUrl: 'https://www.fbil.org.in/#/benchmark/gsec', short: '2y', perDay: true,
+    note: 'FBIL’s daily par yield curve for government securities (G-secs), published as one file per day; the history is filled in weekly points at first, then daily.' },
   { id: 'za', name: 'South Africa', flag: '🇿🇦', badge: 'ZA', src: 'South African Reserve Bank', srcUrl: 'https://www.resbank.co.za/en/home/what-we-do/statistics/key-statistics/current-market-rates', short: '3m',
     note: 'The Reserve Bank publishes Treasury bill rates (weekly tenders) and average bond yields by maturity band (5–10 years, 10 years and longer), shown here at 7.5 and 15 years, so the 10-year figure is an estimate between them.' },
 ];
@@ -190,6 +197,70 @@ export function parseTesouro(text, since = 0) {
   return byDay(rows, 4);
 }
 
+// ChinaBond chart data: [{ worktime, seriesData: [[years, yield]…] }] every 0.1 year out to 50, kept at the usual
+// maturities (enough to draw the curve, much smaller)
+const STD_TENORS = [0.25, 0.5, 1, 2, 3, 5, 7, 10, 15, 20, 30, 40, 50];
+const thin = all => STD_TENORS.map(t => [t, interp(all, t)]).filter(([, y]) => y != null).map(([t, y]) => [t, r4(y)]);
+export function parseChinaBond(json) {
+  const out = new Map();
+  for (const o of Array.isArray(json) ? json : []) {
+    const all = sortPts(new Map((o.seriesData || []).map(([t, y]) => [+t, +y])));
+    const pts = thin(all);
+    if (o.worktime && pts.length >= 5) out.set(dayNum(o.worktime), pts);
+  }
+  return out;
+}
+
+// The smallest .xlsx reader that works here: a zip of XML files. Returns { 'xl/sharedStrings.xml': text, … } for the
+// entries asked for. Uses DecompressionStream (Node 18+ and browsers), so no packages.
+export async function unzipEntries(buf, wanted) {
+  const b = new Uint8Array(buf), dv = new DataView(b.buffer, b.byteOffset, b.byteLength), out = {};
+  let eocd = -1;
+  for (let i = b.length - 22; i >= Math.max(0, b.length - 66000); i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  if (eocd < 0) throw new Error('not a zip file');
+  let p = dv.getUint32(eocd + 16, true);
+  const n = dv.getUint16(eocd + 10, true), dec = new TextDecoder();
+  for (let k = 0; k < n; k++) {
+    const method = dv.getUint16(p + 10, true), size = dv.getUint32(p + 20, true), nameLen = dv.getUint16(p + 28, true);
+    const extra = dv.getUint16(p + 30, true), comment = dv.getUint16(p + 32, true), local = dv.getUint32(p + 42, true);
+    const name = dec.decode(b.subarray(p + 46, p + 46 + nameLen));
+    p += 46 + nameLen + extra + comment;
+    if (!wanted(name)) continue;
+    const start = local + 30 + dv.getUint16(local + 26, true) + dv.getUint16(local + 28, true), data = b.subarray(start, start + size);
+    out[name] = method === 0 ? dec.decode(data)
+      : await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
+  }
+  return out;
+}
+// FBIL's daily file: the "Par Yield" sheet holds Tenor (years) | par yield rows (0.25 … 40). Found by its cells, not
+// its position: the sheet whose rows are a rising tenor in A and a yield in B.
+export async function parseFBIL(buf) {
+  const files = await unzipEntries(buf, n => n === 'xl/sharedStrings.xml' || /^xl\/worksheets\/sheet\d+\.xml$/.test(n));
+  const strings = (files['xl/sharedStrings.xml'] || '').split('<si>').slice(1).map(s => s.replace(/<[^>]*>/g, ''));
+  const date = strings.map(s => s.match(/^(\d{2})-([A-Za-z]{3})-(\d{4})$/)).find(Boolean);
+  const day = date ? Math.floor(Date.parse(`${date[1]} ${date[2]} ${date[3]} UTC`) / DAY) : null;
+  for (const [name, xml] of Object.entries(files)) {
+    if (!name.includes('worksheets')) continue;
+    const pts = new Map();
+    for (const row of xml.split('<row').slice(1)) {
+      const a = row.match(/<c r="A\d+"[^>]*>(?:<f>[^<]*<\/f>)?<v>([\d.]+)<\/v>/), y = row.match(/<c r="B\d+"[^>]*>(?:<f>[^<]*<\/f>)?<v>([\d.]+)<\/v>/);
+      if (a && y && !/t="s"/.test(row.match(/<c r="A\d+"[^>]*>/)[0]) && +a[1] > 0 && +a[1] <= 50 && +y[1] > 0 && +y[1] < 30) pts.set(+a[1], +y[1]);
+    }
+    const p = sortPts(pts);
+    if (p.length >= 8 && day != null) return { day, pts: thin(p) };
+  }
+  return null;
+}
+
+// ECB monthly long-term (10-year) government bond yields per EU country: KEY,…,REF_AREA,…,TIME_PERIOD (YYYY-MM),OBS_VALUE
+export function parseIRS(text) {
+  const [head, ...rows] = csvRows(text), iA = head.indexOf('REF_AREA'), iT = head.indexOf('TIME_PERIOD'), iV = head.indexOf('OBS_VALUE');
+  const out = {};
+  for (const r of rows) if (r[iA] && /^\d{4}-\d{2}$/.test(r[iT]) && r[iV] !== '') (out[r[iA]] ||= []).push([r[iT], +r[iV]]);
+  for (const k in out) out[k].sort((a, b) => a[0] < b[0] ? -1 : 1);
+  return out;
+}
+
 /* ---------- fetchers ---------- */
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 // the Riksbank's open API allows a handful of requests a minute: one at a time, waiting when it says so
@@ -253,6 +324,49 @@ const FETCH = {
     // one file with every day since 2002 (~15 MB): fetched at most every 12 hours (`every`), only the last two years kept
     return parseTesouro(await getText('https://www.tesourotransparente.gov.br/ckan/dataset/df56aa42-484a-4a59-8184-7676580c81e3/resource/796d2059-14e9-44e3-80c9-2d9e30b405c1/download/precotaxatesourodireto.csv', fetchFn, { timeout: 120e3 }), today - SERIES_DAYS - 10);
   },
+  async cn(fetchFn, today) {
+    // every weekday of the last six weeks, then one a week back two years: ~140 dates, 40 per request
+    const dates = [];
+    for (let d = today; d >= today - SERIES_DAYS; d--) {
+      const wd = new Date(d * DAY).getUTCDay();
+      if (wd !== 0 && wd !== 6 && (d >= today - 42 || wd === 3)) dates.push(isoDay(d));
+    }
+    const out = new Map();
+    for (let i = 0; i < dates.length; i += 40) {
+      const url = `https://yield.chinabond.com.cn/cbweb-mn/yc/searchYc?xyzSelect=txy&&workTimes=${dates.slice(i, i + 40).join(',')}&&dxbj=0&&qxll=0,&&yqqxN=N&&yqqxK=K&&ycDefIds=2c9081e50a2f9606010a3068cae70001,&&wrjxCBFlag=0&&locale=en_US`;
+      const r = await fetchFn(url, { method: 'POST', headers: { 'user-agent': 'Mozilla/5.0 (heat.sala.company)' }, signal: AbortSignal.timeout(60e3) });
+      if (!r.ok) throw new Error(`HTTP ${r.status} for ChinaBond`);
+      for (const [d, p] of parseChinaBond(await r.json())) out.set(d, p);
+    }
+    return out;
+  },
+  // India: one file per day, so its history is kept in rates.json and only new days are asked for (a few per run):
+  // the latest, the last two weeks, the exact week / month / year-ago comparison days, and weekly points back a year
+  async in(fetchFn, today, { prev, log } = {}) {
+    const c = COUNTRIES.find(x => x.id === 'in'), days = daysFromSummary(c, prev);
+    const weekday = d => { const w = new Date(d * DAY).getUTCDay(); return w === 6 ? d - 1 : w === 0 ? d - 2 : d; };
+    const getDay = async d => {
+      const r = await fetchFn(`https://www.fbil.org.in/wasdm/gsec/downloadPublished?date=${isoDay(d)}`, { headers: { 'user-agent': 'Mozilla/5.0 (heat.sala.company)' }, signal: AbortSignal.timeout(30e3) });
+      if (!r.ok) return null;                              // no file that day (a holiday)
+      try { return await parseFBIL(await r.arrayBuffer()); } catch { return null; }
+    };
+    const full = d => { for (let j = d; j >= d - 3; j--) if (days.get(j)?.length > 2) return true; return false; };
+    const any = d => { for (let j = d; j >= d - 3; j--) if (days.has(j)) return true; return false; };
+    const latest = weekday(today);                       // (today's file appears in the evening, India time: until then, the day before)
+    const wantFull = [latest, latest - 7, latest - 30, latest - 365].map(weekday);
+    const wantAny = [];
+    for (let k = 1; k <= 14; k++) wantAny.push(weekday(latest - k));
+    for (let k = 21; k <= 371; k += 7) wantAny.push(weekday(latest - k));
+    const todo = [...new Set([...wantFull.filter(d => !full(d)), ...wantAny.filter(d => !any(d))])].slice(0, 14);
+    let got = 0;
+    for (const d of todo) {
+      const r = await getDay(d) || await getDay(weekday(d - 1));
+      if (r) { days.set(r.day, r.pts); got++; }
+    }
+    if (todo.length) log?.(`Rates: FBIL ${got}/${todo.length} daily files fetched`);
+    if (!days.size) throw new Error('no FBIL file');
+    return days;
+  },
   async za(fetchFn, today) {
     const from = isoDay(today - SERIES_DAYS - 10), to = isoDay(today);
     const get = async list => Promise.all(list.map(async ([code, t]) => [t, await sarb(code, from, to, fetchFn)]));
@@ -266,9 +380,21 @@ const shortOf = (c, pts) => interp(pts, SHORT_T[c.short]);
 export function slopeState(s) { return s == null ? null : s < 0 ? 'inverted' : s < FLAT_PP ? 'flat' : 'normal'; }
 
 // the latest curve on or before day d (within 10 days)
+// (a whole curve if there is one: India's history also holds days kept as just their 10-year and 2-year points)
 function curveNear(days, d) {
-  for (let k = d; k >= d - 10; k--) if (days.has(k)) return { date: isoDay(k), pts: days.get(k) };
+  for (const full of [true, false])
+    for (let k = d; k >= d - 10; k--) if (days.has(k) && (!full || days.get(k).length > 2)) return { date: isoDay(k), pts: days.get(k) };
   return null;
+}
+// back from a market's last summary to curves by day: its daily 10-year and short points, plus the whole curves it
+// kept (today, a week, a month, a year ago). For a source fetched one day at a time, so nothing is asked twice.
+export function daysFromSummary(c, s) {
+  const days = new Map();
+  if (!s?.series) return days;
+  const d0 = Math.floor(s.series.t0 / DAY);
+  s.series.d.forEach((o, i) => { const p = [[10, s.series.y10[i]]]; if (s.series.ys[i] != null) p.unshift([SHORT_T[c.short], s.series.ys[i]]); days.set(d0 + o, p); });
+  for (const snap of [s.curve && { date: s.date, pts: s.curve }, ...Object.values(s.then || {})]) if (snap?.pts?.length > 2) days.set(dayNum(snap.date), snap.pts);
+  return days;
 }
 export function summarize(c, days, now) {
   const ds = [...days.keys()].sort((a, b) => a - b).filter(d => d >= Math.floor(now / DAY) - SERIES_DAYS);
@@ -289,6 +415,35 @@ export function summarize(c, days, now) {
     series: { t0: ds[0] * DAY, d, y10, ys },
   };
 }
+/* ---------- Europe, monthly: the ECB's 10-year yield per EU country (no free daily source for these) ---------- */
+// The monthly average of each country's benchmark 10-year government bond yield (the EU "convergence" rate), published
+// early the next month. Germany is fetched too, for the spread every euro bond is measured against.
+export const EU_MONTHLY = [
+  ['FR', 'France', '🇫🇷'], ['IT', 'Italy', '🇮🇹'], ['ES', 'Spain', '🇪🇸'], ['NL', 'Netherlands', '🇳🇱'], ['BE', 'Belgium', '🇧🇪'],
+  ['AT', 'Austria', '🇦🇹'], ['PT', 'Portugal', '🇵🇹'], ['GR', 'Greece', '🇬🇷'], ['IE', 'Ireland', '🇮🇪'], ['FI', 'Finland', '🇫🇮'],
+  ['PL', 'Poland', '🇵🇱'], ['CZ', 'Czechia', '🇨🇿'], ['HU', 'Hungary', '🇭🇺'], ['RO', 'Romania', '🇷🇴'], ['DK', 'Denmark', '🇩🇰'],
+].map(([code, name, flag]) => ({ id: code.toLowerCase(), code, name, flag, badge: code }));
+const EURO = new Set(['FR', 'IT', 'ES', 'NL', 'BE', 'AT', 'PT', 'GR', 'IE', 'FI']);
+const monthBack = (ym, k) => { const [y, m] = ym.split('-').map(Number), t = y * 12 + m - 1 - k; return `${Math.floor(t / 12)}-${String(t % 12 + 1).padStart(2, '0')}`; };
+export function summarizeMonthly(by) {
+  const de = new Map(by.DE || []);
+  return EU_MONTHLY.map(c => {
+    const s = by[c.code];
+    if (!s?.length) return null;
+    const [month, y10] = s.at(-1), at = new Map(s), was = k => at.get(monthBack(month, k));
+    const bp = v => v == null ? null : Math.round((y10 - v) * 100);
+    return {
+      id: c.id, name: c.name, flag: c.flag, badge: c.badge, euro: EURO.has(c.code), month, y10,
+      chg1m: bp(was(1)), chg12m: bp(was(12)), vsDE: EURO.has(c.code) && de.has(month) ? r4(y10 - de.get(month)) : null,
+      series: s.slice(-25), de: EURO.has(c.code) ? [...de].filter(([m]) => m >= s.slice(-25)[0][0]) : null,
+    };
+  }).filter(Boolean);
+}
+async function fetchMonthly(fetchFn, today) {
+  const from = isoDay(today - 800).slice(0, 7), areas = [...EU_MONTHLY.map(c => c.code), 'DE'].join('+');
+  return summarizeMonthly(parseIRS(await getText(`https://data-api.ecb.europa.eu/service/data/IRS/M.${areas}.L.L40.CI.0000..N.Z?startPeriod=${from}&format=csvdata&detail=dataonly`, fetchFn, { timeout: 60e3 })));
+}
+
 export async function build({ prev = null, log = console.log, now = Date.now(), fetchFn = fetch, force = false } = {}) {
   const same = prev?.market === 'rates' && prev?.fmt === FMT;
   const ids = COUNTRIES.map(c => c.id).join(',');           // a market added or removed: fetch now, don't wait for REFETCH
@@ -300,7 +455,7 @@ export async function build({ prev = null, log = console.log, now = Date.now(), 
     const p = prevOf(c.id);
     if (p && !p.notRefreshed && c.every && now - (p.fetchedAt || 0) < c.every * 36e5) return p;   // a big file, fetched less often
     try {
-      const s = summarize(c, await FETCH[c.id](fetchFn, today), now);
+      const s = summarize(c, await FETCH[c.id](fetchFn, today, { prev: p, log }), now);
       if (!s) throw new Error('no data');
       return s;
     } catch (e) {
@@ -309,9 +464,12 @@ export async function build({ prev = null, log = console.log, now = Date.now(), 
     }
   }));
   out.push(...results.filter(Boolean));
+  let monthly = same ? (prev.monthly || []) : [];
+  try { monthly = await fetchMonthly(fetchFn, today); }
+  catch (e) { failed.push(`EU monthly (${e.message})`); monthly = monthly.map(m => ({ ...m, notRefreshed: true })); }
   if (!out.length) throw new Error('no yield curve source answered');
-  log(`Rates: ${out.map(c => `${c.id} ${c.date} 10y ${c.y10?.toFixed(2)}% slope ${c.slope > 0 ? '+' : ''}${c.slope?.toFixed(2)} (${c.state})`).join(' · ')}${failed.length ? ` · failed: ${failed.join(', ')}` : ''}`);
-  return { v: 1, fmt: FMT, market: 'rates', generated: now, fetched: now, flatPP: FLAT_PP, ids, countries: out };
+  log(`Rates: ${out.map(c => `${c.id} ${c.date} 10y ${c.y10?.toFixed(2)}% slope ${c.slope > 0 ? '+' : ''}${c.slope?.toFixed(2)} (${c.state})`).join(' · ')} · monthly: ${monthly.length} EU countries to ${monthly[0]?.month ?? '—'}${failed.length ? ` · failed: ${failed.join(', ')}` : ''}`);
+  return { v: 1, fmt: FMT, market: 'rates', generated: now, fetched: now, flatPP: FLAT_PP, ids, countries: out, monthly };
 }
 
 /* ---------- CLI (Node only) ---------- */

@@ -4,7 +4,7 @@ import * as SIG from '../../signals.mjs';
 import { assemble, toSnapshot, CURRENCIES, scored, pairOf, isoDay } from '../../scripts/build-forex.mjs';
 import { metalSeries, toSnapshot as metalsSnapshot } from '../../scripts/build-metals.mjs';
 import { ENERGY, toHist as energyHist, toSnapshot as energySnapshot } from '../../scripts/build-energy.mjs';
-import { COUNTRIES as RATE_MARKETS, summarize as rateSummary } from '../../scripts/build-rates.mjs';
+import { COUNTRIES as RATE_MARKETS, summarize as rateSummary, EU_MONTHLY, summarizeMonthly } from '../../scripts/build-rates.mjs';
 
 const DAY = 864e5, N = 260;
 
@@ -156,13 +156,13 @@ export function makeEnergyFixtures(cryptoData, now = Date.now()) {
   return snap;
 }
 
-// rates.json: the twelve markets over ~2 years of weekdays. Canada's curve is inverted, the euro area's flat, the rest normal;
+// rates.json: the fourteen daily markets over ~2 years of weekdays. Canada's curve is inverted, the euro area's flat, the rest normal;
 // the US 10-year rose 4 bp on the last day
 export function makeRatesFixture(now = Date.now()) {
   const today = Math.floor(now / DAY), weekdays = [];
   for (let d = today - 1; weekdays.length < 520; d--) if (![0, 6].includes(new Date(d * DAY).getUTCDay())) weekdays.unshift(d);
-  const slope = { us: 1, ea: 0.3, de: 0.8, uk: 1.2, jp: 1.1, ca: -0.4, au: 0.9, ch: 0.7, se: 0.9, no: 0.6, br: 1.5, za: 2 };
-  const level = { us: 4.3, ea: 2.8, de: 2.7, uk: 4.0, jp: 1.5, ca: 3.4, au: 3.6, ch: 0.3, se: 2.5, no: 4.0, br: 13, za: 7 };
+  const slope = { us: 1, ea: 0.3, de: 0.8, uk: 1.2, jp: 1.1, ca: -0.4, au: 0.9, ch: 0.7, se: 0.9, no: 0.6, br: 1.5, cn: 0.6, in: 0.7, za: 2 };
+  const level = { us: 4.3, ea: 2.8, de: 2.7, uk: 4.0, jp: 1.5, ca: 3.4, au: 3.6, ch: 0.3, se: 2.5, no: 4.0, br: 13, cn: 1.5, in: 6.5, za: 7 };
   const countries = RATE_MARKETS.map((c, k) => {
     const w = walk(61 + k, weekdays.length, 0, c.id === 'us' ? 0 : 0.004), days = new Map();   // the US flat until its last day
     weekdays.forEach((d, i) => {
@@ -172,5 +172,9 @@ export function makeRatesFixture(now = Date.now()) {
     });
     return rateSummary(c, days, now);
   });
-  return { v: 1, fmt: 1, market: 'rates', generated: now, fetched: now, flatPP: 0.5, countries };
+  // Europe, monthly: 25 months per country, plus Germany for the gap; Italy 0.8 pp above Germany
+  const months = Array.from({ length: 25 }, (_, i) => { const t = 2024 * 12 + 7 + i; return `${Math.floor(t / 12)}-${String(t % 12 + 1).padStart(2, '0')}`; });
+  const by = { DE: months.map((m, i) => [m, +(2.5 + i * 0.01).toFixed(3)]) };
+  EU_MONTHLY.forEach((c, k) => { by[c.code] = months.map((m, i) => [m, +(2.5 + (c.code === 'IT' ? 0.8 : 0.1 + k * 0.05) + i * 0.012).toFixed(3)]); });
+  return { v: 1, fmt: 1, market: 'rates', generated: now, fetched: now, flatPP: 0.5, countries, monthly: summarizeMonthly(by) };
 }
