@@ -102,7 +102,8 @@ test('dxySeries: ICE formula on the six USD/XXX rates, only on days all six have
   assert.deepEqual(dxySeries(ones).map(x => x[1]), [50.143, 50.143, 50.143]);
   // the dollar buys 1% more euros: the index rises by about the euro's weight (0.576%)
   const eurUp = { ...ones, eur: h([1, 1.01, 1.01]) };
-  assert.equal(+((dxySeries(eurUp)[1][1] / dxySeries(eurUp)[0][1] - 1) * 100).toFixed(2), 0.57);
+  const eurMove = (dxySeries(eurUp)[1][1] / dxySeries(eurUp)[0][1] - 1) * 100;
+  assert.ok(Math.abs(eurMove - 0.575) < 0.005, `index moved ${eurMove}%`);   // 1.01^0.576 − 1, with the index kept to 3 decimals
   // a day one currency lacks is left out; a missing currency gives no index
   const gap = { ...ones, sek: h([1, 1], [0, 2]) };
   assert.deepEqual(dxySeries(gap).map(x => isoDay(x[0] / DAY)), ['2026-09-28', '2026-09-30']);
