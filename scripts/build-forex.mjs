@@ -163,6 +163,25 @@ export function assemble(ecb, extras) {
 export const BACK = { '24h': 1, '7d': 5, '30d': 21 };
 const chg = (c, k) => c.length > k ? (c[c.length - 1] / c[c.length - 1 - k] - 1) * 100 : null;
 
+// US Dollar Index, with ICE's formula: 50.14348112 × EUR/USD^−0.576 × USD/JPY^0.136 × GBP/USD^−0.119 × USD/CAD^0.091
+// × USD/SEK^0.042 × USD/CHF^0.036. Pairs here are all USD/XXX, so EUR/USD^−0.576 = USD/EUR^0.576 and every weight is
+// positive. Built from the daily ECB rates (14:15 Frankfurt), it tracks the official index (ICE futures, traded around
+// the clock) closely but not exactly. The page computes it from forex.json (app/dxy.mjs): no extra requests.
+export const DXY_WEIGHTS = { eur: 0.576, jpy: 0.136, gbp: 0.119, cad: 0.091, sek: 0.042, chf: 0.036 };
+const DXY_K = 50.14348112;
+// hist: forex.json's hist, in its stored USD/XXX quoting. Returns [[time, index], …] for every business day all six
+// rates exist, or null if a currency is missing.
+export function dxySeries(hist) {
+  const ids = Object.keys(DXY_WEIGHTS);
+  const byDay = ids.map(id => {
+    const h = hist?.[id];
+    return h?.c?.length ? new Map(h.c.map((v, i) => [Math.round(h.t0 / DAY) + (h.d ? h.d[i] : i), v])) : null;
+  });
+  if (byDay.some(m => !m)) return null;
+  const days = [...byDay[0].keys()].filter(d => byDay.every(m => m.get(d) > 0)).sort((a, b) => a - b);
+  return days.map(d => [d * DAY, +(DXY_K * ids.reduce((p, id, k) => p * byDay[k].get(d) ** DXY_WEIGHTS[id], 1)).toFixed(3)]);
+}
+
 // forex.json, in the same shape as data.json so the page can show it the same way
 export function toSnapshot(series, { now = Date.now(), params = null, fetched = now, prev = null } = {}) {
   const markets = [], hist = {};
