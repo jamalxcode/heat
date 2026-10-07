@@ -68,6 +68,8 @@ export const FX_SPEC = [
   ['JPY', 22, 0.0006],    // ECB, quoted USD/JPY
   ['GBP', 23, 0.0001],
   ['CHF', 24, -0.0002],
+  ['CAD', 28, 0.0002],    // with EUR, JPY, GBP, CHF and SEK: the six currencies of the US Dollar Index bar
+  ['SEK', 29, -0.0001],
   ['RUB', 25, 0.0008],    // extra feed: "?" mark
   ['EGP', 26, 0.0015],
   ['SAR', 0, 0],          // pegged to the dollar: hidden until "Pegged" is ticked
@@ -79,7 +81,7 @@ export function makeForexFixtures(now = Date.now()) {
   for (let d = Math.floor(now / DAY) - 1; days.length < FX_N; d--) { const wd = new Date(d * DAY).getUTCDay(); if (wd !== 0 && wd !== 6) days.unshift(d); }
   const ecb = {}, extras = {};
   for (const [code, seed, drift] of FX_SPEC) {
-    const base = { EUR: 0.9, JPY: 150, GBP: 0.78, CHF: 0.85, RUB: 85, EGP: 48, SAR: 3.75, IRR: 1.2e6 }[code];
+    const base = { EUR: 0.9, JPY: 150, GBP: 0.78, CHF: 0.85, CAD: 1.36, SEK: 10.5, RUB: 85, EGP: 48, SAR: 3.75, IRR: 1.2e6 }[code];
     const c = seed ? walk(seed, FX_N, drift, 0.004).map(v => v / 100 * base) : Array(FX_N).fill(base);
     if (code === 'EGP') c[FX_N - 1] = c[FX_N - 2] * 1.15;   // an unusual one-day jump: flagged ⚠ (findSpikes)
     const src = CURRENCIES.find(x => x.code === code).src;

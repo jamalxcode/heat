@@ -293,7 +293,7 @@ test("scorecard: clicking one of yesterday's coins opens its chart card beside i
 
 // Forex: the same page at /forex/, with forex.json (tests/e2e/fixtures.mjs: 8 currencies, SAR pegged, IRR warned)
 test.describe('forex', () => {
-  const FX_VISIBLE = 7;   // 8 in the test data, minus the pegged SAR
+  const FX_VISIBLE = 9;   // 10 in the test data, minus the pegged SAR
   test.beforeEach(async ({ page }) => {
     await page.goto('/forex/');
     await expect(page.locator('#status')).toContainText(`${FX_VISIBLE}/${FX_VISIBLE} currencies with indicators`);
@@ -313,6 +313,23 @@ test.describe('forex', () => {
     const faq = ld['@graph'].find(x => x['@type'] === 'FAQPage').mainEntity.map(q => q.name);
     expect(await page.locator('footer .about h3').allTextContents()).toEqual(faq);
     expect(external).toEqual([]);
+  });
+
+  test('US Dollar Index bar: computed from the six ECB rates, follows the timeframe, not on the Scorecard or other markets', async ({ page }) => {
+    const bar = page.locator('#dxy');
+    await expect(bar).toBeVisible();
+    await expect(bar).toContainText('US Dollar Index');
+    expect(Number(await bar.locator('.dxy-val').textContent())).toBeGreaterThan(50);
+    await expect(bar.locator('.dxy-chg')).toHaveClass(/\bh-?[0-4]\b/);                    // the same heat colours as the tiles
+    await expect(bar.locator('.dxy-tfs')).toContainText('1w');
+    await page.locator('#colorBy [data-v="30d"]').click();
+    await expect(bar.locator('.dxy-tfs')).toContainText('1d');                              // the chosen timeframe moves into the coloured chip
+    await page.locator('#quote [data-v="usd"]').click();
+    await expect(bar.locator('.dxy-val')).toHaveText(/^\d+\.\d\d$/);                        // an index of the dollar: the same either way pairs are quoted
+    await page.locator('#view [data-v="score"]').click();
+    await expect(bar).toBeHidden();
+    await page.goto('/');
+    await expect(page.locator('#dxy')).toBeHidden();
   });
 
   test('tiles: every pair USD/…, rates without $, ✓ for ECB and ? for the extra feed', async ({ page }) => {
