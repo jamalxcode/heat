@@ -616,6 +616,13 @@
    "Gate.io": "STRK",
    "MEXC": "STRK",
    "KuCoin": "STRK"
+  },
+  "tezos": {
+   "Binance": "XTZ",
+   "OKX": "XTZ",
+   "MEXC": "XTZ",
+   "KuCoin": "XTZ",
+   "Gate.io": "XTZ"
   }
  }
 }
