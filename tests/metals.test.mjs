@@ -123,3 +123,11 @@ test('health: CoinGecko, candles, ECB, TradingView states', () => {
   assert.equal(by(health({ crypto: { ...crypto, marketStale: true } }, now)).rankings, 'down');
   assert.equal(by(health({ forex: { rateDate: '2026-09-25' } }, now)).ecb, 'down');
 });
+
+test('cross-check: gold within 1%; silver, platinum and palladium (which swing more) within 2%', () => {
+  const d = dayNum('2026-10-05'), days = { '2026-10-05': { xau: 1 / 4000, xag: 1 / 50, xpt: 1 / 1700 } };
+  const c = crossCheck(days, { '2026-10-05': { xau: 4060, xag: 50.75, xpt: 1740 } }, d);
+  assert.deepEqual([c.xau.diff, c.xau.ok], [1.5, false]);
+  assert.deepEqual([c.xag.diff, c.xag.ok], [1.5, true]);
+  assert.deepEqual([c.xpt.diff, c.xpt.ok], [2.35, false]);
+});

@@ -277,3 +277,12 @@ test('build: a market whose inflation source fails keeps its figure from the las
   assert.equal(later.countries[0].infl.v, 3.4, 'the OECD failed: the last figure is kept');
   assert.equal(later.countries[0].real, 1.9);
 });
+
+test('health: each market has its own allowance before it counts as late (weekly tables, holidays, batches)', () => {
+  const now = Date.parse('2026-10-07T10:00:00Z');
+  const row = countries => health({ rates: { countries } }, now).sources.find(s => s.key === 'yields');
+  assert.equal(row([{ badge: 'CH', date: '2026-09-20', lateAfter: 35 }]).state, 'ok');
+  assert.equal(row([{ badge: 'CH', date: '2026-08-20', lateAfter: 35 }]).state, 'down');
+  assert.equal(row([{ badge: 'US', date: '2026-09-25' }]).state, 'down', 'default: 7 days');
+  assert.equal(COUNTRIES.find(c => c.id === 'ch').lateAfter, 35);
+});
