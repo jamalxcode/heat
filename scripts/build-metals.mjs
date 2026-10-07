@@ -19,7 +19,9 @@ import { fetchExtras, pool, isoDay, dayNum, DAY, XAPI_FROM } from './build-forex
 const HISTORY_DAYS = 400;               // calendar days kept: indicators need 260
 const REFETCH = 60 * 60e3;              // exchange-api changes once a day: check for a new file hourly
 const FMT = 2;                          // 2: exchange-api files filed under the day before their date
-const AGREE_PCT = 1;                    // the two sources' closes within this: confirmed
+// the two sources' closes within this (%): confirmed. Silver and the platinum metals swing several times more than gold,
+// and the sources take their daily price at slightly different times, so on a volatile day they need more room
+export const AGREE_PCT = { xau: 1, xag: 2, xpt: 2, xpd: 2 };
 const SQ_KEEP = 10;                     // days of Swissquote closing quotes kept for the cross-check
 
 export const METALS = [
@@ -70,7 +72,7 @@ export async function fetchLive(fetchFn = fetch) {
 }
 
 // Cross-check: for each metal, the latest day both sources have (exchange-api's close, Swissquote's last quote that
-// day). → { xau: { day, diff: % (Swissquote vs exchange-api), ok: within AGREE_PCT }, … }
+// day). → { xau: { day, diff: % (Swissquote vs exchange-api), ok: within AGREE_PCT for that metal }, … }
 export function crossCheck(days, sq, primaryLatest) {
   const out = {};
   for (const m of METALS) {
@@ -78,7 +80,7 @@ export function crossCheck(days, sq, primaryLatest) {
       const x = days[isoDay(d)]?.[m.code], s = sq[isoDay(d)]?.[m.code];
       if (!(x > 0 && s > 0)) continue;
       const diff = (s * x - 1) * 100;                     // x is ounces per dollar: s × x = Swissquote ÷ exchange-api
-      out[m.code] = { day: isoDay(d), diff: +diff.toFixed(2), ok: Math.abs(diff) <= AGREE_PCT };
+      out[m.code] = { day: isoDay(d), diff: +diff.toFixed(2), ok: Math.abs(diff) <= (AGREE_PCT[m.code] ?? 1) };
       break;
     }
   }

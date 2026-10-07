@@ -30,10 +30,12 @@ const SERIES_DAYS = 760;                // ~2 years of daily 10-year and short y
 const LONG_DAYS = 3660;                 // ~10 years of weekly 10-year and short yields, for the slope history and its rank
 const LONG_EVERY = 7 * DAY;             // how often a fetch reaches back that far (in between, the history is carried over)
 const FMT = 1;                          // the history kept between runs (China's, India's): a change drops it
-const LAYOUT = 2;                       // what each market carries (2: inflation, real yield, ten-year rank): a change
+const LAYOUT = 3;                       // what each market carries (2: inflation, real yield, ten-year rank; 3: lateAfter): a change
                                         // rebuilds the file at once instead of reusing the last one for REFETCH
 export const FLAT_PP = 0.5;
 
+// lateAfter: days before the health line calls a market late (default 7: the RBA's table comes out weekly, China closes
+// for week-long holidays, the SNB publishes in batches);
 // short: the short leg of the slope ('2y', or 'Bank Rate' / '3m' where no 2-year is published); every: hours between
 // fetches when more than the default REFETCH (a big file); note: a caveat shown under the market's chart
 export const COUNTRIES = [
@@ -46,15 +48,15 @@ export const COUNTRIES = [
     note: 'The free daily series has the 5, 10 and 20-year gilt yields; the short end is the Bank Rate.' },
   { id: 'jp', region: 'Asia-Pacific', name: 'Japan', flag: '🇯🇵', badge: 'JP', src: 'Ministry of Finance Japan', srcUrl: 'https://www.mof.go.jp/english/policy/jgbs/reference/interest_rate/index.htm', short: '2y' },
   { id: 'ca', region: 'Americas', name: 'Canada', flag: '🇨🇦', badge: 'CA', src: 'Bank of Canada', srcUrl: 'https://www.bankofcanada.ca/rates/interest-rates/canadian-bonds/', short: '2y' },
-  { id: 'au', region: 'Asia-Pacific', name: 'Australia', flag: '🇦🇺', badge: 'AU', src: 'Reserve Bank of Australia', srcUrl: 'https://www.rba.gov.au/statistics/tables/#interest-rates', short: '2y',
+  { id: 'au', region: 'Asia-Pacific', name: 'Australia', flag: '🇦🇺', badge: 'AU', lateAfter: 10, src: 'Reserve Bank of Australia', srcUrl: 'https://www.rba.gov.au/statistics/tables/#interest-rates', short: '2y',
     note: 'The Reserve Bank publishes the 2, 3, 5 and 10-year government bond yields.' },
-  { id: 'ch', region: 'Europe', name: 'Switzerland', flag: '🇨🇭', badge: 'CH', src: 'Swiss National Bank', srcUrl: 'https://data.snb.ch/en/topics/ziredev', short: '2y',
-    note: 'Spot rates of Swiss Confederation bonds.' },
+  { id: 'ch', region: 'Europe', name: 'Switzerland', flag: '🇨🇭', badge: 'CH', lateAfter: 35, src: 'Swiss National Bank', srcUrl: 'https://data.snb.ch/en/topics/ziredev', short: '2y',
+    note: 'Spot rates of Swiss Confederation bonds. The Swiss National Bank publishes them in batches, so the latest can be a few weeks old.' },
   { id: 'se', region: 'Europe', name: 'Sweden', flag: '🇸🇪', badge: 'SE', src: 'Sveriges Riksbank', srcUrl: 'https://www.riksbank.se/en-gb/statistics/interest-rates-and-exchange-rates/', short: '2y' },
   { id: 'no', region: 'Europe', name: 'Norway', flag: '🇳🇴', badge: 'NO', src: 'Norges Bank', srcUrl: 'https://www.norges-bank.no/en/topics/Statistics/Interest-rates/Government-debt-securities/', short: '2y' },
   { id: 'br', region: 'Americas', name: 'Brazil', flag: '🇧🇷', badge: 'BR', src: 'Tesouro Nacional (Tesouro Direto rates)', srcUrl: 'https://www.tesourotransparente.gov.br/ckan/dataset/taxas-dos-titulos-ofertados-pelo-tesouro-direto', short: '2y', every: 12,
     note: 'Fixed-rate bonds offered to savers through Tesouro Direto (Prefixado, with and without coupons): the National Treasury’s own daily rates, close to the market’s. Maturities are fixed dates, so the points move a little each day.' },
-  { id: 'cn', region: 'Asia-Pacific', name: 'China', flag: '🇨🇳', badge: 'CN', src: 'ChinaBond (China Central Depository & Clearing)', srcUrl: 'https://yield.chinabond.com.cn/cbweb-mn/yield_main?locale=en_US', short: '2y',
+  { id: 'cn', region: 'Asia-Pacific', name: 'China', flag: '🇨🇳', badge: 'CN', lateAfter: 12, src: 'ChinaBond (China Central Depository & Clearing)', srcUrl: 'https://yield.chinabond.com.cn/cbweb-mn/yield_main?locale=en_US', short: '2y',
     note: 'ChinaBond’s government bond yield curve, the benchmark for Chinese government bonds; before the last month the history is weekly.' },
   { id: 'in', region: 'Asia-Pacific', name: 'India', flag: '🇮🇳', badge: 'IN', src: 'Financial Benchmarks India (FBIL)', srcUrl: 'https://www.fbil.org.in/#/benchmark/gsec', short: '2y', perDay: true,
     note: 'FBIL’s daily par yield curve for government securities (G-secs), published as one file per day; the history is filled in weekly points at first, then daily.' },
@@ -448,7 +450,7 @@ export function summarize(c, days, now, prevLong = null) {
   // sign); not the UK, whose short end here is the Bank Rate
   const y3m = c.short !== 'Bank Rate' && pts[0][0] > 0 && pts[0][0] <= 0.26 ? interp(pts, 0.25) : null;
   return {
-    id: c.id, name: c.name, flag: c.flag, badge: c.badge, region: c.region, src: c.src, srcUrl: c.srcUrl, short: c.short, note: c.note || null, fetchedAt: now,
+    id: c.id, name: c.name, flag: c.flag, badge: c.badge, region: c.region, src: c.src, srcUrl: c.srcUrl, short: c.short, note: c.note || null, lateAfter: c.lateAfter || 7, fetchedAt: now,
     date: isoDay(last), y10: ten == null ? null : r4(ten), yShort: sh == null ? null : r4(sh), slope, state: slopeState(slope),
     y3m: y3m == null ? null : r4(y3m), slope3m: y3m != null && ten != null ? r4(ten - y3m) : null, slopePct, longYears,
     curve: pts,

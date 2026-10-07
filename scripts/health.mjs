@@ -64,7 +64,8 @@ export function health({ crypto, forex, metals, energy, rates, fuel, tv }, now =
   // Bond yields: the official curves (US Treasury, ECB, Bank of England, MOF Japan, Bank of Canada, Bank Al-Maghrib).
   // Each publishes once a business day, some a few days late: a curve over a week old, or not refreshed, is a warning
   if (rates !== undefined) {
-    const cs = rates?.countries || [], old = cs.filter(c => c.notRefreshed || ageDays(c.date, now) > 7);
+    // each market's own allowance (lateAfter: the RBA's weekly table, China's holidays, the SNB's batches; default 7 days)
+    const cs = rates?.countries || [], old = cs.filter(c => c.notRefreshed || ageDays(c.date, now) > (c.lateAfter || 7));
     const oldest = cs.reduce((a, c) => !a || c.date < a.date ? c : a, null);
     // the ECB's monthly European figures: month M's average comes out early in M+1, so a month 75+ days old is late
     const ms = rates?.monthly || [], mLate = ms.length && (ms.some(m => m.notRefreshed) || ageDays(ms[0].month + '-01', now) > 75);
