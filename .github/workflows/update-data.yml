@@ -71,6 +71,7 @@ jobs:
           # sitemap for search engines: the crypto, forex, metals, energy and rates pages, whose data changes every day
           printf '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>https://heat.sala.company/</loc><lastmod>%s</lastmod><changefreq>hourly</changefreq></url>\n  <url><loc>https://heat.sala.company/forex/</loc><lastmod>%s</lastmod><changefreq>daily</changefreq></url>\n  <url><loc>https://heat.sala.company/metals/</loc><lastmod>%s</lastmod><changefreq>daily</changefreq></url>\n  <url><loc>https://heat.sala.company/energy/</loc><lastmod>%s</lastmod><changefreq>daily</changefreq></url>\n  <url><loc>https://heat.sala.company/rates/</loc><lastmod>%s</lastmod><changefreq>daily</changefreq></url>\n</urlset>\n' "$(date -u +%F)" "$(date -u +%F)" "$(date -u +%F)" "$(date -u +%F)" "$(date -u +%F)" > _site/sitemap.xml
           cp scripts/build-data.mjs _site/scripts/   # the page runs it itself if data.json ever goes stale
+          cp scripts/build-forex.mjs _site/scripts/  # the page imports it for the US Dollar Index bar (app/dxy.mjs); every page loads it
           [ -f data/scorecard.json ] && cp data/scorecard.json _site/ || true
           [ -f data/pairs.json ] && cp data/pairs.json _site/ || true
           node scripts/build-data.mjs _site/data.json
