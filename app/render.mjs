@@ -4,7 +4,6 @@ import { $, $$, BINS, chgOf, esc, fmtBig, fmtPct, fmtPrice, heatClass, logo, M, 
 import { computeFor, match, P } from './data.mjs';
 import { emo, pc, renderScorecard } from './scorecard.mjs';
 import { showDetail } from './interact.mjs';
-import { renderDxy } from './dxy.mjs';
 
 /* ================= rendering ================= */
 export const ICON = {
@@ -336,7 +335,6 @@ export function renderAll() {
   $('#grid').classList.toggle('heatmap', S.density === 'heatmap');   // heatmap tiles: colour, symbol, change, price
   $('#density').hidden = S.view !== 'grid';
   if (S.view === 'grid') renderGrid(); else if (S.view === 'table') renderTable(); else renderScorecard();
-  if (M.key === 'forex') renderDxy();         // the US Dollar Index bar above the grid
   renderCounts();
   renderFooter();
   syncURL();                                  // the address bar always shares what's on screen

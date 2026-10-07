@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as S from '../signals.mjs';
-import { CURRENCIES, scored, pairOf, priceOf, assemble, toSnapshot, isoDay, dayNum, DAY, BACK, DXY_WEIGHTS, dxySeries } from '../scripts/build-forex.mjs';
+import { CURRENCIES, scored, pairOf, priceOf, assemble, toSnapshot, isoDay, dayNum, DAY, BACK } from '../scripts/build-forex.mjs';
 import { swap } from '../scripts/market-page.mjs';
 
 const cur = code => CURRENCIES.find(c => c.code === code);
@@ -91,26 +91,4 @@ test('forex page: the SEO, About and sources blocks are swapped, the rest is the
   const out = swap(html, 'SEO', '<!-- SEO:start -->\n<title>Forex</title>\n<!-- SEO:end -->\n');
   assert.equal(out, '<head>\n<!-- SEO:start -->\n<title>Forex</title>\n<!-- SEO:end -->\n</head><p>tiles</p>');
   assert.throws(() => swap('<p></p>', 'ABOUT', 'x'), /no ABOUT markers/);
-});
-
-test('dxySeries: ICE formula on the six USD/XXX rates, only on days all six have', () => {
-  assert.equal(Object.values(DXY_WEIGHTS).reduce((a, b) => a + b, 0).toFixed(3), '1.000', 'weights add up to 100%');
-  const t0 = dayNum('2026-09-28') * DAY;
-  const h = (c, d = [0, 1, 2]) => ({ t0, d, c });
-  // every rate at 1: the index is the formula's constant
-  const ones = Object.fromEntries(Object.keys(DXY_WEIGHTS).map(id => [id, h([1, 1, 1])]));
-  assert.deepEqual(dxySeries(ones).map(x => x[1]), [50.143, 50.143, 50.143]);
-  // the dollar buys 1% more euros: the index rises by about the euro's weight (0.576%)
-  const eurUp = { ...ones, eur: h([1, 1.01, 1.01]) };
-  const eurMove = (dxySeries(eurUp)[1][1] / dxySeries(eurUp)[0][1] - 1) * 100;
-  assert.ok(Math.abs(eurMove - 0.575) < 0.005, `index moved ${eurMove}%`);   // 1.01^0.576 − 1, with the index kept to 3 decimals
-  // a day one currency lacks is left out; a missing currency gives no index
-  const gap = { ...ones, sek: h([1, 1], [0, 2]) };
-  assert.deepEqual(dxySeries(gap).map(x => isoDay(x[0] / DAY)), ['2026-09-28', '2026-09-30']);
-  const { chf, ...noChf } = ones;
-  assert.equal(dxySeries(noChf), null);
-  // early-2024 rates (EUR/USD 1.08, USD/JPY 150, GBP/USD 1.27, USD/CAD 1.36, USD/SEK 10.5, USD/CHF 0.88): DXY was about 104
-  const real = { eur: h([1 / 1.08]), jpy: h([150]), gbp: h([1 / 1.27]), cad: h([1.36]), sek: h([10.5]), chf: h([0.88]) };
-  const v = dxySeries(real)[0][1];
-  assert.ok(v > 103 && v < 105, `DXY ${v}`);
 });
