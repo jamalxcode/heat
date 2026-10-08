@@ -282,7 +282,7 @@ function render() {
     ? `Colour: the curve, 10-year minus 2-year: ${scale([['h-3', '≤ −0.5'], ['h-1', '−0.25…0'], ['h0', '0…0.5 flat'], ['h1', '0.5…1'], ['h3', '≥ 1.5']])} pp · <b>red = inverted</b>, blue = steep`
     : colorBy === 'real'
       ? `Colour: the real yield (10-year minus inflation): ${scale([['h-3', '≤ −2'], ['h-1', '−1…−0.25'], ['h0', '±0.25'], ['h2', '1…2'], ['h4', '≥ 3']])} % · <b>blue = above inflation</b>, red = below`
-      : `${tf} change in the 10-year yield: ${scale([['h-4', `≤ −${t[3]}`], ['h-2', `−${t[1]}…${t[2]}`], ['h0', `±${t[0]}`], ['h2', `${t[1]}…${t[2]}`], ['h4', `≥ ${t[3]}`]])} bp · <b>blue = yields rose</b> (bond prices fell)`;
+      : `${tf} change in the 10-year yield: ${scale([['h-4', `≤ −${t[3]}`], ['h-2', `−${t[1]}…${t[2]}`], ['h0', `±${t[0]}`], ['h2', `${t[1]}…${t[2]}`], ['h4', `≥ ${t[3]}`]])} bp · <b>blue = yields rose</b> (bond prices fell) <span class="r-bpnote" title="A basis point is a hundredth of a percentage point">· 1 bp = 0.01 pt, so +25 bp = 4.00% → 4.25%</span>`;
   $('#rtf').hidden = colorBy !== 'change';
   $$('#rcolor button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === colorBy));
   // the address names the open market (?c=jp), so a link opens its curve
