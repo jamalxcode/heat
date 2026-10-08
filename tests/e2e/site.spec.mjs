@@ -870,6 +870,7 @@ test.describe('rates', () => {
   test('colour by: change (a week by default), the curve or the real yield; the corner number follows; remembered', async ({ page }) => {
     await expect(page.locator('#rtf button[aria-pressed="true"]')).toHaveText('1w');
     await expect(page.locator('#rlegend')).toContainText('1w change in the 10-year yield');
+    await expect(page.locator('#rlegend .r-bpnote')).toContainText('1 bp = 0.01 pt');
     await page.locator('#rcolor button[data-v="curve"]').click();
     await expect(page.locator('#rtf')).toBeHidden();
     await expect(page.locator('#rlegend')).toContainText('the curve');
