@@ -623,6 +623,11 @@
    "MEXC": "XTZ",
    "KuCoin": "XTZ",
    "Gate.io": "XTZ"
+  },
+  "unibase": {
+   "KuCoin": "UB",
+   "Gate.io": "UB",
+   "MEXC": "UB"
   }
  }
 }
