@@ -626,12 +626,12 @@ test.describe('metals', () => {
     await expect(page.locator('#status')).toContainText(`${N}/${N} assets with indicators`);
   });
 
-  test('loads its own data and search tags; no scorecard, no pegged checkbox; the switch links all five pages', async ({ page }) => {
+  test('loads its own data and search tags; no scorecard, no pegged checkbox; the switch links all six pages', async ({ page }) => {
     await expect(tiles(page)).toHaveCount(N);
     await expect(page).toHaveTitle(/Precious Metals Heatmap/);
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://heat.sala.company/metals/');
     await expect(page.locator('#market a[aria-current="page"]')).toHaveText(/Metals/);
-    await expect(page.locator('#market a')).toHaveCount(5);
+    await expect(page.locator('#market a')).toHaveCount(6);
     await expect(page.locator('#market a[data-m="forex"]')).toHaveAttribute('href', '/forex/');
     await expect(page.locator('#view [data-v="score"]')).toBeHidden();
     await expect(page.locator('#pegged')).toBeHidden();
