@@ -1,7 +1,7 @@
 // Sources health: one line in every page's footer saying which data sources are working, so a source that quietly
 // fails (a backup in use, a stale feed) is visible instead of silent. Built at the end of the deploy job from the
 // files it just made, so it costs no extra requests.
-//   node scripts/health.mjs <out health.json> <data.json> <forex.json> <metals.json> <tv.json> [energy.json] [rates.json] [fuel.json]
+//   node scripts/health.mjs <out health.json> <data.json> <forex.json> <metals.json> <tv.json> [energy.json] [rates.json] [fuel.json] [etfs.json]
 // state: 'ok' (✓), 'warn' (⚠: working, but on a backup, partly, or a bit old) or 'down' (✕: not working)
 const DAY = 864e5, HOUR = 36e5;
 const ageDays = (iso, now) => iso ? (now - Date.parse(iso + 'T00:00:00Z')) / DAY : Infinity;
@@ -13,7 +13,15 @@ export function futuresOpen(now) {
   return !(wd === 6 || (wd === 5 && h >= 21) || (wd === 0 && h < 23));
 }
 
-export function health({ crypto, forex, metals, energy, rates, fuel, tv }, now = Date.now()) {
+// US stocks trade 9:30–16:00 New York time on weekdays: 13:30–20:00 UTC in summer, 14:30–21:00 in winter. A rough
+// UTC window wide enough for both, starting 30 minutes late so the first quote of the day has time to arrive
+// (holidays aren't known here).
+export function stocksOpen(now) {
+  const d = new Date(now), wd = d.getUTCDay(), h = d.getUTCHours() + d.getUTCMinutes() / 60;
+  return wd >= 1 && wd <= 5 && h >= 15 && h < 20;
+}
+
+export function health({ crypto, forex, metals, energy, etfs, rates, fuel, tv }, now = Date.now()) {
   const out = [];
   const add = (key, name, what, state, note) => out.push({ key, name, what, state, note });
 
@@ -61,6 +69,16 @@ export function health({ crypto, forex, metals, energy, rates, fuel, tv }, now =
       !src ? 'no data' : `${src.got}/${src.of} contracts · newest quote ${Number.isFinite(age) ? (age < 2 * HOUR ? `${Math.round(age / 60e3)} min` : `${(age / HOUR).toFixed(0)} h`) + ' old' : 'missing'}${open ? '' : ' · markets closed'}`);
   }
 
+  // Yahoo Finance: the ETF prices. Judged by the newest quote's age during US market hours; outside them the last
+  // close is the latest there is (a Friday close on Monday morning, or after a holiday)
+  if (etfs !== undefined) {
+    const src = etfs?.sources, age = src?.at ? now - src.at : Infinity;
+    const open = stocksOpen(now), most = src && src.got >= src.of * 0.95;
+    add('yahoo-etf', 'Yahoo (ETFs)', 'US ETF prices',
+      !src ? 'down' : open ? (age <= 45 * 60e3 && most ? 'ok' : age <= DAY ? 'warn' : 'down') : (age <= 4.5 * DAY ? (most ? 'ok' : 'warn') : 'down'),
+      !src ? 'no data' : `${src.got}/${src.of} ETFs · newest quote ${Number.isFinite(age) ? (age < 2 * HOUR ? `${Math.round(age / 60e3)} min` : `${(age / HOUR).toFixed(0)} h`) + ' old' : 'missing'}${open ? '' : ' · market closed'}`);
+  }
+
   // Bond yields: the official curves (US Treasury, ECB, Bank of England, MOF Japan, Bank of Canada, Bank Al-Maghrib).
   // Each publishes once a business day, some a few days late: a curve over a week old, or not refreshed, is a warning
   if (rates !== undefined) {
@@ -102,8 +120,8 @@ if (IS_NODE && process.argv[1] && import.meta.url.endsWith(process.argv[1].repla
   const { readFile, writeFile } = await import('node:fs/promises');
   const [out = 'health.json', ...files] = process.argv.slice(2);
   const read = async f => { try { return JSON.parse(await readFile(f, 'utf8')); } catch { return null; } };
-  const [crypto, forex, metals, tv, energy = null, rates = null, fuel = null] = await Promise.all(files.map(read));
-  const h = health({ crypto, forex, metals, energy, rates, fuel, tv });
+  const [crypto, forex, metals, tv, energy = null, rates = null, fuel = null, etfs = null] = await Promise.all(files.map(read));
+  const h = health({ crypto, forex, metals, energy, etfs, rates, fuel, tv });
   await writeFile(out, JSON.stringify(h));
   console.log('Sources: ' + h.sources.map(s => `${s.name} ${s.state === 'ok' ? '✓' : s.state === 'warn' ? '⚠' : '✕'} (${s.note})`).join(' · '));
 }

@@ -2,7 +2,7 @@
 // Each asset has a list of candidate TradingView symbols, best first (the exchange pair its candles came from, then
 // fallbacks). The deploy job checks the candidates against TradingView's public symbol lookup and caches the results
 // in tv.json; the page links to the first candidate known to exist, and shows no link when none does.
-//   node scripts/tradingview.mjs <out tv.json> <data.json> [forex.json] [metals.json] [energy.json] [rates.json]   (env PREV_URL = last tv.json)
+//   node scripts/tradingview.mjs <out tv.json> <data.json> [forex.json] [metals.json] [energy.json] [rates.json] [etfs.json]   (env PREV_URL = last tv.json)
 // The page imports candidates() and pick(), so it has no Node dependencies.
 
 // our candle source → TradingView exchange prefix
@@ -12,13 +12,16 @@ const METAL = { xau: 'TVC:GOLD', xag: 'TVC:SILVER', xpt: 'TVC:PLATINUM', xpd: 'T
 // rates: the 10-year government bond yield, TVC:XX10Y by country code (the UK is GB, the euro area EU)
 const RATE_CODE = { uk: 'GB', ea: 'EU' };
 const ENERGY = { wti: 'NYMEX:CL1!', brent: 'ICEEUR:BRN1!', diesel: 'NYMEX:HO1!', gasoline: 'NYMEX:RB1!', natgas: 'NYMEX:NG1!', ttf: 'ICEENDEX:TFM1!' };
+// ETFs: the ticker on its listing exchange (Yahoo's exchange code → TradingView's prefix; NYSE Arca is AMEX there),
+// then the other US exchanges in case the listing moved
+const ETF_EXCH = { PCX: 'AMEX', ASE: 'AMEX', NGM: 'NASDAQ', NMS: 'NASDAQ', NCM: 'NASDAQ', NAS: 'NASDAQ', NIM: 'NASDAQ', BTS: 'CBOE', NYQ: 'NYSE' };
 const clean = s => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
 // symbols that may belong to a different asset with the same ticker: only trusted if TradingView's description
 // matches the asset's name (the exchange pairs come from verified trading pairs, so they don't need this)
 const loose = sym => sym.startsWith('CRYPTO:') || sym.startsWith('COINBASE:');
 
-// c: the tile (id, symbol, name); h: its hist entry (src, pair); market: 'crypto' | 'forex' | 'metals' | 'energy' | 'rates'; flipped: the
+// c: the tile (id, symbol, name); h: its hist entry (src, pair); market: 'crypto' | 'forex' | 'metals' | 'energy' | 'etfs' | 'rates'; flipped: the
 // forex …/USD view
 export function candidates(c, h, market, flipped = false) {
   if (market === 'forex') {
@@ -27,6 +30,10 @@ export function candidates(c, h, market, flipped = false) {
   }
   if (market === 'rates') return /^[a-z]{2}$/.test(c.id) ? [`TVC:${(RATE_CODE[c.id] || c.id).toUpperCase()}10Y`] : [];
   if (market === 'energy') return ENERGY[c.id] ? [ENERGY[c.id]] : [];
+  if (market === 'etfs') {
+    const t = clean(c.symbol);
+    return t ? [...new Set([ETF_EXCH[c.exch], 'AMEX', 'NASDAQ', 'CBOE'].filter(Boolean).map(x => `${x}:${t}`))] : [];
+  }
   if (METAL[c.id]) return [METAL[c.id]];
   const out = [], sym = clean(c.symbol);
   const base = clean(String(h?.pair || '').split('/')[0]);
@@ -98,12 +105,13 @@ export async function refresh(assets, prev = {}, { now = Date.now(), lookupFn = 
   return sym;
 }
 
-// every asset on the five pages (both quote directions for forex); the short lists first, so a first run (80
+// every asset on the six pages (both quote directions for forex); the short lists first, so a first run (80
 // checks at most) covers metals and currencies, and the coins over the next few runs
-export function assetsOf({ crypto, forex, metals, energy, rates }) {
+export function assetsOf({ crypto, forex, metals, energy, etfs, rates }) {
   const out = [];
   for (const c of [...(rates?.countries || []), ...(rates?.monthly || [])]) out.push([c, null, 'rates']);
   for (const c of energy?.markets || []) out.push([c, energy.hist?.[c.id], 'energy']);
+  for (const c of etfs?.markets || []) out.push([c, null, 'etfs']);
   for (const c of metals?.markets || []) out.push([c, metals.hist?.[c.id], 'metals']);
   for (const c of forex?.markets || []) out.push([c, null, 'forex', false], [c, null, 'forex', true]);
   for (const c of crypto?.markets || []) out.push([c, crypto.hist?.[c.id], 'crypto']);
@@ -116,12 +124,12 @@ if (IS_NODE && process.argv[1] && import.meta.url.endsWith(process.argv[1].repla
   const { readFile, writeFile } = await import('node:fs/promises');
   const [out = 'tv.json', ...files] = process.argv.slice(2);
   const read = async f => { try { return JSON.parse(await readFile(f, 'utf8')); } catch { return null; } };
-  const [crypto, forex, metals, energy, rates] = await Promise.all(files.map(read));
+  const [crypto, forex, metals, energy, rates, etfs] = await Promise.all(files.map(read));
   let prev = {};
   if (process.env.PREV_URL) {
     try { prev = (await (await fetch(process.env.PREV_URL + '?b=' + Date.now(), { signal: AbortSignal.timeout(20e3) })).json()).sym || {}; }
     catch { console.log('No previous tv.json (first run?)'); }
   }
-  const sym = await refresh(assetsOf({ crypto, forex, metals, energy, rates }), prev);
+  const sym = await refresh(assetsOf({ crypto, forex, metals, energy, etfs, rates }), prev);
   await writeFile(out, JSON.stringify({ v: 1, t: Date.now(), sym }));
 }

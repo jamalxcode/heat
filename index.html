@@ -413,7 +413,7 @@ button.sc-chip:hover, button.sc-chip[aria-expanded="true"] { box-shadow: inset 0
 /* phones: filter chips become one swipeable row, and the top bar, controls and scale tighten up */
 @media (max-width: 640px) {
   .controls .ctl { flex: 1 1 100%; min-width: 0; }
-  .seg.market { max-width: 100%; overflow-x: auto; scrollbar-width: none; }   /* five markets: swipe sideways if they don't fit */
+  .seg.market { max-width: 100%; overflow-x: auto; scrollbar-width: none; }   /* six markets: swipe sideways if they don't fit */
   .seg.market::-webkit-scrollbar { display: none; }
   .seg.market a { flex: none; }
   .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
@@ -528,6 +528,12 @@ body.proven-pnfUp [data-k="pnfUp"], body.proven-pnfDown [data-k="pnfDown"] { fon
 .grid.heatmap .tile.stop-closed, .grid.heatmap .tile.stop-intraday { box-shadow: none; }
 .grid.heatmap .tile.stop-closed::after { content: '🛑'; position: absolute; top: 5px; right: 6px; font-size: 13px; line-height: 1; }
 .grid.heatmap .tile.stop-intraday::after { content: '⚠'; position: absolute; top: 5px; right: 6px; font-size: 13px; line-height: 1; }
+/* ETFs: a heading per group across the grid, and heatmap tiles that keep the fund's short name (tickers say little) */
+.grid .tgroup { grid-column: 1 / -1; margin: 14px 0 2px; font-size: 15px; font-weight: 700; display: flex; align-items: baseline; gap: 8px; }
+.grid .tgroup:first-child { margin-top: 0; }
+.grid .tgroup span { font-size: 12px; font-weight: 600; color: var(--muted); }
+.grid.heatmap.named .tile .name { display: block; font-size: 10.5px; line-height: 1.25; opacity: .85; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.grid.heatmap.named .tile .name .emo, .grid.heatmap.named .tile .name .pnf-mark { display: none; }
 @media (max-width: 700px) { .grid.heatmap { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; } .grid.heatmap .tile { min-height: 80px; } .grid.heatmap .tile .chg { font-size: 18px; } }
 /* a price that changed since the last refresh blinks once in its direction */
 @keyframes flash-up { from { box-shadow: inset 0 0 0 3px #4aa8e8; } to { box-shadow: inset 0 0 0 3px transparent; } }
@@ -669,6 +675,7 @@ footer .about p { margin: 0; }
       <a href="/forex/" data-m="forex">💱 Forex</a>
       <a href="/metals/" data-m="metals">🥇 Metals</a>
       <a href="/energy/" data-m="energy">🛢️ Energy</a>
+      <a href="/etfs/" data-m="etfs">📊 ETFs</a>
       <a href="/rates/" data-m="rates">📈 Rates</a>
     </nav>
     <div class="seg" id="colorBy" role="group" aria-label="Color by">

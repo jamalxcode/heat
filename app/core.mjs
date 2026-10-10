@@ -64,6 +64,7 @@ export const logo = (c, px) => c.flag
   ? FLAG_EMOJI ? `<span class="flag" style="font-size:${px - 2}px" aria-hidden="true">${c.flag}</span>` : `<span class="flag-code" aria-hidden="true">${flagCode(c.flag)}</span>`
   : c.badge ? `<span class="metal metal-${esc(c.id)}" style="width:${px}px;height:${px}px" aria-hidden="true">${esc(c.badge)}</span>`   // metals: their chemical symbol (Au, Ag …)
   : c.image ? `<img src="${esc(c.image)}" alt="" loading="lazy" width="${px}" height="${px}">`
+  : c.group ? ''                      // ETFs: the ticker is the logo (country funds get their flag above)
   : `<span class="ph" style="width:${px}px;height:${px}px" aria-hidden="true">${esc(c.symbol.slice(0, 1).toUpperCase())}</span>`;
 
 /* ================= state ================= */

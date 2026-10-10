@@ -14,6 +14,8 @@ export const CHECKS = [
   ['metals.json', d => Date.now() - Date.parse(d.metalsDate + 'T00:00:00Z'), 3 * DAY, 'latest metal price date'],
   ['energy.json', d => Date.now() - d.generated, HOUR, 'energy file last built'],
   ['energy.json', d => Date.now() - (d.sources?.at || 0), 3 * DAY + 6 * HOUR, 'newest energy futures quote'],   // Fri 21:00 UTC → Mon 03:00, or a holiday
+  ['etfs.json', d => Date.now() - d.generated, HOUR, 'ETF file last built'],
+  ['etfs.json', d => Date.now() - (d.sources?.at || 0), 4 * DAY + 6 * HOUR, 'newest ETF quote'],   // Fri 20:00 UTC → Tue morning after a Monday holiday
   ['rates.json', d => Date.now() - d.generated, HOUR, 'rates file last built'],
   ['fuel.json', d => Date.now() - d.generated, HOUR, 'fuel file last built'],
   ['fuel.json', d => Date.now() - Date.parse((d.pump.find(p => p.id === 'us')?.date || '1970-01-01') + 'T00:00:00Z'), 10 * DAY, 'latest US pump prices (weekly)'],

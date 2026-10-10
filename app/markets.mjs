@@ -125,6 +125,27 @@ MARKETS.energy = {
     + (late ? ' · <b>⚠ this update is running late</b>' : '') + '</span>' + linkYahoo,
 };
 
+// ETFs: 112 US-listed stock ETFs from Yahoo Finance (scripts/build-etfs.mjs), shown in groups (US market, sectors,
+// industries & themes, international). Stocks trade on weekdays only, so the changes count trading days, like energy.
+const linkYahooEtf = '<a class="cg-attr" href="https://finance.yahoo.com/markets/etfs/" target="_blank" rel="noopener">Source: Yahoo Finance</a>';
+MARKETS.etfs = {
+  ...MARKETS.energy,
+  key: 'etfs', data: '/etfs.json', noun: 'ETFs', one: 'ETF', nameCol: 'ETF',
+  bins: { '24h': [0.5, 1, 2, 3.5], '7d': [1, 2.5, 5, 8], '30d': [2, 5, 10, 15] },
+  bench: 'spy', benchLabel: 'S&P 500',
+  volume: true,                       // real exchange volume: the VOL row and column work as on the crypto page
+  grouped: true,                      // the grid is split into the groups in etfs.json (US market, sectors, themes, abroad)
+  noScorecard: 'There’s no scorecard for ETFs yet: the 🚀/😢 are tested every day on the crypto and forex pages. Here they summarize each fund’s chart; the tiles, charts and stops work as everywhere else.',
+  tableCaption: () => 'US stock ETFs',
+  noHistory: 'No price history from Yahoo Finance for this ETF right now.',
+  price: p => '$' + p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+  verify: c => c.notRefreshed ? `<span class="vf guess" title="Yahoo Finance didn't answer for this ETF in the latest update: showing its last known price" aria-label="not refreshed">?</span>` : '',
+  sourceLine: (c, h, ind) => `${c.notRefreshed ? '⚠ not refreshed in the latest update · ' : ''}${esc(c.fund || h.pair)} (${esc(h.pair)}) on Yahoo Finance · US dollars · ${ind.n} trading days`,
+  srcInfo: () => 'ETFs: prices, daily history and volume from Yahoo Finance (unofficial, no key), checked every 10 minutes, so a price is up to about 10–20 minutes old; the day’s official close is picked up within the hour. US dollars per share.',
+  fresh: ({ tm, ago, next, late, refreshMin, latestDate }) => `<span>🕒 <b>Last refreshed ${tm}</b> (${ago}) · ${next} · <b>not real-time</b>: every ${refreshMin} min, US market hours only (9:30–16:00 New York)${latestDate ? ` (latest ${latestDate})` : ''}`
+    + (late ? ' · <b>⚠ this update is running late</b>' : '') + '</span>' + linkYahooEtf,
+};
+
 // Rates: government bond yield curves (scripts/build-rates.mjs). Not prices, so the page draws its own view (app/rates.mjs)
 // instead of the tile pipeline; these settings only label the shared controls and set the color scale (in basis points).
 MARKETS.rates = {
@@ -133,6 +154,6 @@ MARKETS.rates = {
   bins: { '1d': [2, 5, 10, 20], '1w': [5, 12, 25, 40], '1m': [10, 25, 50, 80] },
 };
 
-export const MARKET = ['forex', 'metals', 'energy', 'rates'].find(m => location.pathname.startsWith('/' + m)) || 'crypto';
+export const MARKET = ['forex', 'metals', 'energy', 'etfs', 'rates'].find(m => location.pathname.startsWith('/' + m)) || 'crypto';
 export const M = MARKETS[MARKET];
 export const TF = tf => M.label[tf];                       // what a timeframe is called on this market (24h / 1d …)

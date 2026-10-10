@@ -65,11 +65,11 @@ jobs:
         run: |
           mkdir -p _site
           mkdir -p _site/scripts
-          cp index.html signals.mjs robots.txt og-image.png og-image-forex.png og-image-metals.png og-image-energy.png og-image-rates.png _site/
+          cp index.html signals.mjs robots.txt og-image.png og-image-forex.png og-image-metals.png og-image-energy.png og-image-etfs.png og-image-rates.png _site/
           cp -r app _site/   # the page script, in modules (app/main.mjs starts it)
           cp -r fonts _site/   # Inter, self-hosted (no calls to Google)
-          # sitemap for search engines: the crypto, forex, metals, energy and rates pages, whose data changes every day
-          printf '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>https://heat.sala.company/</loc><lastmod>%s</lastmod><changefreq>hourly</changefreq></url>\n  <url><loc>https://heat.sala.company/forex/</loc><lastmod>%s</lastmod><changefreq>daily</changefreq></url>\n  <url><loc>https://heat.sala.company/metals/</loc><lastmod>%s</lastmod><changefreq>daily</changefreq></url>\n  <url><loc>https://heat.sala.company/energy/</loc><lastmod>%s</lastmod><changefreq>daily</changefreq></url>\n  <url><loc>https://heat.sala.company/rates/</loc><lastmod>%s</lastmod><changefreq>daily</changefreq></url>\n</urlset>\n' "$(date -u +%F)" "$(date -u +%F)" "$(date -u +%F)" "$(date -u +%F)" "$(date -u +%F)" > _site/sitemap.xml
+          # sitemap for search engines: the crypto, forex, metals, energy, ETF and rates pages, whose data changes every day
+          printf '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>https://heat.sala.company/</loc><lastmod>%s</lastmod><changefreq>hourly</changefreq></url>\n  <url><loc>https://heat.sala.company/forex/</loc><lastmod>%s</lastmod><changefreq>daily</changefreq></url>\n  <url><loc>https://heat.sala.company/metals/</loc><lastmod>%s</lastmod><changefreq>daily</changefreq></url>\n  <url><loc>https://heat.sala.company/energy/</loc><lastmod>%s</lastmod><changefreq>daily</changefreq></url>\n  <url><loc>https://heat.sala.company/etfs/</loc><lastmod>%s</lastmod><changefreq>daily</changefreq></url>\n  <url><loc>https://heat.sala.company/rates/</loc><lastmod>%s</lastmod><changefreq>daily</changefreq></url>\n</urlset>\n' "$(date -u +%F)" "$(date -u +%F)" "$(date -u +%F)" "$(date -u +%F)" "$(date -u +%F)" "$(date -u +%F)" > _site/sitemap.xml
           cp scripts/build-data.mjs _site/scripts/   # the page runs it itself if data.json ever goes stale
           cp scripts/build-forex.mjs _site/scripts/  # the page imports it for the US Dollar Index bar (app/dxy.mjs); every page loads it
           [ -f data/scorecard.json ] && cp data/scorecard.json _site/ || true
@@ -117,6 +117,18 @@ jobs:
           PREV_URL="$BASE_URL/fuel.json" node scripts/build-fuel.mjs _site/fuel.json _site/forex.json \
             || { echo "::warning::fuel build failed, republishing the last fuel.json"; curl -sf "$BASE_URL/fuel.json" -o _site/fuel.json || true; }
 
+      # ETFs: /etfs/ (same page, ETF search tags) and etfs.json: 112 US stock ETFs from Yahoo Finance (latest prices
+      # every build in 6 bulk requests, full history with volume hourly). A failure republishes the last good file and
+      # never blocks the rest of the deploy.
+      - name: Fetch ETF prices
+        env:
+          PREV_URL: ${{ steps.pages.outputs.base_url }}/etfs.json
+          BASE_URL: ${{ steps.pages.outputs.base_url }}
+        run: |
+          node scripts/market-page.mjs etfs _site/etfs/index.html
+          timeout 120 node scripts/build-etfs.mjs _site/etfs.json _site/data.json \
+            || { echo "::warning::ETF build failed, republishing the last etfs.json"; curl -sf "$BASE_URL/etfs.json" -o _site/etfs.json || true; }
+
       # Rates: /rates/ (same page, its own view in app/rates.mjs) and rates.json. The build started in the background at
       # the top of this job (it can take a few minutes, waiting on slow sources); here it's collected. A failure
       # republishes the last good file and never blocks the rest of the deploy.
@@ -136,12 +148,12 @@ jobs:
           BASE_URL: ${{ steps.pages.outputs.base_url }}
         run: |
           cp scripts/tradingview.mjs _site/scripts/   # the page imports it for the link
-          timeout 90 node scripts/tradingview.mjs _site/tv.json _site/data.json _site/forex.json _site/metals.json _site/energy.json _site/rates.json \
+          timeout 90 node scripts/tradingview.mjs _site/tv.json _site/data.json _site/forex.json _site/metals.json _site/energy.json _site/rates.json _site/etfs.json \
             || { echo "::warning::TradingView check failed, republishing the last tv.json"; curl -sf "$BASE_URL/tv.json" -o _site/tv.json || true; }
 
       # Sources health: one footer line on every page saying which data sources are working (from the files just built)
       - name: Sources health
-        run: node scripts/health.mjs _site/health.json _site/data.json _site/forex.json _site/metals.json _site/tv.json _site/energy.json _site/rates.json _site/fuel.json || echo "::warning::sources health line not built"
+        run: node scripts/health.mjs _site/health.json _site/data.json _site/forex.json _site/metals.json _site/tv.json _site/energy.json _site/rates.json _site/fuel.json _site/etfs.json || echo "::warning::sources health line not built"
 
       - uses: actions/upload-pages-artifact@v5
         with:

@@ -626,12 +626,12 @@ test.describe('metals', () => {
     await expect(page.locator('#status')).toContainText(`${N}/${N} assets with indicators`);
   });
 
-  test('loads its own data and search tags; no scorecard, no pegged checkbox; the switch links all five pages', async ({ page }) => {
+  test('loads its own data and search tags; no scorecard, no pegged checkbox; the switch links all six pages', async ({ page }) => {
     await expect(tiles(page)).toHaveCount(N);
     await expect(page).toHaveTitle(/Precious Metals Heatmap/);
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://heat.sala.company/metals/');
     await expect(page.locator('#market a[aria-current="page"]')).toHaveText(/Metals/);
-    await expect(page.locator('#market a')).toHaveCount(5);
+    await expect(page.locator('#market a')).toHaveCount(6);
     await expect(page.locator('#market a[data-m="forex"]')).toHaveAttribute('href', '/forex/');
     await expect(page.locator('#view [data-v="score"]')).toBeHidden();
     await expect(page.locator('#pegged')).toBeHidden();
@@ -735,6 +735,62 @@ test.describe('energy', () => {
     await expect(page.locator('#detail .d-src', { hasText: 'US dollars per barrel' })).toContainText('CL=F');
     await expect(page.locator('#detail .d-head a.tv').first()).toHaveAttribute('href', /symbol=NYMEX%3ACL1!$/);
     await expect(page.locator('#detail')).toContainText('vs Brent');
+  });
+});
+
+// ETFs: the same page at /etfs/, with etfs.json (tests/e2e/fixtures.mjs: all 112 funds on weekdays, KSA not refreshed)
+test.describe('etfs', () => {
+  const N = 112;
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/etfs/');
+    await expect(page.locator('#status')).toContainText(`${N}/${N} ETFs with indicators`);
+  });
+
+  test('loads its own data and search tags; no scorecard; trading-day timeframes', async ({ page }) => {
+    await expect(tiles(page)).toHaveCount(N);
+    await expect(page).toHaveTitle(/US ETF Heatmap/);
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://heat.sala.company/etfs/');
+    await expect(page.locator('#market a[aria-current="page"]')).toHaveText(/ETFs/);
+    await expect(page.locator('#view [data-v="score"]')).toBeHidden();
+    await expect(page.locator('#pegged')).toBeHidden();
+    await expect(page.locator('#colorBy button')).toHaveText(['1d', '1w', '1m']);
+    await expect(page.locator('#fresh')).toContainText('US market hours only');
+    await expect(page.locator('#fresh a')).toHaveText('Source: Yahoo Finance');
+    const ld = JSON.parse(await page.locator('script[type="application/ld+json"]').textContent());
+    const faq = ld['@graph'].find(x => x['@type'] === 'FAQPage').mainEntity.map(q => q.name);
+    expect(await page.locator('footer .about h3').allTextContents()).toEqual(faq);
+    expect(external).toEqual([]);
+  });
+
+  test('grouped: a heading per group with its count, tiles in order under it; filters keep the headings honest', async ({ page }) => {
+    await expect(page.locator('#grid .tgroup')).toHaveText(['US stock market 28', 'Sectors 11', 'Industries & themes 39', 'International 34']);
+    await expect(page.locator('#grid .tgroup[data-g="sector"] + .tile')).toHaveAttribute('data-id', 'xlk');
+    await expect(page.locator('#grid > *').first()).toHaveClass(/tgroup/);
+    await page.locator('#colorBy [data-v="7d"]').click();
+    const heat = page.locator('#legendScale [data-heat]').first();
+    await heat.click();
+    const shown = await tiles(page).count();
+    const counts = (await page.locator('#grid .tgroup span').allTextContents()).map(Number);
+    expect(counts.reduce((a, b) => a + b, 0)).toBe(shown);
+  });
+
+  test('tiles: short names (kept on heatmap tiles), flags for countries, dollar prices, fund name in the popup, a TradingView link', async ({ page }) => {
+    const spy = tile(page, 'spy');
+    await expect(spy).toContainText('S&P 500');
+    expect(await spy.locator('.px').textContent()).toMatch(/^\$[\d,]+\.\d\d$/);
+    await expect(tile(page, 'ewj')).toContainText('Japan');
+    await expect(tile(page, 'ewj').locator('.flag, .flag-code')).toHaveCount(1);
+    await expect(tile(page, 'ksa').locator('.vf.guess')).toHaveAttribute('title', /didn't answer/);   // not refreshed
+    await expect(spy.locator('.row .k', { hasText: 'VOL' })).toHaveCount(1);
+    await spy.click();
+    await expect(page.locator('#detail')).toHaveClass(/pinned/);
+    await expect(page.locator('#detail .d-src', { hasText: 'SPY Fund Trust' })).toContainText('SPY Fund Trust (SPY) on Yahoo Finance');
+    await expect(page.locator('#detail .d-head a.tv').first()).toHaveAttribute('href', /symbol=AMEX%3ASPY$/);
+    await page.keyboard.press('Escape');
+    await page.locator('#density [data-v="heatmap"]').click();
+    await expect(page.locator('#grid')).toHaveClass(/heatmap/);
+    await expect(spy.locator('.name .nm')).toBeVisible();
+    await expect(spy.locator('.name .nm')).toHaveText('S&P 500');
   });
 });
 
@@ -943,8 +999,8 @@ test.describe('phone', () => {
     await expect(popup).not.toHaveClass(/show/);
   });
 
-  test('every page fits the screen with the five-way market switch', async ({ page }) => {
-    for (const url of ['/', '/forex/', '/metals/', '/energy/', '/rates/']) {
+  test('every page fits the screen with the six-way market switch', async ({ page }) => {
+    for (const url of ['/', '/forex/', '/metals/', '/energy/', '/etfs/', '/rates/']) {
       await page.goto(url);
       await expect(page.locator('#grid .tile, #grid .rtile').first()).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), url).toBe(true);
