@@ -31,19 +31,25 @@ export const ENERGY = [
 const HOSTS = ['https://query1.finance.yahoo.com', 'https://query2.finance.yahoo.com'];
 const chartUrl = (host, sym, range) => `${host}/v8/finance/chart/${encodeURIComponent(sym)}?range=${range}&interval=1d&includePrePost=false`;
 
-// Yahoo's chart answer → { days: Map(trading day → close), price, t (ms of the latest quote) }, or null.
-// Each daily candle's time is midnight at the exchange, so its local date (time + the exchange's UTC offset) is the
-// trading day. Days without a close (holidays, the odd gap) are skipped; a repeated day keeps its last value.
+// Yahoo's chart answer → { days: Map(trading day → close), vols: Map(trading day → volume), price, t (ms of the
+// latest quote), name, exch }, or null. Each daily candle's time is midnight (futures) or the opening bell (stocks) at
+// the exchange, so its local date (time + the exchange's UTC offset) is the trading day. Days without a close
+// (holidays, the odd gap) are skipped; a repeated day keeps its last value.
 export function parseChart(j) {
   const r = j?.chart?.result?.[0];
-  const ts = r?.timestamp, cl = r?.indicators?.quote?.[0]?.close;
+  const ts = r?.timestamp, q = r?.indicators?.quote?.[0], cl = q?.close, vo = q?.volume;
   if (!Array.isArray(ts) || !Array.isArray(cl)) return null;
-  const off = (r.meta?.gmtoffset || 0) * 1000, days = new Map();
-  ts.forEach((t, i) => { if (cl[i] > 0) days.set(Math.floor((t * 1000 + off) / DAY), +cl[i].toPrecision(6)); });
+  const off = (r.meta?.gmtoffset || 0) * 1000, days = new Map(), vols = new Map();
+  ts.forEach((t, i) => {
+    if (!(cl[i] > 0)) return;
+    const d = Math.floor((t * 1000 + off) / DAY);
+    days.set(d, +cl[i].toPrecision(6));
+    if (vo?.[i] > 0) vols.set(d, vo[i]);
+  });
   const price = r.meta?.regularMarketPrice, at = r.meta?.regularMarketTime;
   if (price > 0 && at > 0) days.set(Math.floor((at * 1000 + off) / DAY), +price.toPrecision(6));   // the latest quote is today's close so far
   if (!days.size) return null;
-  return { days, price: price > 0 ? +price.toPrecision(6) : [...days.values()].at(-1), t: at > 0 ? at * 1000 : null };
+  return { days, vols, price: price > 0 ? +price.toPrecision(6) : [...days.values()].at(-1), t: at > 0 ? at * 1000 : null, name: r.meta?.longName || null, exch: r.meta?.exchangeName || null };
 }
 
 export async function fetchChart(sym, range, fetchFn = fetch) {

@@ -4,6 +4,7 @@ import * as SIG from '../../signals.mjs';
 import { assemble, toSnapshot, CURRENCIES, scored, pairOf, isoDay } from '../../scripts/build-forex.mjs';
 import { metalSeries, toSnapshot as metalsSnapshot } from '../../scripts/build-metals.mjs';
 import { ENERGY, toHist as energyHist, toSnapshot as energySnapshot } from '../../scripts/build-energy.mjs';
+import { ETFS, toHist as etfHist, toSnapshot as etfSnapshot } from '../../scripts/build-etfs.mjs';
 import { COUNTRIES as RATE_MARKETS, summarize as rateSummary, EU_MONTHLY, summarizeMonthly } from '../../scripts/build-rates.mjs';
 
 const DAY = 864e5, N = 260;
@@ -128,6 +129,7 @@ export function makeTvFixture(now = Date.now()) {
     'FX_IDC:USDJPY': [1, now, 'U.S. DOLLAR / JAPANESE YEN'], 'FX_IDC:JPYUSD': [1, now, 'JAPANESE YEN / U.S. DOLLAR'],
     'TVC:GOLD': [1, now, 'Gold'],
     'NYMEX:CL1!': [1, now, 'Crude Oil Futures'],
+    'AMEX:SPY': [1, now, 'State Street SPDR S&P 500 ETF Trust'],
     'TVC:US10Y': [1, now, 'United States 10 Year Government Bonds Yield'], 'TVC:IT10Y': [1, now, 'Italy 10 Year Government Bonds Yield'],
   } };
 }
@@ -156,6 +158,24 @@ export function makeEnergyFixtures(cryptoData, now = Date.now()) {
   const snap = energySnapshot(series, { params: cryptoData.params }, { now, quotes });
   const ttf = snap.markets.find(m => m.id === 'ttf');
   Object.assign(ttf, { notRefreshed: true, quoteAt: now - 3 * 3600e3 });
+  return snap;
+}
+
+// etfs.json: all 112 funds over ~300 weekdays with volume, quoted 10 minutes ago; KSA's latest update failed, so it
+// keeps its last price and is flagged as not refreshed
+export function makeEtfsFixture(cryptoData, now = Date.now()) {
+  const today = Math.floor(now / DAY), weekdays = [];
+  for (let d = today; weekdays.length < 300; d--) if (![0, 6].includes(new Date(d * DAY).getUTCDay())) weekdays.unshift(d);
+  const series = {}, quotes = {}, info = {};
+  ETFS.forEach((a, k) => {
+    const w = walk(101 + k, weekdays.length, 0.0004 * ((k % 7) - 3), 0.015);
+    const vols = new Map(weekdays.map((d, i) => [d, 1e6 * (1 + (i % 5))]));
+    series[a.id] = etfHist(new Map(weekdays.map((d, i) => [d, +(w[i] * (1 + k % 9)).toPrecision(6)])), vols, a, now);
+    info[a.id] = { name: `${a.yahoo} Fund Trust`, exch: a.yahoo === 'QQQ' ? 'NGM' : 'PCX' };
+    if (a.id !== 'ksa') quotes[a.id] = { price: series[a.id].c.at(-1), t: now - 10 * 60e3 };
+  });
+  const snap = etfSnapshot(series, { params: cryptoData.params }, { now, quotes, info });
+  Object.assign(snap.markets.find(m => m.id === 'ksa'), { notRefreshed: true, quoteAt: now - 2 * 3600e3 });
   return snap;
 }
 

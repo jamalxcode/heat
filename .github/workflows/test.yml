@@ -20,3 +20,12 @@ jobs:
         with:
           node-version: 22
       - run: node --test   # finds tests/*.test.mjs
+      # TEMP (remove before merge): does Yahoo answer GitHub's runners for the ETF history and the bulk prices?
+      - name: TEMP check ETF sources from a runner
+        run: |
+          node --input-type=module -e "
+          const { build } = await import('./scripts/build-etfs.mjs');
+          const a = await build();
+          const b = await build({ prev: a });
+          console.log('history', a.sources.got, 'bulk', b.sources.got, 'KB', Math.round(JSON.stringify(b).length / 1024));
+          if (a.sources.got < 105 || b.sources.got < 105) process.exit(1);"

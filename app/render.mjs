@@ -230,7 +230,12 @@ export const emptyHTML = () => `<div class="empty">No ${M.noun} are ${[S.filter 
 
 export function renderGrid() {
   const list = visibleCoins();
-  $('#grid').innerHTML = list.length ? list.map(tileHTML).join('') : emptyHTML();
+  if (!list.length) { $('#grid').innerHTML = emptyHTML(); return; }
+  // ETFs: a heading per group (US market, sectors, themes, abroad), each with the tiles that are showing
+  $('#grid').innerHTML = M.grouped && S.groups ? S.groups.map(([k, label]) => {
+    const g = list.filter(c => c.group === k);
+    return g.length ? `<h2 class="tgroup" data-g="${esc(k)}">${esc(label)} <span>${g.length}</span></h2>${g.map(tileHTML).join('')}` : '';
+  }).join('') : list.map(tileHTML).join('');
 }
 
 export function updateCoin(c) {
@@ -334,6 +339,7 @@ export function renderAll() {
   $('#tablewrap').hidden = S.view !== 'table';
   $('#scorewrap').hidden = S.view !== 'score';
   $('#grid').classList.toggle('heatmap', S.density === 'heatmap');   // heatmap tiles: colour, symbol, change, price
+  $('#grid').classList.toggle('named', !!M.grouped);                  // ETFs: tickers say little, so heatmap tiles keep the short name
   $('#density').hidden = S.view !== 'grid';
   if (S.view === 'grid') renderGrid(); else if (S.view === 'table') renderTable(); else renderScorecard();
   if (M.key === 'forex') renderDxy();         // the US Dollar Index bar above the grid

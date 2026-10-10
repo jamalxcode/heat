@@ -97,7 +97,7 @@ export async function show(raw, live) {
   const data = quoteView(raw);
   const isNew = data.generated !== S.updated;
   S.mode = live ? 'live' : 'snapshot';
-  S.markets = data.markets; S.updated = data.generated; S.marketSrc = data.marketSrc; S.stale = !!data.marketStale; S.rateDate = data.rateDate; S.latestDate = data.latestDate ?? data.metalsDate;
+  S.markets = data.markets; S.updated = data.generated; S.marketSrc = data.marketSrc; S.stale = !!data.marketStale; S.rateDate = data.rateDate; S.latestDate = data.latestDate ?? data.metalsDate; S.groups = data.groups || null;
   S.stable = new Set(data.cats?.stable || []); S.gold = new Set(data.cats?.gold || []);
   S.hist = {};
   for (const [id, h] of Object.entries(data.hist || {})) S.hist[id] = unpack(h);
@@ -118,7 +118,7 @@ export async function run() {
   try {
     if (!S.coins.length) setStatus('Loading prices…', 'busy');
     const snap = S.noSnapshot ? null : await loadSnapshot();
-    // only the crypto page can rebuild its data in the browser; elsewhere (forex, metals, energy) an older file is still the latest
+    // only the crypto page can rebuild its data in the browser; elsewhere (forex, metals, energy, ETFs) an older file is still the latest
     if (snap && (Date.now() - snap.generated < SNAPSHOT_MAX_AGE || !M.liveBuild)) {
       const isNew = await show(snap, false);
       // the next build lands ~10 min after this one; if it hasn't appeared yet, look again every 2 min
