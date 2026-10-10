@@ -628,6 +628,13 @@
    "KuCoin": "UB",
    "Gate.io": "UB",
    "MEXC": "UB"
+  },
+  "kaia": {
+   "Binance": "KAIA",
+   "OKX": "KAIA",
+   "Gate.io": "KAIA",
+   "KuCoin": "KAIA",
+   "MEXC": "KAIA"
   }
  }
 }
