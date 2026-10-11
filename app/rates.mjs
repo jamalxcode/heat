@@ -10,7 +10,7 @@ import { chartUrl, pick } from '/scripts/tradingview.mjs';
 const DAY = 864e5, REFRESH = 10 * 60e3;
 const TFS = [['1d', 1], ['1w', 7], ['1m', 30]];
 const REGIONS = ['Americas', 'Europe', 'Asia-Pacific', 'Africa'];
-const SORTS = [['default', 'Default'], ['state', 'Inverted first'], ['y10', '10-year yield'], ['real', 'Real yield'], ['move', 'Biggest move']];
+const SORTS = [['default', 'Default'], ['state', 'Inverted first'], ['risk', 'Riskiest first'], ['y10', '10-year yield'], ['real', 'Real yield'], ['move', 'Biggest move']];
 // what each reading means, with an arrow for the curve's slope (shape, not just colour: readable without telling red
 // from green). The recession record is a US finding, so only the US gets it
 const STATE = {
@@ -73,6 +73,33 @@ const inflNote = x => x.infl ? `inflation ${x.infl.v.toFixed(1)}% (${monthLabel(
 // inflation as a quiet grey note, so they can't be confused
 const realPill = x => `<span class="r-real ${x.real == null ? '' : x.real >= 0 ? 'pos' : 'neg'}" title="Real yield: the 10-year yield minus the latest yearly inflation">${x.real == null ? '' : `<span aria-hidden="true">${x.real >= 0 ? '▲' : '▼'}</span>`}Real yield <b>${fmtReal(x.real)}</b></span>`;
 const inflTag = x => `<span class="r-infl" title="Latest yearly consumer-price inflation${x.infl ? ` (${monthLabel(x.infl.month, true)}, ${esc(x.infl.src)})` : ''}">CPI ${x.infl ? x.infl.v.toFixed(1) + '%' : '—'}${x.infl ? ` · ${monthLabel(x.infl.month).split(' ')[0]}` : ''}</span>`;
+// The risk tag (scripts/build-rates.mjs riskOf): how much more than the benchmark (the US; Germany for the European
+// cards) the government pays on 10-year debt, ranked against its own last ten years. ▼ low / ● average / ▲ high: a
+// shape for each, on blue / grey / orange, so it reads without telling red from green
+const RISK = { low: ['▼', 'Low risk'], avg: ['●', 'Average risk'], high: ['▲', 'High risk'] };
+const VS = { us: ['the US', 'US'], de: ['Germany', 'DE'] };   // [in a sentence, on the card] (a flag would be two bare letters on Windows)
+const yearsWord = y => y >= 9.5 ? '10' : String(Math.max(1, Math.round(y)));
+export function riskWords(x) {
+  const r = x.risk;
+  if (!r) return '';
+  if (r.bench) return `${x.name} is a benchmark: ${x.id === 'us' ? 'the other daily markets' : 'the European monthly cards'} are compared with it.`;
+  const gap = `${x.name} pays ${Math.abs(r.spread).toFixed(2)} pp ${r.spread >= 0 ? 'more' : 'less'} than ${VS[r.vs][0]} on 10-year debt`;
+  if (!r.level) return `${gap}. Not enough history yet to say whether that is high or low for ${x.name}: ${r.years} years so far, 3 needed.`;
+  const rank = r.pct === 100 ? 'the widest' : r.pct === 0 ? 'the narrowest' : r.pct >= 50 ? `wider than ${r.pct}%` : `narrower than ${100 - r.pct}%`;
+  return `${gap}: ${rank} of the last ${yearsWord(r.years)} years, so ${RISK[r.level][1].toLowerCase()}.`
+    + (r.clean ? ' Same currency, so the gap is credit risk: what credit default swaps price.' : ' Different currencies, so the gap carries inflation and currency risk as well as credit risk.');
+}
+const riskTag = x => {
+  const r = x.risk;
+  if (!r) return '';
+  const t = esc(riskWords(x));
+  if (r.bench) return `<span class="r-risk bench" title="${t}">Benchmark</span>`;
+  if (!r.level) return `<span class="r-risk none" title="${t}">Risk: building history</span>`;
+  return `<span class="r-risk ${r.level}" title="${t}"><span aria-hidden="true">${RISK[r.level][0]}</span> ${RISK[r.level][1]}</span>`;
+};
+// its own line on the card: the tag, and the gap it comes from (the monthly euro cards show that gap already)
+const riskRow = (x, shown = false) => x.risk ? `<div class="rt-bot rt-risk">${riskTag(x)}${x.risk.bench || shown ? '' : `<span class="r-vs" title="10-year yield minus ${VS[x.risk.vs][0]}’s">vs ${VS[x.risk.vs][1]} ${fmtPP(x.risk.spread)}</span>`}</div>` : '';
+const riskAria = x => x.risk?.level ? `, ${RISK[x.risk.level][1].toLowerCase()}` : '';
 const rankNote = c => c.slopePct == null ? null : `steeper than ${c.slopePct}% of the last ${c.longYears >= 9.5 ? '10' : Math.max(1, Math.round(c.longYears))} years`;
 
 /* ---------- sketches: a tiny curve in each card (the 10-year path for the monthly ones) ---------- */
@@ -101,20 +128,22 @@ export function colourOf(x, monthly, mode = colorBy, tfKey = tf) {
 
 function tileHTML(c) {
   const k = TFS.find(x => x[0] === tf)[1], bp = changeBp(c, k), st = STATE[c.state], old = bizDaysSince(c.date) > 2, col = colourOf(c, false);
-  return `<button class="rtile ${col.cls}${c.id === sel ? ' sel' : ''}" data-id="${esc(c.id)}" data-coin="1" aria-haspopup="dialog" aria-label="${esc(`${c.name}: 10-year ${fmtY(c.y10)}, ${tf} ${fmtBp(bp)}, curve ${st?.label || 'unknown'}, real yield ${fmtReal(c.real)}`)}">
+  return `<button class="rtile ${col.cls}${c.id === sel ? ' sel' : ''}" data-id="${esc(c.id)}" data-coin="1" aria-haspopup="dialog" aria-label="${esc(`${c.name}: 10-year ${fmtY(c.y10)}, ${tf} ${fmtBp(bp)}, curve ${st?.label || 'unknown'}, real yield ${fmtReal(c.real)}${riskAria(c)}`)}">
     <div class="rt-top"><span class="rt-name">${logoOf(c)}<b>${esc(c.name)}</b></span><span class="rt-chg">${col.corner}</span>
       <span class="rt-y"><span class="rt-yl">10-year</span> ${fmtY(c.y10)}</span><span class="rt-date${old ? ' old' : ''}"${old ? ' title="More than 2 business days old: this source publishes late, or didn’t update"' : ''}>${c.notRefreshed ? '⚠ ' : ''}${dayLabel(c.date)}</span></div>
     <div class="rt-bot"><span class="rt-state st-${esc(c.state || 'none')}">${st ? `<span class="st-ico" aria-hidden="true">${st.icon}</span> ${st.label}` : '—'}</span>${curveSpark(c)}<span class="rt-slope" title="10-year minus ${shortLabel(c)}, in percentage points">10y−${shortTag(c)} ${fmtPP(c.slope).replace(' pp', '')}</span></div>
     <div class="rt-bot rt-real">${realPill(c)}${inflTag(c)}</div>
+    ${riskRow(c)}
   </button>`;
 }
 function mTileHTML(m) {
   const col = colourOf(m, true);
-  return `<button class="rtile mtile ${col.cls}${m.id === sel ? ' sel' : ''}" data-id="${esc(m.id)}" data-coin="1" aria-haspopup="dialog" aria-label="${esc(`${m.name}: 10-year ${fmtY(m.y10)} in ${monthLabel(m.month, true)}, ${fmtBp(m.chg1m)} on the month, real yield ${fmtReal(m.real)}`)}">
+  return `<button class="rtile mtile ${col.cls}${m.id === sel ? ' sel' : ''}" data-id="${esc(m.id)}" data-coin="1" aria-haspopup="dialog" aria-label="${esc(`${m.name}: 10-year ${fmtY(m.y10)} in ${monthLabel(m.month, true)}, ${fmtBp(m.chg1m)} on the month, real yield ${fmtReal(m.real)}${riskAria(m)}`)}">
     <div class="rt-top"><span class="rt-name">${logoOf(m)}<b>${esc(m.name)}</b></span><span class="rt-chg">${col.corner}</span>
       <span class="rt-y"><span class="rt-yl">10-year</span> ${fmtY(m.y10)}</span><span class="rt-date">${m.notRefreshed ? '⚠ ' : ''}${monthLabel(m.month)}</span></div>
     <div class="rt-bot"><span>${m.vsDE != null ? `vs 🇩🇪 ${fmtPP(m.vsDE)}` : 'not in the euro'}</span>${monthSpark(m)}<span class="rt-slope">1y ${fmtBp(m.chg12m)}</span></div>
     <div class="rt-bot rt-real">${realPill(m)}${inflTag(m)}</div>
+    ${riskRow(m, m.vsDE != null)}
   </button>`;
 }
 
@@ -127,6 +156,7 @@ export function sorted(list, monthly, by = sortBy, tfKey = tf) {
   const k = TFS.find(x => x[0] === tfKey)[1], cmp = {
     default: () => 0,
     state: monthly ? desc(m => m.vsDE) : asc(c => c.slope),           // inverted first; monthly: the widest gap to Germany
+    risk: desc(x => x.risk?.pct),                                       // the widest gap for that country first; benchmarks last
     y10: desc(x => x.y10),
     real: desc(x => x.real),
     move: monthly ? desc(m => absOrNull(m.chg1m)) : desc(c => absOrNull(changeBp(c, k))),
@@ -140,13 +170,13 @@ function tableHTML(cs, ms) {
   const daily = cs.map(c => `<tr class="r-row" data-id="${esc(c.id)}" data-coin="1" tabindex="0"><th scope="row">${logoOf(c)} ${esc(c.name)}</th>
     <td class="${bizDaysSince(c.date) > 2 ? 'old' : ''}">${dayLabel(c.date)}</td><td><b>${fmtY(c.y10)}</b></td><td>${fmtY(c.yShort)} <span class="r-muted">${shortTag(c)}</span></td>
     <td>${fmtPP(c.slope)}</td><td>${c.short === '3m' ? '—' : fmtPP(c.slope3m)}</td><td>${STATE[c.state] ? `<span class="rt-state st-${esc(c.state)}"><span class="st-ico" aria-hidden="true">${STATE[c.state].icon}</span> ${STATE[c.state].label}</span>` : '—'}</td>
-    <td>${c.slopePct == null ? '—' : c.slopePct + '%'}</td><td>${c.infl ? c.infl.v.toFixed(1) + '%' : '—'}</td><td>${fmtReal(c.real)}</td>
+    <td>${c.slopePct == null ? '—' : c.slopePct + '%'}</td><td>${c.infl ? c.infl.v.toFixed(1) + '%' : '—'}</td><td>${fmtReal(c.real)}</td><td>${riskTag(c) || '—'}</td>
     ${k.map(d => `<td>${fmtBp(changeBp(c, d))}</td>`).join('')}</tr>`).join('');
   const monthly = ms.map(m => `<tr class="r-row" data-id="${esc(m.id)}" data-coin="1" tabindex="0"><th scope="row">${logoOf(m)} ${esc(m.name)}</th>
     <td>${monthLabel(m.month)}</td><td><b>${fmtY(m.y10)}</b></td><td>${fmtPP(m.vsDE)}</td><td>${fmtBp(m.chg1m)}</td><td>${fmtBp(m.chg12m)}</td>
-    <td>${m.infl ? m.infl.v.toFixed(1) + '%' : '—'}</td><td>${fmtReal(m.real)}</td></tr>`).join('');
-  return `<div class="r-tblwrap"><table class="r-tbl"><caption>Daily official yields</caption><thead><tr><th>Market</th><th>Date</th><th>10-year</th><th>Short</th><th title="10-year minus the short leg">Gap</th><th title="10-year minus 3-month">10y − 3m</th><th>Reading</th><th title="Share of the last years' weeks when the gap was flatter">Steeper than</th><th>Inflation</th><th title="10-year minus inflation">Real 10y</th><th>1d</th><th>1w</th><th>1m</th></tr></thead><tbody>${daily}</tbody></table></div>`
-    + (ms.length ? `<div class="r-tblwrap"><table class="r-tbl"><caption>Europe, monthly (ECB, average of the month)</caption><thead><tr><th>Country</th><th>Month</th><th>10-year</th><th>vs Germany</th><th>1 month</th><th>1 year</th><th>Inflation</th><th>Real 10y</th></tr></thead><tbody>${monthly}</tbody></table></div>` : '');
+    <td>${m.infl ? m.infl.v.toFixed(1) + '%' : '—'}</td><td>${fmtReal(m.real)}</td><td>${riskTag(m) || '—'}</td></tr>`).join('');
+  return `<div class="r-tblwrap"><table class="r-tbl"><caption>Daily official yields</caption><thead><tr><th>Market</th><th>Date</th><th>10-year</th><th>Short</th><th title="10-year minus the short leg">Gap</th><th title="10-year minus 3-month">10y − 3m</th><th>Reading</th><th title="Share of the last years' weeks when the gap was flatter">Steeper than</th><th>Inflation</th><th title="10-year minus inflation">Real 10y</th><th title="The gap to the US 10-year, ranked against the last 10 years">Risk</th><th>1d</th><th>1w</th><th>1m</th></tr></thead><tbody>${daily}</tbody></table></div>`
+    + (ms.length ? `<div class="r-tblwrap"><table class="r-tbl"><caption>Europe, monthly (ECB, average of the month)</caption><thead><tr><th>Country</th><th>Month</th><th>10-year</th><th>vs Germany</th><th>1 month</th><th>1 year</th><th>Inflation</th><th>Real 10y</th><th title="The gap to Germany, ranked against the last 10 years">Risk</th></tr></thead><tbody>${monthly}</tbody></table></div>` : '');
 }
 
 /* ---------- charts (plain SVG) ---------- */
@@ -227,22 +257,22 @@ function detailHTML(c) {
   return `<div class="r-card r-pop" data-country="${esc(c.id)}"><div class="r-head"><h2>${tvLink(c, `${logoOf(c)} ${esc(c.name)}`)} <span class="r-muted">yield curve</span>${tvGo(c)}</h2>
       <span class="rt-state st-${esc(c.state || 'none')}">${st ? `<span class="st-ico" aria-hidden="true">${st.icon}</span> ${st.label}` : '—'}</span></div>
     <div class="r-mini">10y <b>${fmtY(c.y10)}</b> · ${shortLabel(c)} <b>${fmtY(c.yShort)}</b> · gap <b>${fmtPP(c.slope)}</b>${c.slope3m != null && c.short !== '3m' ? ` · 10y−3m <b>${fmtPP(c.slope3m)}</b>` : ''} · ${dayLabel(c.date)}</div>
-    <div class="r-mini r-mini2">${realPill(c)}${inflTag(c)}${rank ? `<span>${rank}</span>` : ''}</div>
+    <div class="r-mini r-mini2">${realPill(c)}${inflTag(c)}${riskTag(c)}${rank ? `<span>${rank}</span>` : ''}</div>
     <div class="seg r-tabs" role="group" aria-label="Chart"><button data-rtab="curve" aria-pressed="${popTab === 'curve'}">Curve</button><button data-rtab="history" aria-pressed="${popTab === 'history'}">History</button></div>
     ${chart}
     <div class="r-more">
-    <p class="r-says">${st ? `The 10-year yield is <b>${fmtY(c.y10)}</b> and the ${SHORT_WORDS[shortLabel(c)] || shortLabel(c)} <b>${fmtY(c.yShort)}</b>: a gap of <b>${fmtPP(c.slope)}</b>${rank ? `, ${rank}` : ''}. ${st.label}: ${st.note}.${c.state === 'inverted' && c.id === 'us' ? US_INVERTED : ''}` : 'No reading yet.'}${c.slope3m != null && c.short !== '3m' ? ` The 10-year minus the 3-month yield, the gap the US Federal Reserve watches most, is <b>${fmtPP(c.slope3m)}</b>.` : ''}${c.real != null ? ` After inflation (${inflNote(c)}), the 10-year pays <b>${fmtReal(c.real)}</b> a year.` : ''}</p>
+    <p class="r-says">${st ? `The 10-year yield is <b>${fmtY(c.y10)}</b> and the ${SHORT_WORDS[shortLabel(c)] || shortLabel(c)} <b>${fmtY(c.yShort)}</b>: a gap of <b>${fmtPP(c.slope)}</b>${rank ? `, ${rank}` : ''}. ${st.label}: ${st.note}.${c.state === 'inverted' && c.id === 'us' ? US_INVERTED : ''}` : 'No reading yet.'}${c.slope3m != null && c.short !== '3m' ? ` The 10-year minus the 3-month yield, the gap the US Federal Reserve watches most, is <b>${fmtPP(c.slope3m)}</b>.` : ''}${c.real != null ? ` After inflation (${inflNote(c)}), the 10-year pays <b>${fmtReal(c.real)}</b> a year.` : ''}${c.risk ? ' ' + esc(riskWords(c)) : ''}</p>
     <details class="r-table"><summary>Every maturity</summary><table><thead><tr><th>Maturity</th><th>Yield</th><th>vs a month ago</th><th>vs a year ago</th></tr></thead><tbody>${rows}</tbody></table></details>
     <p class="r-src">${c.notRefreshed ? '⚠ The source didn’t answer in the latest check: showing its last curve. ' : ''}Source: <a href="${esc(c.srcUrl)}" target="_blank" rel="noopener">${esc(c.src)}</a>, closing yields of ${dayLabel(c.date)}.${c.note ? ' ' + esc(c.note) : ''}${c.infl ? ` Inflation: ${esc(c.infl.src)}, yearly change in consumer prices.` : ''}</p></div></div>`;
 }
 function monthHTML(m) {
   return `<div class="r-card r-pop" data-country="${esc(m.id)}"><div class="r-head"><h2>${tvLink(m, `${logoOf(m)} ${esc(m.name)}`)} <span class="r-muted">10-year, monthly</span>${tvGo(m)}</h2><span class="r-muted">📅 monthly</span></div>
     <div class="r-mini">${monthLabel(m.month)} <b>${fmtY(m.y10)}</b> · month <b>${fmtBp(m.chg1m)}</b> · year <b>${fmtBp(m.chg12m)}</b>${m.vsDE != null ? ` · vs Germany <b>${fmtPP(m.vsDE)}</b>` : ''}</div>
-    <div class="r-mini r-mini2">${realPill(m)}${inflTag(m)}</div>
+    <div class="r-mini r-mini2">${realPill(m)}${inflTag(m)}${riskTag(m)}</div>
     ${monthChart(m)}
     <div class="r-keys">${keyOf(m.name, 'var(--blue, #2f6fd0)', 2.4)}${m.de ? keyOf('Germany', COLORS.de, 1.4, '5 4') : ''}</div>
     <div class="r-more">
-    <p class="r-says">${esc(m.name)}’s 10-year government bond yield averaged <b>${fmtY(m.y10)}</b> in ${monthLabel(m.month, true)}: <b>${fmtBp(m.chg1m)}</b> on the month and <b>${fmtBp(m.chg12m)}</b> on the year${m.vsDE != null ? `, <b>${fmtPP(m.vsDE)}</b> above Germany’s (the gap investors watch as a measure of risk in the euro area)` : ''}.${m.real != null ? ` After inflation (${inflNote(m)}), it pays <b>${fmtReal(m.real)}</b> a year.` : ''}</p>
+    <p class="r-says">${esc(m.name)}’s 10-year government bond yield averaged <b>${fmtY(m.y10)}</b> in ${monthLabel(m.month, true)}: <b>${fmtBp(m.chg1m)}</b> on the month and <b>${fmtBp(m.chg12m)}</b> on the year${m.vsDE != null ? `, <b>${fmtPP(m.vsDE)}</b> above Germany’s (the gap investors watch as a measure of risk in the euro area)` : ''}.${m.real != null ? ` After inflation (${inflNote(m)}), it pays <b>${fmtReal(m.real)}</b> a year.` : ''}${m.risk ? ' ' + esc(riskWords(m)) : ''}</p>
     <p class="r-src">${m.notRefreshed ? '⚠ The source didn’t answer in the latest check: showing the last figures. ' : ''}Source: <a href="https://data.ecb.europa.eu/data/datasets/IRS" target="_blank" rel="noopener">European Central Bank</a>, long-term interest rates for convergence purposes: the monthly average of the country’s benchmark 10-year government bond yield, published early the next month. No free source has these countries’ daily yields or whole curves, so there is no curve or normal / flat / inverted reading here.${m.infl ? ` Inflation: ${esc(m.infl.src)}.` : ''}</p></div></div>`;
 }
 
@@ -252,6 +282,7 @@ const HELP = `<div class="r-help" id="rhelp" hidden>
   <p><b>Card colour</b> (and the number in each card's top corner), your choice: <b>Change</b>, the move in the 10-year yield over 1 day, 1 week or 1 month (blue: yields rose, so bond prices fell; a day is mostly noise for bonds, so a week is the default); <b>Curve</b>, how steep the curve is (red: inverted, grey: flat, blue: steep); or <b>Real yield</b> (blue: above inflation, red: below). The monthly European cards show the change on the month and have no curve.</p>
   <p><b>The reading</b> compares long and short rates: 10-year minus 2-year (UK: minus the Bank Rate, BR; South Africa: minus the 3-month bill). ↗ Normal: +0.5 pp or more. → Flat: 0 to +0.5. ↘ Inverted: below zero (the arrow shows which way the curve slopes). “Steeper than 85% of the last 10 years” compares today’s gap with that country’s own history, which matters more than the fixed bands for a country whose curve is usually steep or usually flat. The popup also gives the 10-year minus 3-month gap where it exists.</p>
   <p><b>Real yield:</b> the 10-year yield minus the latest yearly inflation: roughly what a lender earns after rising prices. It makes Brazil’s 14% and Switzerland’s 0.6% comparable.</p>
+  <p><b>Risk tag:</b> how much more the government pays than a safe benchmark on 10-year debt (the US for the daily markets, Germany for the European monthly cards), compared with that country’s own last ten years. <b>▲ High risk</b>: the gap is wider than on 75% of them, so markets want more than usual to lend to it. <b>● Average</b>: a normal gap for that country. <b>▼ Low risk</b>: narrower than usual. Because each country is compared with itself, Brazil isn’t flagged just for always paying more than the US, only when it pays more than it usually does. Within the euro the gap to Germany is credit risk, close to what credit default swaps price; between currencies it also carries inflation and currency risk (hover a tag for which). The US and Germany are the benchmarks; a market with under 3 years of history gets its tag once it has them.</p>
   <p><b>The sketch</b> on each card is the shape of today’s curve, short maturities on the left; on the monthly cards it is the 10-year over the last year. A greyed date is more than 2 business days old.</p>
   <p><b>Europe, monthly:</b> countries with no free daily source, from the ECB’s monthly averages (no curve, so no reading), with the gap to Germany for euro members.</p>
 </div>`;

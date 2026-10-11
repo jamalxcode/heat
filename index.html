@@ -327,6 +327,19 @@ button.sc-chip:hover, button.sc-chip[aria-expanded="true"] { box-shadow: inset 0
   :root:not([data-theme="light"]) .r-real.neg { background: rgba(217,115,13,.28); color: #ffbf7a; }
 }
 .r-infl { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+/* the risk tag: ▲ high (orange), ● average (grey), ▼ low (blue); benchmark and "building history" quiet outlines */
+.rt-bot.rt-risk { padding-top: 0; align-items: center; }
+.r-risk { display: inline-flex; align-items: baseline; gap: 4px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--neutral); color: var(--ink-2); white-space: nowrap; }
+.r-risk.high { background: #fde6cc; color: #8a4300; }
+.r-risk.low { background: #dde9fb; color: #1a4f9c; }
+.r-risk.bench, .r-risk.none { background: none; box-shadow: inset 0 0 0 1px var(--border); color: var(--muted); font-weight: 600; }
+.r-vs { font-size: 10.5px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+:root[data-theme="dark"] .r-risk.high { background: rgba(217,115,13,.28); color: #ffbf7a; }
+:root[data-theme="dark"] .r-risk.low { background: rgba(47,111,208,.28); color: #9cc2ff; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .r-risk.high { background: rgba(217,115,13,.28); color: #ffbf7a; }
+  :root:not([data-theme="light"]) .r-risk.low { background: rgba(47,111,208,.28); color: #9cc2ff; }
+}
 .r-mini2 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 3px; }
 .rt-date.old { opacity: .5; font-style: italic; }
 .r-sel { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--ink-2); }

@@ -30,7 +30,7 @@ const SERIES_DAYS = 760;                // ~2 years of daily 10-year and short y
 const LONG_DAYS = 3660;                 // ~10 years of weekly 10-year and short yields, for the slope history and its rank
 const LONG_EVERY = 7 * DAY;             // how often a fetch reaches back that far (in between, the history is carried over)
 const FMT = 1;                          // the history kept between runs (China's, India's): a change drops it
-const LAYOUT = 3;                       // what each market carries (2: inflation, real yield, ten-year rank; 3: lateAfter): a change
+const LAYOUT = 4;                       // what each market carries (2: inflation, real yield, ten-year rank; 3: lateAfter; 4: risk tag): a change
                                         // rebuilds the file at once instead of reusing the last one for REFETCH
 export const FLAT_PP = 0.5;
 
@@ -528,6 +528,44 @@ export const EU_MONTHLY = [
   ['PL', 'Poland', '🇵🇱'], ['CZ', 'Czechia', '🇨🇿'], ['HU', 'Hungary', '🇭🇺'], ['RO', 'Romania', '🇷🇴'], ['DK', 'Denmark', '🇩🇰'],
 ].map(([code, name, flag]) => ({ id: code.toLowerCase(), code, name, flag, badge: code }));
 const EURO = new Set(['FR', 'IT', 'ES', 'NL', 'BE', 'AT', 'PT', 'GR', 'IE', 'FI']);
+
+/* ---------- risk tag: the spread to a benchmark, ranked against the market's own last ten years ---------- */
+// How much more a government pays than the benchmark on 10-year debt (Germany for the European cards, the US for
+// the rest), and where that gap sits in its own history: wider than on 75% of the weeks (months) of the last ten years
+// is high risk, narrower than on 75% of them low. Ranking each market against itself means a country that always pays
+// more (Brazil) is flagged only when it pays more than it usually does. Within the euro the gap to Germany is credit
+// risk (what credit default swaps price); across currencies it also carries inflation and currency risk, so `clean`
+// says which, and the page words it accordingly.
+const RISK_YEARS = 3;                   // less history than this: no tag yet (China, India: theirs builds up week by week)
+const RISK_HIGH = 75, RISK_LOW = 25;
+export const riskLevel = pct => pct == null ? null : pct >= RISK_HIGH ? 'high' : pct <= RISK_LOW ? 'low' : 'avg';
+// now: today's spread; past: the spreads over the history, oldest first, ending with the latest (which is now): the
+// share of the earlier ones narrower than now, so a record gap is 100 and a record low 0
+export function riskOf(now, past, years, vs, clean) {
+  const out = { vs, clean, spread: r4(now), years: Math.round(years * 10) / 10, pct: null, level: null };
+  const before = past.slice(0, -1);
+  if (years < RISK_YEARS || before.length < 30) return out;
+  out.pct = Math.round(before.filter(v => v < now).length / before.length * 100);
+  out.level = riskLevel(out.pct);
+  return out;
+}
+// a daily market against the US (the euro area's AAA curve is left out: Germany is part of it, so its gap is noise)
+export function dailyRisk(c, byId) {
+  if (c.id === 'us' || c.id === 'de') return { bench: true };
+  const b = byId.us;
+  if (c.id === 'ea' || !b?.long || !c.long || c.y10 == null || b.y10 == null) return null;
+  const week = d => Math.floor((d + 3) / 7), bw = new Map();
+  b.long.d.forEach((o, i) => bw.set(week(b.long.t0 / DAY + o), b.long.y10[i]));
+  const past = [];
+  let first = null, last = null;
+  c.long.d.forEach((o, i) => {
+    const d = c.long.t0 / DAY + o, v = bw.get(week(d));
+    if (v == null || c.long.y10[i] == null) return;
+    past.push(c.long.y10[i] - v); first ??= d; last = d;
+  });
+  return riskOf(c.y10 - b.y10, past, first == null ? 0 : (last - first) / 365.25, 'us', false);
+}
+
 const monthBack = (ym, k) => { const [y, m] = ym.split('-').map(Number), t = y * 12 + m - 1 - k; return `${Math.floor(t / 12)}-${String(t % 12 + 1).padStart(2, '0')}`; };
 export function summarizeMonthly(by) {
   const de = new Map(by.DE || []);
@@ -536,15 +574,19 @@ export function summarizeMonthly(by) {
     if (!s?.length) return null;
     const [month, y10] = s.at(-1), at = new Map(s), was = k => at.get(monthBack(month, k));
     const bp = v => v == null ? null : Math.round((y10 - v) * 100);
+    // the risk tag: the gap to Germany each month of the last ten years (for every country here: within the euro
+    // it is credit risk, outside it also inflation and currency risk)
+    const gaps = s.filter(([m]) => m > monthBack(month, 120) && de.has(m)).map(([m, v]) => v - de.get(m));
     return {
       id: c.id, name: c.name, flag: c.flag, badge: c.badge, euro: EURO.has(c.code), month, y10,
       chg1m: bp(was(1)), chg12m: bp(was(12)), vsDE: EURO.has(c.code) && de.has(month) ? r4(y10 - de.get(month)) : null,
       series: s.slice(-25), de: EURO.has(c.code) ? [...de].filter(([m]) => m >= s.slice(-25)[0][0]) : null,
+      risk: de.has(month) ? riskOf(y10 - de.get(month), gaps, (gaps.length - 1) / 12, 'de', EURO.has(c.code)) : null,
     };
   }).filter(Boolean);
 }
 async function fetchMonthly(fetchFn, today) {
-  const from = isoDay(today - 800).slice(0, 7), areas = [...EU_MONTHLY.map(c => c.code), 'DE'].join('+');
+  const from = isoDay(today - 3700).slice(0, 7), areas = [...EU_MONTHLY.map(c => c.code), 'DE'].join('+');
   return summarizeMonthly(parseIRS(await getText(`https://data-api.ecb.europa.eu/service/data/IRS/M.${areas}.L.L40.CI.0000..N.Z?startPeriod=${from}&format=csvdata&detail=dataonly`, fetchFn, { timeout: 60e3 })));
 }
 
@@ -582,6 +624,9 @@ export async function build({ prev = null, log = console.log, now = Date.now(), 
   const withReal = x => { const i = inflation[x.id] || x.infl || lastInfl(x.id) || null; return { ...x, infl: i, real: i && x.y10 != null ? r4(x.y10 - i.v) : null }; };
   out.splice(0, out.length, ...out.map(withReal));
   monthly = monthly.map(withReal);
+  // the risk tag: each daily market's gap to the US 10-year (Germany's to it: the European benchmark), ranked
+  const byId = Object.fromEntries(out.map(c => [c.id, c]));
+  out.splice(0, out.length, ...out.map(c => ({ ...c, risk: dailyRisk(c, byId) })));
   if (!out.length) throw new Error('no yield curve source answered');
   log(`Rates: ${out.map(c => `${c.id} ${c.date} 10y ${c.y10?.toFixed(2)}% slope ${c.slope > 0 ? '+' : ''}${c.slope?.toFixed(2)} (${c.state})`).join(' · ')} · monthly: ${monthly.length} EU countries to ${monthly[0]?.month ?? '—'}${failed.length ? ` · failed: ${failed.join(', ')}` : ''}`);
   return { v: 1, fmt: FMT, layout: LAYOUT, market: 'rates', generated: now, fetched: now, flatPP: FLAT_PP, ids, countries: out, monthly };
