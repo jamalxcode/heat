@@ -964,6 +964,38 @@ test.describe('rates', () => {
     await expect(pop).toHaveClass(/pinned/);                                 // stays open once pinned
   });
 
+  test('risk tag on every card: the gap to the US (Germany for Europe) ranked in its own history; benchmarks say so; sortable; explained', async ({ page }) => {
+    await expect(page.locator('.rtile[data-id="us"] .r-risk')).toHaveText('Benchmark');
+    await expect(page.locator('.rtile[data-id="de"] .r-risk')).toHaveText('Benchmark');
+    await expect(page.locator('.rtile[data-id="ea"] .r-risk')).toHaveCount(0);           // the AAA curve: Germany is part of it
+    const uk = page.locator('.rtile[data-id="uk"]');
+    await expect(uk.locator('.r-risk')).toHaveText(/^[▲●▼] (High|Average|Low) risk$/);
+    await expect(uk.locator('.r-vs')).toContainText('vs US');
+    await expect(uk.locator('.r-risk')).toHaveAttribute('title', /than the US on 10-year debt.*inflation and currency risk/);
+    const it = page.locator('.mtile[data-id="it"]'), es = page.locator('.mtile[data-id="es"]');
+    await expect(it.locator('.r-risk')).toHaveText('▲ High risk');                         // its widest gap in the five years
+    await expect(it.locator('.r-risk')).toHaveAttribute('title', /0\.85 pp more than Germany.*the widest of the last 5 years.*credit risk/);
+    await expect(it.locator('.r-vs')).toHaveCount(0);                                     // the gap is on the card already
+    await expect(es.locator('.r-risk')).toHaveText('▼ Low risk');
+    await expect(page.locator('.mtile[data-id="pl"] .r-risk')).toHaveAttribute('title', /inflation and currency risk/);
+    await expect(page.locator('.mtile[data-id="pl"] .r-vs')).toContainText('vs DE');
+    await page.locator('#rsort').selectOption('risk');
+    await expect(page.locator('#ratesMonthly .mtile').first()).toHaveAttribute('data-id', 'it');
+    await expect(page.locator('#ratesMonthly .mtile').last()).toHaveAttribute('data-id', 'es');
+    await expect(page.locator('#grid .rtile').last()).toHaveAttribute('data-id', /^(us|ea|de)$/);   // benchmarks and untagged last
+    await page.locator('#rsort').selectOption('default');
+    await it.click();
+    await expect(page.locator('#detail .r-mini2 .r-risk')).toHaveText('▲ High risk');
+    await expect(page.locator('#detail .r-says')).toContainText('so high risk');
+    await page.keyboard.press('Escape');
+    await page.locator('#rhelpBtn').click();
+    await expect(page.locator('#rhelp')).toContainText('Risk tag');
+    await page.locator('#rview button[data-v="table"]').click();
+    await expect(page.locator('#ratesTable th', { hasText: /^Risk$/ })).toHaveCount(2);
+    await expect(page.locator('#ratesTable tr[data-id="it"] .r-risk')).toHaveText('▲ High risk');
+    await page.locator('#rview button[data-v="cards"]').click();
+  });
+
   test('Europe, monthly: its own labelled row; a tile opens the monthly chart with Germany for comparison', async ({ page }) => {
     const row = page.locator('#ratesMonthly');
     await expect(row).toBeVisible();

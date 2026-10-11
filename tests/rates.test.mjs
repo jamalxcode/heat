@@ -1,7 +1,7 @@
 // Unit tests for the rates page data (scripts/build-rates.mjs). Run: node --test tests/
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { COUNTRIES, interp, parseUS, parseECB, parseBoE, parseMOF, parseBoC, parseRBA, parseBBK, parseSNB, parseNB, mergeSeries, mergeSARB, parseTesouro, parseChinaBond, parseFBIL, unzipEntries, parseIRS, summarizeMonthly, daysFromSummary, EU_MONTHLY, parseEurostat, parseOECD, parseJapanCPI, summarize, slopeState, build } from '../scripts/build-rates.mjs';
+import { COUNTRIES, interp, parseUS, parseECB, parseBoE, parseMOF, parseBoC, parseRBA, parseBBK, parseSNB, parseNB, mergeSeries, mergeSARB, parseTesouro, parseChinaBond, parseFBIL, unzipEntries, parseIRS, summarizeMonthly, daysFromSummary, EU_MONTHLY, parseEurostat, parseOECD, parseJapanCPI, summarize, slopeState, build, riskOf, riskLevel, dailyRisk } from '../scripts/build-rates.mjs';
 import { health } from '../scripts/health.mjs';
 import { dayNum, DAY } from '../scripts/build-forex.mjs';
 import { deflateRawSync } from 'node:zlib';
@@ -218,7 +218,55 @@ test('Europe, monthly: the ECB 10-year per country, change on the month and year
   assert.equal(it.vsDE, 0.5);
   assert.equal(it.de.length, 25);
   assert.equal(ms[1].vsDE, null, 'Poland is not in the euro: no gap to Germany');
+  assert.deepEqual({ ...it.risk }, { vs: 'de', clean: true, spread: 0.5, years: 2, pct: null, level: null }, 'two years: too short for a risk tag');
+  assert.equal(ms[1].risk.clean, false, 'Poland vs Germany: different currencies');
   assert.equal(EU_MONTHLY.length, 15);
+});
+
+test('risk tag: today’s gap ranked against the history before it; high from 75%, low to 25%; too little history, no level', () => {
+  const past = Array.from({ length: 100 }, (_, i) => i / 100);          // 0.00 … 0.99, then today
+  assert.deepEqual(riskOf(2, [...past, 2], 10, 'us', false), { vs: 'us', clean: false, spread: 2, years: 10, pct: 100, level: 'high' }, 'a record gap');
+  assert.equal(riskOf(-1, [...past, -1], 10, 'us', false).level, 'low', 'a record low');
+  assert.equal(riskOf(0.5, [...past, 0.5], 10, 'us', false).pct, 50);
+  assert.equal(riskOf(0.5, [...past, 0.5], 10, 'us', false).level, 'avg');
+  assert.deepEqual([riskLevel(75), riskLevel(74), riskLevel(26), riskLevel(25), riskLevel(null)], ['high', 'avg', 'avg', 'low', null]);
+  const short = riskOf(2, [...past, 2], 2.5, 'us', false);
+  assert.deepEqual([short.pct, short.level, short.spread], [null, null, 2], 'under 3 years: the gap but no tag');
+});
+
+test('risk tag, daily markets: the gap to the US week by week; the US and Germany are benchmarks; the euro AAA curve has none', () => {
+  const t0 = 17000 * DAY, weeks = 300;                                   // ~5.7 years of weekly points
+  const long = f => ({ t0, d: Array.from({ length: weeks }, (_, i) => i * 7), y10: Array.from({ length: weeks }, (_, i) => f(i)), ys: [] });
+  const us = { id: 'us', y10: 4, long: long(() => 4) };
+  const wide = { id: 'uk', y10: 5.5, long: long(i => i === weeks - 1 ? 5.5 : 4.5 + (i % 10) / 20) };   // usually 0.5–0.95 above, now 1.5
+  const r = dailyRisk(wide, { us });
+  assert.deepEqual([r.vs, r.clean, r.spread, r.pct, r.level], ['us', false, 1.5, 100, 'high']);
+  assert.equal(r.years, 5.7);
+  assert.equal(dailyRisk({ ...wide, y10: 4.4 }, { us }).level, 'low', 'below its usual gap');
+  assert.deepEqual(dailyRisk(us, { us }), { bench: true });
+  assert.deepEqual(dailyRisk({ id: 'de' }, { us }), { bench: true });
+  assert.equal(dailyRisk({ ...wide, id: 'ea' }, { us }), null);
+  assert.equal(dailyRisk({ ...wide, long: null }, { us }), null, 'no history: no tag');
+  // weeks without a US point are skipped, not compared with another week's
+  const gappy = dailyRisk(wide, { us: { ...us, long: { ...us.long, d: us.long.d.slice(0, 100), y10: us.long.y10.slice(0, 100) } } });
+  assert.equal(gappy.years, 1.9);
+  assert.equal(gappy.level, null);
+});
+
+test('risk tag, Europe monthly: ten years of the gap to Germany; within the euro it is credit risk', () => {
+  const months = Array.from({ length: 125 }, (_, i) => { const t = 2016 * 12 + 3 + i; return `${Math.floor(t / 12)}-${String(t % 12 + 1).padStart(2, '0')}`; });
+  const by = {
+    DE: months.map((m, i) => [m, 1 + i * 0.01]),
+    IT: months.map((m, i) => [m, 1 + i * 0.01 + 2 - i * 0.01]),          // Italy's gap narrowing from 2 pp: now its narrowest
+    PL: months.map((m, i) => [m, 1 + i * 0.01 + 3 + (i % 7) * 0.1]),
+  };
+  const [it, pl] = summarizeMonthly(by);
+  assert.equal(it.month, months.at(-1));
+  assert.deepEqual([it.risk.vs, it.risk.clean, it.risk.pct, it.risk.level], ['de', true, 0, 'low']);
+  assert.equal(it.risk.years, 9.9, 'the last ten years only (119 months back)');
+  assert.equal(it.series.length, 25, 'the chart still shows two years');
+  assert.equal(pl.risk.clean, false);
+  assert.ok(['low', 'avg', 'high'].includes(pl.risk.level));
 });
 
 test('health: the monthly figures count as late 75 days after their month began', () => {
