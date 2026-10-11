@@ -1,5 +1,5 @@
 {
- "t": 1791678524897,
+ "t": 1791698858583,
  "pairs": {
   "bitcoin": {
    "Binance": "BTC",
@@ -31,14 +31,14 @@
   "solana": {
    "Binance": "SOL",
    "Gate.io": "SOL",
-   "OKX": "SOL",
    "MEXC": "SOL",
+   "OKX": "SOL",
    "KuCoin": "SOL"
   },
   "zcash": {
    "Binance": "ZEC",
-   "OKX": "ZEC",
    "KuCoin": "ZEC",
+   "OKX": "ZEC",
    "Gate.io": "ZEC"
   },
   "hyperliquid": {
@@ -73,8 +73,7 @@
    "KuCoin": "ADA"
   },
   "rain": {
-   "MEXC": "RAIN",
-   "Gate.io": "RAIN"
+   "MEXC": "RAIN"
   },
   "leo-token": {
    "OKX": "LEO",
@@ -116,8 +115,8 @@
   },
   "litecoin": {
    "Binance": "LTC",
-   "KuCoin": "LTC",
    "MEXC": "LTC",
+   "KuCoin": "LTC",
    "OKX": "LTC",
    "Gate.io": "LTC"
   },
@@ -174,8 +173,8 @@
   "ethena": {
    "Binance": "ENA",
    "MEXC": "ENA",
-   "Gate.io": "ENA",
    "KuCoin": "ENA",
+   "Gate.io": "ENA",
    "OKX": "ENA"
   },
   "memecore": {
@@ -243,8 +242,8 @@
   },
   "world-liberty-financial": {
    "Binance": "WLFI",
-   "Gate.io": "WLFI",
    "OKX": "WLFI",
+   "Gate.io": "WLFI",
    "MEXC": "WLFI",
    "KuCoin": "WLFI"
   },
@@ -271,8 +270,7 @@
   },
   "htx-dao": {
    "MEXC": "HTX",
-   "Gate.io": "HTX",
-   "KuCoin": "HTX"
+   "Gate.io": "HTX"
   },
   "ethereum-classic": {
    "Binance": "ETC",
@@ -303,8 +301,8 @@
   "crypto-com-chain": {
    "OKX": "CRO",
    "Gate.io": "CRO",
-   "KuCoin": "CRO",
-   "MEXC": "CRO"
+   "MEXC": "CRO",
+   "KuCoin": "CRO"
   },
   "arbitrum": {
    "Binance": "ARB",
@@ -316,8 +314,7 @@
   "just": {
    "Binance": "JST",
    "MEXC": "JST",
-   "Gate.io": "JST",
-   "KuCoin": "JST"
+   "Gate.io": "JST"
   },
   "kaspa": {
    "MEXC": "KAS",
@@ -341,8 +338,8 @@
   "pancakeswap-token": {
    "Binance": "CAKE",
    "MEXC": "CAKE",
-   "KuCoin": "CAKE",
-   "Gate.io": "CAKE"
+   "Gate.io": "CAKE",
+   "KuCoin": "CAKE"
   },
   "vechain": {
    "Binance": "VET",
@@ -422,9 +419,9 @@
   },
   "injective-protocol": {
    "Binance": "INJ",
+   "KuCoin": "INJ",
    "Gate.io": "INJ",
    "MEXC": "INJ",
-   "KuCoin": "INJ",
    "OKX": "INJ"
   },
   "ether-fi": {
@@ -486,8 +483,8 @@
    "MEXC": "STX"
   },
   "beldex": {
-   "KuCoin": "BDX",
-   "MEXC": "BDX"
+   "MEXC": "BDX",
+   "KuCoin": "BDX"
   },
   "official-trump": {
    "Binance": "TRUMP",
