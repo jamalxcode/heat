@@ -635,6 +635,13 @@
    "Gate.io": "KAIA",
    "KuCoin": "KAIA",
    "MEXC": "KAIA"
+  },
+  "optimism": {
+   "Binance": "OP",
+   "OKX": "OP",
+   "Gate.io": "OP",
+   "KuCoin": "OP",
+   "MEXC": "OP"
   }
  }
 }
