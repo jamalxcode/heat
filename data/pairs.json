@@ -1,5 +1,5 @@
 {
- "t": 1792283328946,
+ "t": 1792299199576,
  "pairs": {
   "bitcoin": {
    "Binance": "BTC",
@@ -74,10 +74,11 @@
    "KuCoin": "ADA"
   },
   "rain": {
-   "MEXC": "RAIN"
+   "MEXC": "RAIN",
+   "KuCoin": "RAIN",
+   "Gate.io": "RAIN"
   },
   "leo-token": {
-   "Gate.io": "LEO",
    "OKX": "LEO"
   },
   "stellar": {
@@ -179,7 +180,6 @@
    "Gate.io": "ENA"
   },
   "memecore": {
-   "Gate.io": "M",
    "MEXC": "M"
   },
   "ondo-finance": {
@@ -209,8 +209,8 @@
    "KuCoin": "PUMP"
   },
   "mantle": {
-   "MEXC": "MNT",
    "Gate.io": "MNT",
+   "MEXC": "MNT",
    "KuCoin": "MNT"
   },
   "polkadot": {
@@ -315,7 +315,9 @@
   },
   "just": {
    "Binance": "JST",
-   "MEXC": "JST"
+   "MEXC": "JST",
+   "Gate.io": "JST",
+   "KuCoin": "JST"
   },
   "kaspa": {
    "Gate.io": "KAS",
@@ -332,8 +334,8 @@
   "render-token": {
    "Binance": "RENDER",
    "OKX": "RENDER",
-   "KuCoin": "RENDER",
    "Gate.io": "RENDER",
+   "KuCoin": "RENDER",
    "MEXC": "RENDER"
   },
   "pancakeswap-token": {
@@ -409,8 +411,8 @@
   "dash": {
    "Binance": "DASH",
    "KuCoin": "DASH",
-   "OKX": "DASH",
    "MEXC": "DASH",
+   "OKX": "DASH",
    "Gate.io": "DASH"
   },
   "stable-2": {
@@ -446,6 +448,7 @@
   },
   "akedo": {
    "Gate.io": "AKE",
+   "KuCoin": "AKE",
    "MEXC": "AKE"
   },
   "flare-networks": {
@@ -484,7 +487,8 @@
   },
   "beldex": {
    "MEXC": "BDX",
-   "KuCoin": "BDX"
+   "KuCoin": "BDX",
+   "Gate.io": "BDX"
   },
   "official-trump": {
    "Binance": "TRUMP",
@@ -552,8 +556,8 @@
   },
   "celestia": {
    "Binance": "TIA",
-   "OKX": "TIA",
    "Gate.io": "TIA",
+   "OKX": "TIA",
    "MEXC": "TIA",
    "KuCoin": "TIA"
   },
