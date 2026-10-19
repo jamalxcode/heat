@@ -646,6 +646,11 @@
    "Gate.io": "OP",
    "KuCoin": "OP",
    "MEXC": "OP"
+  },
+  "quack-ai": {
+   "Gate.io": "Q",
+   "KuCoin": "Q",
+   "MEXC": "Q"
   }
  }
 }
