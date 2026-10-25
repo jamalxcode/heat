@@ -1,5 +1,5 @@
 {
- "t": 1792888125692,
+ "t": 1792904599469,
  "pairs": {
   "bitcoin": {
    "Binance": "BTC",
@@ -75,8 +75,7 @@
   },
   "rain": {
    "KuCoin": "RAIN",
-   "Gate.io": "RAIN",
-   "MEXC": "RAIN"
+   "Gate.io": "RAIN"
   },
   "leo-token": {
    "OKX": "LEO",
@@ -132,8 +131,8 @@
   },
   "sui": {
    "Binance": "SUI",
-   "OKX": "SUI",
    "KuCoin": "SUI",
+   "OKX": "SUI",
    "Gate.io": "SUI",
    "MEXC": "SUI"
   },
@@ -145,9 +144,9 @@
   },
   "hedera-hashgraph": {
    "Binance": "HBAR",
+   "KuCoin": "HBAR",
    "OKX": "HBAR",
    "Gate.io": "HBAR",
-   "KuCoin": "HBAR",
    "MEXC": "HBAR"
   },
   "quant-network": {
@@ -233,13 +232,13 @@
    "KuCoin": "ASTER",
    "Gate.io": "ASTER",
    "Binance": "ASTER",
-   "OKX": "ASTER",
-   "MEXC": "ASTER"
+   "MEXC": "ASTER",
+   "OKX": "ASTER"
   },
   "sky": {
    "Binance": "SKY",
-   "OKX": "SKY",
    "Gate.io": "SKY",
+   "OKX": "SKY",
    "MEXC": "SKY",
    "KuCoin": "SKY"
   },
@@ -276,8 +275,8 @@
    "Gate.io": "HTX"
   },
   "ethereum-classic": {
-   "OKX": "ETC",
    "Binance": "ETC",
+   "OKX": "ETC",
    "Gate.io": "ETC",
    "KuCoin": "ETC",
    "MEXC": "ETC"
@@ -298,14 +297,12 @@
    "MEXC": "TRX",
    "Gate.io": "TRX"
   },
-  "whitebit": {
-   "MEXC": "WBT"
-  },
+  "whitebit": {},
   "crypto-com-chain": {
    "OKX": "CRO",
    "Gate.io": "CRO",
-   "KuCoin": "CRO",
-   "MEXC": "CRO"
+   "MEXC": "CRO",
+   "KuCoin": "CRO"
   },
   "arbitrum": {
    "Binance": "ARB",
@@ -316,8 +313,7 @@
   },
   "just": {
    "Binance": "JST",
-   "MEXC": "JST",
-   "Gate.io": "JST"
+   "MEXC": "JST"
   },
   "kaspa": {
    "KuCoin": "KAS",
@@ -412,8 +408,8 @@
    "Binance": "DASH",
    "KuCoin": "DASH",
    "OKX": "DASH",
-   "Gate.io": "DASH",
-   "MEXC": "DASH"
+   "MEXC": "DASH",
+   "Gate.io": "DASH"
   },
   "stable-2": {
    "MEXC": "STABLE",
