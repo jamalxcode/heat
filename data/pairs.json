@@ -649,6 +649,12 @@
    "Gate.io": "Q",
    "KuCoin": "Q",
    "MEXC": "Q"
+  },
+  "sun-token": {
+   "Binance": "SUN",
+   "MEXC": "SUN",
+   "Gate.io": "SUN",
+   "KuCoin": "SUN"
   }
  }
 }
