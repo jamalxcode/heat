@@ -39,16 +39,22 @@ jobs:
       - name: Rebuild the daily lists
         env:
           COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
-        run: node scripts/backfill-universe.mjs ${{ inputs.dry_run && '--dry-run' || '' }} --limit "${{ inputs.limit }}" --days "${{ inputs.days }}"
+          # inputs go through env vars, never straight into the script line
+          DRY_RUN: ${{ inputs.dry_run }}
+          LIMIT: ${{ inputs.limit }}
+          DAYS: ${{ inputs.days }}
+        run: node scripts/backfill-universe.mjs $([ "$DRY_RUN" = "true" ] && echo --dry-run) --limit "$LIMIT" --days "$DAYS"
 
       # saved even when the run stopped early, so the next run resumes instead of asking CoinGecko again
       - name: Commit progress and lists
         if: always()
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           for f in data/backfill-cache.json data/universe-history.json; do [ -f "$f" ] && git add "$f"; done
           if git diff --cached --quiet; then echo "Nothing changed"; exit 0; fi
-          git commit -m "chore: backfill daily lists ($([ '${{ inputs.dry_run }}' = 'true' ] && echo 'dry run' || echo 'full'))"
+          git commit -m "chore: backfill daily lists ($([ "$DRY_RUN" = 'true' ] && echo 'dry run' || echo 'full'))"
           git pull --rebase --quiet
           git push
