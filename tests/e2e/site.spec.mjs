@@ -1041,86 +1041,87 @@ test.describe('phone', () => {
   });
 });
 
-// Prediction markets: the same page at /predictions/, drawing its own view from predictions.json (tests/e2e/fixtures.mjs:
-// five markets on four venues, Betfair not set up)
+// Prediction markets: the same page at /predictions/, drawing its own view from predictions.json (tests/e2e/fixtures.mjs)
 test.describe('predictions', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/predictions/');
   });
+  const ids = async (page, sel = '#grid > .grid .ptile') => page.locator(sel).evaluateAll(els => els.map(e => e.dataset.id));
 
-  test('a tab per venue plus All; ranked likeliest + most money (#1 big), or by interest, or by topic busiest first; search tags', async ({ page }) => {
+  test('a tab per venue (Betfair hidden until set up); open questions ranked likeliest + most money; search tags', async ({ page }) => {
     await expect(page).toHaveTitle(/Prediction Market Heatmap/);
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://heat.sala.company/predictions/');
     await expect(page.locator('#market a[aria-current="page"]')).toHaveText(/Predictions/);
-    await expect(page.locator('#pvenue button')).toHaveText([/^All/, /Polymarket/, /Kalshi/, /PredictIt/, /Manifold/, /Betfair.*not set up/]);
-    await expect(page.locator('#grid .ptile')).toHaveCount(5);
-    // likeliest + most money = the likeliest outcome's chance × log10(interest): mayor 71% × 6.9, Fed (70% no) × 6.2,
-    // Senate 55% × 6.6, Bitcoin (88% no) × 1.9, PredictIt (no money figures) last
-    expect(await page.locator('#grid .ptile').evaluateAll(els => els.map(e => e.dataset.id))).toEqual(['pm:mayor', 'pm:fed', 'ks:SEN', 'mf:x', 'pi:8000']);
-    await expect(page.locator('.ptile[data-id="pm:fed"] .pt-ans')).toHaveText('No');                // 30% yes shown as its likelier side
-    await expect(page.locator('.ptile[data-id="pm:fed"] .pt-p')).toHaveText('70%');
-    await expect(page.locator('.ptile[data-id="pm:fed"]')).toContainText('+8.0 pp');               // and its move turned round
-    // interest = bet today + a 30th of bet in total: mayor $5M + $3M, Senate $2M + $1.67M, Fed $1M + $0.67M, Bitcoin $50 + $30
-    await page.locator('#prank').selectOption('interest');
-    expect(await page.locator('#grid .ptile').evaluateAll(els => els.map(e => e.dataset.id))).toEqual(['pm:mayor', 'ks:SEN', 'pm:fed', 'mf:x', 'pi:8000']);
-    await expect(page.locator('.ptile[data-id="pm:fed"] .pt-ans')).toHaveText('Yes');
-    await expect(page.locator('.ptile[data-id="pm:fed"] .pt-p')).toHaveText('30%');
-    await expect(page.locator('#grid .ptile').first()).toHaveClass(/sz-l/);
-    await expect(page.locator('#grid .ptile').first()).toContainText('#1');
-    // question, answer, chance, money bet today; the total in the foot
+    await expect(page.locator('#pvenue button')).toHaveText([/^All/, /Polymarket/, /Kalshi/, /PredictIt/, /Manifold/]);
+    // certainty × log10(interest): mayor 71% × 6.9, Fed (70% no) × 6.2, Senate (merged) 55% × 6.6, thin 60% (no) × 2.1, PredictIt (no money) last
+    await expect.poll(() => ids(page)).toEqual(['pm:mayor', 'pm:fed', 'ks:SEN', 'pm:thin', 'pi:8000']);
     const top = page.locator('#grid .ptile').first();
+    await expect(top).toHaveClass(/sz-l/);
+    await expect(top.locator('.pt-rank')).toHaveText('#1');
     await expect(top.locator('.pt-title')).toHaveText('NYC mayor winner?');
     await expect(top.locator('.pt-ans')).toHaveText('Alice');
     await expect(top.locator('.pt-p')).toHaveText('71%');
     await expect(top.locator('.pt-amt')).toHaveText('$5M bet today');
-    await expect(top.locator('.pt-foot')).toContainText('$90M total');
-    await expect(page.locator('.ptile[data-id="pi:8000"] .pt-ans')).toHaveText('Vance');      // a one-option market isn't a yes/no
-    await expect(page.locator('.ptile[data-id="pi:8000"]')).toContainText('no money figures');
-    await page.locator('#pgroup').selectOption('cat');
-    await expect(page.locator('#grid .r-group h3')).toHaveText([/Politics/, /Economy/, /Crypto/]);
-    await page.locator('#prank').selectOption('today');
-    expect(await page.locator('#grid .r-group').first().locator('.ptile').evaluateAll(els => els.map(e => e.dataset.id))).toEqual(['pm:mayor', 'ks:SEN', 'pi:8000']);
-    await page.locator('#prank').selectOption('move');
-    await expect(page.locator('#grid .r-group').nth(1).locator('.ptile').first()).toHaveAttribute('data-id', 'pm:fed');
-    await page.locator('#prank').selectOption('sure');
-    await expect(page.locator('#view, #colorBy, #legend')).toHaveCount(3);
-    await expect(page.locator('#view')).toBeHidden();
+    await expect(top.locator('.pt-chg')).toHaveText('▲ +5.0 pp');
+    await expect(top).toHaveClass(/q2/);                                                            // teal, not the site's blue
+    await expect(page.locator('.ptile[data-id="pm:fed"] .pt-ans')).toHaveText('No');                // 30% yes shown as its likelier side
+    await expect(page.locator('.ptile[data-id="pm:fed"] .pt-p')).toHaveText('70%');
+    await expect(page.locator('.ptile[data-id="pm:fed"] .pt-chg')).toHaveText('▲ +8.0 pp');          // and its move turned round
+    await expect(page.locator('.ptile[data-id="pi:8000"] .pt-ans')).toHaveText('Vance');             // one named option isn't a yes/no
+    await expect(page.locator('.ptile[data-id="pm:thin"]')).toHaveClass(/thin/);
+    await expect(page.locator('.ptile[data-id="pm:thin"] .pt-foot')).toContainText('thin market');
   });
 
-  test('venue tabs filter and go in the address; Betfair explains it is not set up', async ({ page }) => {
-    await page.locator('#pvenue button[data-v="polymarket"]').click();
-    await expect(page.locator('#grid .ptile')).toHaveCount(2);
-    await expect(page).toHaveURL(/\/predictions\/\?v=polymarket$/);
-    await page.locator('#pvenue button[data-v="betfair"]').click();
-    await expect(page.locator('#grid .ptile')).toHaveCount(0);
-    await expect(page.locator('#grid .p-note')).toContainText('isn’t connected yet');
-    await page.goto('/predictions/?v=manifold');
-    await expect(page.locator('#grid .ptile')).toHaveCount(1);
-    await expect(page.locator('#grid .ptile')).toContainText('$900 total play money');
+  test('the same question on two venues is one tile comparing them, ⚡ when they differ; the popup lists each venue', async ({ page }) => {
+    const sen = page.locator('.ptile[data-id="ks:SEN"]');
+    await expect(sen.locator('.pv')).toHaveText(['K', 'PI']);
+    await expect(sen.locator('.pt-cmp')).toHaveText('⚡ K 55% · PI 61%');
+    await expect(page.locator('.ptile[data-id="pi:SEN"]')).toHaveCount(0);                          // folded into Kalshi's tile
+    await sen.click();
+    await expect(page.locator('#detail .p-cmp tbody tr')).toHaveCount(2);
+    await expect(page.locator('#detail .p-differ')).toContainText('differ by 6 points');
+    await page.keyboard.press('Escape');
+    await page.locator('#pvenue button[data-v="predictit"]').click();                              // a venue's own tab: no merging
+    await expect.poll(() => ids(page)).toEqual(['pi:8000', 'pi:SEN']);                             // PredictIt keeps its own order
   });
 
-  test('colour follows the timeframe; a click opens every outcome with its moves; the table sorts', async ({ page }) => {
+  test('decided questions fold into a row at the bottom; topics switch off; play money and single games are off to start', async ({ page }) => {
+    await expect(page.locator('#pdone summary')).toContainText('1');
+    await expect(page.locator('#pdone .ptile')).toHaveCount(1);
+    await expect(page.locator('#pdone .ptile[data-id="ks:DONE"] .pt-foot')).toContainText('99% sure already');
+    await expect(page.locator('.ptile[data-id="mf:x"]')).toHaveCount(0);
+    await expect(page.locator('.ptile[data-id="ks:GAME"]')).toHaveCount(0);
+    await page.locator('#pplay').check();
+    await expect(page.locator('.ptile[data-id="mf:x"]')).toHaveCount(1);
+    await page.locator('#ptopics button[data-topic="games"]').click();
+    await expect(page.locator('.ptile[data-id="ks:GAME"]')).toHaveCount(1);
+    await page.locator('#ptopics button[data-topic="Politics"]').click();
+    await expect(page.locator('.ptile[data-id="pm:mayor"]')).toHaveCount(0);
+    await page.reload();                                                                          // the choices are remembered
+    await expect(page.locator('.ptile[data-id="pm:mayor"]')).toHaveCount(0);
+    await expect(page.locator('.ptile[data-id="mf:x"]')).toHaveCount(1);
+  });
+
+  test('rank by contested or interest; colour follows the timeframe; the table sorts; search', async ({ page }) => {
+    await page.locator('#prank').selectOption('contested');
+    await expect.poll(() => ids(page)).toEqual(['ks:SEN', 'pm:mayor', 'pm:fed', 'pm:thin', 'pi:8000']);
+    await page.locator('#prank').selectOption('interest');
+    await expect.poll(() => ids(page)).toEqual(['pm:mayor', 'ks:SEN', 'pm:fed', 'pm:thin', 'pi:8000']);
+    await expect(page.locator('.ptile[data-id="pm:fed"] .pt-ans')).toHaveText('Yes');
     const mayor = page.locator('.ptile[data-id="pm:mayor"]');
-    await expect(mayor).toContainText('+5.0 pp');
     await page.locator('#ptf button[data-v="1w"]').click();
-    await expect(mayor).toContainText('+12 pp');
+    await expect(mayor.locator('.pt-chg')).toHaveText('▲ +12 pp');
     await mayor.click();
     await expect(page.locator('#detail')).toHaveClass(/pinned/);
-    await expect(page.locator('#detail .p-otbl tbody tr')).toHaveCount(2);
     await expect(page.locator('#detail .p-chart')).toBeVisible();
-    await expect(page.locator('#detail .kv')).toContainText('#1 of 5');
-    await expect(page.locator('#detail .kv')).toContainText('Bet in total$90M');
+    await expect(page.locator('#detail .kv')).toContainText('Buy–sell gap1.0 points');
     await expect(page).toHaveURL(/m=pm%3Amayor/);
     await page.keyboard.press('Escape');
-    await expect(page.locator('#detail')).not.toHaveClass(/pinned/);
     await page.locator('#pview button[data-v="table"]').click();
-    await expect(page.locator('#grid tbody tr')).toHaveCount(5);
-    await expect(page.locator('#grid tbody tr').first()).toHaveAttribute('data-id', 'pm:mayor');
+    await expect(page.locator('#grid tbody tr')).toHaveCount(6);                                    // the open ones and the decided one
     await page.locator('#grid th[data-sort="total"]').click();
-    await expect(page.locator('#grid tbody tr').first()).toHaveAttribute('data-id', 'pm:mayor');   // $90M, the most
-    await page.locator('#grid th[data-sort="p"]').click();
-    await expect(page.locator('#grid tbody tr').first()).toHaveAttribute('data-id', 'mf:x');       // 88% (no), the surest
-    await page.locator('#psearch').fill('bitcoin');
+    await expect(page.locator('#grid tbody tr').first()).toHaveAttribute('data-id', 'pm:mayor');
+    await page.locator('#psearch').fill('fed');
     await expect(page.locator('#grid tbody tr')).toHaveCount(1);
   });
 });

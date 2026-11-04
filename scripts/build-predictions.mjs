@@ -108,8 +108,10 @@ function finish(rec, outcomes, exclusive) {
     ...rec,
     exclusive: !!exclusive,
     head: head.name,
-    outcomes: shown.map(o => ({ name: o.name, p: r4(o.p), d1: r4(o.d1), d7: r4(o.d7), d30: r4(o.d30), ...(o.vol24 != null ? { vol24: Math.round(o.vol24) } : {}) })),
+    outcomes: shown.map(o => ({ name: o.name, p: r4(o.p), d1: r4(o.d1), d7: r4(o.d7), d30: r4(o.d30), ...(o.vol24 != null ? { vol24: Math.round(o.vol24) } : {}), ...(o.sp != null ? { sp: r4(o.sp) } : {}) })),
     more: clean.length - shown.length,
+    // where the headline's own price history lives (backfill): a Kalshi market ticker or a Polymarket token
+    ...(head.src ? { src: head.src } : {}),
   };
 }
 
@@ -135,15 +137,22 @@ async function getJSON(fetchFn, url, { tries = 3, timeout = 20e3, ...init } = {}
 // negRisk) has one outcome per market, named by its groupItemTitle; a single market with named outcomes (Team A / Team B)
 // has one outcome per name.
 export function fromPolymarket(e) {
+  // "Build your map" style bundles have no single answer that reads on its own: left out
+  if (/build your/i.test(e.title || '')) return null;
   const markets = (e.markets || []).filter(m => m.active !== false && !m.closed);
   if (!markets.length) return null;
+  // an event of several options where only one is still open keeps that option's name (not a bare "Yes")
+  const multiEvent = (e.markets || []).length > 1;
+  const spread = m => { const b = num(m.bestBid), a = num(m.bestAsk); return b != null && a != null && a >= b ? a - b : null; };
+  const token = m => parseList(m.clobTokenIds)[0];
   const outcomes = [];
   const yesNo = m => { const o = parseList(m.outcomes); return o.length === 2 && /^yes$/i.test(o[0]) && /^no$/i.test(o[1]); };
   if (markets.length === 1 && !yesNo(markets[0])) {
     const m = markets[0], names = parseList(m.outcomes), prices = parseList(m.outcomePrices).map(num);
     const d1 = num(m.oneDayPriceChange), d7 = num(m.oneWeekPriceChange), d30 = num(m.oneMonthPriceChange);
+    const tok = parseList(m.clobTokenIds);
     names.forEach((name, i) => outcomes.push({
-      name: String(name), p: clamp01(prices[i]),
+      name: String(name), p: clamp01(prices[i]), sp: spread(m), src: tok[i] ? { tok: String(tok[i]) } : null,
       // the changes are for the first outcome; with two outcomes the second moves the other way
       d1: i === 0 ? d1 : names.length === 2 && d1 != null ? -d1 : null,
       d7: i === 0 ? d7 : names.length === 2 && d7 != null ? -d7 : null,
@@ -154,8 +163,9 @@ export function fromPolymarket(e) {
       const prices = parseList(m.outcomePrices).map(num);
       const p = clamp01(prices[0] ?? num(m.lastTradePrice));
       outcomes.push({
-        name: markets.length === 1 ? 'Yes' : String(m.groupItemTitle || m.question || 'Yes'),
+        name: markets.length === 1 && !multiEvent ? 'Yes' : String(m.groupItemTitle || m.question || 'Yes'),
         p, d1: num(m.oneDayPriceChange), d7: num(m.oneWeekPriceChange), d30: num(m.oneMonthPriceChange), vol24: num(m.volume24hr),
+        sp: spread(m), src: token(m) ? { tok: String(token(m)) } : null,
       });
     }
   }
@@ -164,7 +174,7 @@ export function fromPolymarket(e) {
     id: 'pm:' + e.slug, venue: 'polymarket', title: String(e.title || markets[0].question),
     cat: catFrom(labels, e.title), url: `https://polymarket.com/event/${encodeURIComponent(e.slug)}`,
     end: isoOf(e.endDate || markets[0].endDate), vol24: num(e.volume24hr) ?? 0, vol: num(e.volume), liq: num(e.liquidity), oi: num(e.openInterest), cur: 'USD',
-  }, outcomes, e.negRisk || markets.length === 1);
+  }, outcomes, e.negRisk || (markets.length === 1 && !multiEvent));
 }
 async function polymarket({ fetchFn }) {
   const out = [];
@@ -186,20 +196,23 @@ const KALSHI = 'https://api.elections.kalshi.com/trade-api/v2';
 export function fromKalshi(e) {
   const markets = (e.markets || []).filter(m => !m.status || ['active', 'open'].includes(m.status));
   if (!markets.length) return null;
+  // the middle of the best bid and ask (what it would cost to trade now), not the last trade, which in a thin market can
+  // be one small order; the last trade only when there's no two-sided quote
+  const mid = (bid, ask) => bid != null && ask != null && ask > 0 && ask >= bid ? (bid + ask) / 2 : null;
   const price = m => {
     const last = num(m.last_price_dollars) ?? (num(m.last_price) != null ? num(m.last_price) / 100 : null);
-    const bid = num(m.yes_bid_dollars), ask = num(m.yes_ask_dollars);
-    if (last != null && last > 0) return last;
-    return bid != null && ask != null && ask > 0 ? (bid + ask) / 2 : last;
+    return mid(num(m.yes_bid_dollars), num(m.yes_ask_dollars)) ?? (last != null && last > 0 ? last : null);
   };
-  const prevOf = m => num(m.previous_price_dollars) ?? (num(m.previous_price) != null ? num(m.previous_price) / 100 : null);
+  const prevOf = m => mid(num(m.previous_yes_bid_dollars), num(m.previous_yes_ask_dollars))
+    ?? num(m.previous_price_dollars) ?? (num(m.previous_price) != null ? num(m.previous_price) / 100 : null);
+  const spreadOf = m => { const b = num(m.yes_bid_dollars), a = num(m.yes_ask_dollars); return b != null && a != null && a > 0 && a >= b ? a - b : null; };
   const outcomes = markets.map(m => {
     const p = clamp01(price(m)), prev = prevOf(m), c24 = num(m.volume_24h_fp) ?? num(m.volume_24h) ?? 0;
     const avg = p == null ? 0 : prev != null && prev > 0 ? (p + prev) / 2 : p;
     return {
       name: String(markets.length === 1 ? 'Yes' : m.yes_sub_title || m.subtitle || m.title || m.ticker),
       p, d1: p != null && prev != null && prev > 0 ? p - prev : null, d7: null, d30: null,
-      vol24: c24 * avg, c24,
+      vol24: c24 * avg, c24, sp: spreadOf(m), src: { tk: m.ticker, series: e.series_ticker || null },
     };
   });
   const pOf = m => clamp01(price(m)) || 0;
@@ -356,7 +369,7 @@ export function updateHist(prevHist, recs, now) {
     if (series) series.p.forEach((v, i) => { if (v != null && series.d + i >= from) days.set(series.d + i, v); });
     days.set(today, head.p);
     const first = Math.min(...days.keys());
-    out[r.id] = { o: r.head, d: first, p: Array.from({ length: today - first + 1 }, (_, i) => days.get(first + i) ?? null) };
+    out[r.id] = { o: r.head, d: first, p: Array.from({ length: today - first + 1 }, (_, i) => days.get(first + i) ?? null), ...(series?.bf ? { bf: series.bf } : {}) };
   }
   return out;
 }
@@ -373,6 +386,112 @@ function fillChanges(recs, hist, now) {
     const head = r.outcomes.find(o => o.name === r.head), h = hist[r.id];
     for (const [key, k] of [['d1', 1], ['d7', 7], ['d30', 30]]) if (head[key] == null) head[key] = r4(histChange(h, k, today));
   }
+}
+
+/* ---------- backfill: the venues' own daily prices for the days this file hasn't seen ---------- */
+// A new record's history starts on the day it's first tracked, so 1w / 1m moves would be blank for a month. Kalshi
+// (daily candles) and Polymarket (prices-history) publish their past prices: for a record with under 25 days of history
+// the missing days are filled from there, at most BACKFILL_PER_RUN records per venue per update (so a first run
+// doesn't hammer them), and each record is asked at most once a day.
+const BACKFILL_PER_RUN = 40, BACKFILL_MIN_DAYS = 25;
+const dayOfTs = s => Math.floor((s * 1000 - 1) / DAY);   // a candle stamped at the end of its day belongs to that day
+async function pastPrices(fetchFn, src, now) {
+  const end = Math.floor(now / 1000), start = end - KEEP_DAYS * 86400, out = new Map();
+  if (src.tk && src.series) {
+    const d = await getJSON(fetchFn, `${KALSHI}/series/${encodeURIComponent(src.series)}/markets/${encodeURIComponent(src.tk)}/candlesticks?start_ts=${start}&end_ts=${end}&period_interval=1440`, { tries: 2 });
+    for (const c of d.candlesticks || []) {
+      const b = num(c.yes_bid?.close_dollars), a = num(c.yes_ask?.close_dollars), last = num(c.price?.close_dollars);
+      const p = b != null && a != null && a > 0 && a >= b ? (a + b) / 2 : last;
+      if (p != null && c.end_period_ts) out.set(dayOfTs(c.end_period_ts), clamp01(p));
+    }
+  } else if (src.tok) {
+    const d = await getJSON(fetchFn, `https://clob.polymarket.com/prices-history?market=${encodeURIComponent(src.tok)}&startTs=${start}&endTs=${end}&fidelity=1440`, { tries: 2 });
+    for (const x of d.history || []) { const p = num(x.p); if (p != null && x.t) out.set(Math.floor(x.t * 1000 / DAY), clamp01(p)); }
+  }
+  return out;
+}
+export async function backfill({ fetchFn, markets, hist, now, log = () => {} }) {
+  const today = Math.floor(now / DAY), from = today - KEEP_DAYS + 1;
+  const want = markets.filter(m => m.src && !m.stale && hist[m.id] && hist[m.id].p.filter(v => v != null).length < BACKFILL_MIN_DAYS && !(now - (hist[m.id].bf || 0) < DAY));
+  const pick = ['kalshi', 'polymarket'].flatMap(v => want.filter(m => m.venue === v).slice(0, BACKFILL_PER_RUN));
+  let filled = 0;
+  await pool(pick, 4, async m => {
+    const h = hist[m.id];
+    h.bf = now;
+    try {
+      const past = await pastPrices(fetchFn, m.src, now);
+      if (!past.size) return;
+      const days = new Map(h.p.map((v, i) => [h.d + i, v]).filter(x => x[1] != null));
+      for (const [d, v] of past) if (d >= from && d < today && !days.has(d)) days.set(d, v);   // today stays the live price
+      const first = Math.min(...days.keys());
+      h.d = first; h.p = Array.from({ length: today - first + 1 }, (_, i) => days.get(first + i) ?? null);
+      filled++;
+    } catch { /* tried again tomorrow */ }
+  });
+  if (pick.length) log(`  History: backfilled ${filled}/${pick.length} markets from the venues' past prices`);
+}
+
+/* ---------- the same question on several venues ---------- */
+// No shared ids exist, so questions are matched by their words and, for several-outcome questions, their outcomes:
+//   - the title's meaningful words (no "will", "who", "winner"…) overlap (Jaccard similarity), years must agree, and
+//     a party word on one side and the other party on the other blocks a match (Democratic vs Republican nominee);
+//   - two yes/no questions need ≥ 0.7 word overlap; two several-outcome questions ≥ 0.35 plus at least half their
+//     leading outcomes in common (2 or more); a yes/no is never matched with a several-outcome question.
+// Each venue appears at most once in a group; the group's id is its member with the most interest. Matching is a
+// best guess: the page shows each venue's own price and links to it, so a wrong match is visible, not hidden.
+const STOP = new Set('will the who what which when where how win wins winner winning be by after before for a an and or of on in to is are at as with than this that next market odds election elections us u.s 2025s'.split(' '));
+const words = t => new Set(String(t).toLowerCase().replace(/[’']/g, '').replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter(w => w.length > 2 && !STOP.has(w)).map(w => w.replace(/s$/, '')));
+const years = t => new Set(String(t).match(/\b20\d\d\b/g) || []);
+// a person's surname, so "J.D. Vance" ≈ "Vance", "Scott Colom (D)" ≈ "Colom" and PredictIt's "Dems (Colom)" ≈ "Colom"
+export const normName = n => { let s = String(n).toLowerCase(); const inner = s.match(/\(([^)]{4,})\)/); if (inner && /^(dems?|democrats?|gop|republicans?|rep|ind|independent)\b/.test(s)) s = inner[1]; s = s.replace(/\([^)]{0,3}\)/g, ' ').replace(/[^a-z0-9 ]+/g, ' ').trim(); return s.split(/\s+/).pop() || ''; };
+const PARTY = [/\b(democrat|democratic|democrats|dem|dems)\b/i, /\b(republican|republicans|gop)\b/i];
+// places: two questions naming different states or countries are never the same question ("which party wins the
+// Senate race in Alaska" vs "… in Maine" share every other word)
+const PLACES = ['alabama', 'alaska', 'arizona', 'arkansas', 'california', 'colorado', 'connecticut', 'delaware', 'florida', 'georgia', 'hawaii', 'idaho', 'illinois', 'indiana', 'iowa', 'kansas', 'kentucky', 'louisiana', 'maine', 'maryland', 'massachusetts', 'michigan', 'minnesota', 'mississippi', 'missouri', 'montana', 'nebraska', 'nevada', 'new hampshire', 'new jersey', 'new mexico', 'new york', 'north carolina', 'north dakota', 'ohio', 'oklahoma', 'oregon', 'pennsylvania', 'rhode island', 'south carolina', 'south dakota', 'tennessee', 'texas', 'utah', 'vermont', 'virginia', 'west virginia', 'washington', 'wisconsin', 'wyoming',
+  'france', 'french', 'germany', 'german', 'israel', 'canada', 'canadian', 'japan', 'brazil', 'mexico', 'india', 'australia', 'uk', 'britain', 'british', 'italy', 'spain', 'poland', 'hungary', 'chile', 'colombia', 'peru', 'argentina', 'south korea', 'korea', 'netherlands', 'portugal', 'ukraine', 'russia', 'iran', 'venezuela', 'china', 'taiwan', 'romania', 'czech', 'philippines', 'new york city', 'nyc', 'los angeles', 'chicago'];
+const placesOf = t => { const s = ' ' + String(t).toLowerCase().replace(/[^a-z ]+/g, ' ') + ' '; const out = new Set(); for (const p of PLACES) if (s.includes(' ' + p + ' ')) out.add(p); for (const p of [...out]) for (const q of out) if (q !== p && q.includes(p)) out.delete(p); return out; };
+const jaccard = (a, b) => { let n = 0; for (const x of a) if (b.has(x)) n++; return n / (a.size + b.size - n || 1); };
+function sameQuestion(a, b) {
+  if (a.venue === b.venue) return 0;
+  const yn = m => m.outcomes.length === 1;
+  const ya = years(a.title), yb = years(b.title);
+  if (ya.size && yb.size && ![...ya].some(y => yb.has(y))) return 0;
+  const pa = placesOf(a.title), pb = placesOf(b.title);
+  if (pa.size && pb.size && ![...pa].some(p => pb.has(p))) return 0;
+  // "which party wins the Senate" (the whole country) vs "… in Alaska": only one names a place and the outcomes are
+  // just the parties, so nothing else tells them apart
+  const parties = m => m.outcomes.length > 1 && m.outcomes.every(o => /\b(dem|dems|democrat|democratic|democrats|rep|gop|republican|republicans)\b/i.test(o.name));
+  if (!pa.size !== !pb.size && parties(a) && parties(b)) return 0;
+  const [da, ra] = PARTY.map(re => re.test(a.title)), [db, rb] = PARTY.map(re => re.test(b.title));
+  if ((da && !ra && rb && !db) || (ra && !da && db && !rb)) return 0;
+  const sim = jaccard(words(a.title), words(b.title));
+  if (yn(a) !== yn(b)) return 0;
+  if (yn(a)) return sim >= 0.7 ? sim : 0;
+  const na = new Set(a.outcomes.slice(0, 6).map(o => normName(o.name))), nb = new Set(b.outcomes.slice(0, 6).map(o => normName(o.name)));
+  let shared = 0; for (const x of na) if (nb.has(x)) shared++;
+  return sim >= 0.35 && shared >= 2 && shared >= Math.min(na.size, nb.size) / 2 ? sim + shared / 10 : 0;
+}
+export function matchGroups(markets) {
+  const byInterest = [...markets].sort((a, b) => (b.interest || 0) - (a.interest || 0));
+  const groupOf = new Map();                  // id → leader id
+  const members = new Map();                  // leader id → [records]
+  for (const m of byInterest) {
+    if (groupOf.has(m.id)) continue;
+    let best = null, bestScore = 0;
+    for (const [lead, ms] of members) {
+      if (ms.some(x => x.venue === m.venue)) continue;
+      const score = Math.min(...ms.map(x => sameQuestion(x, m)));
+      if (score > bestScore) { best = lead; bestScore = score; }
+    }
+    if (best) { members.get(best).push(m); groupOf.set(m.id, best); }
+    else { members.set(m.id, [m]); groupOf.set(m.id, m.id); }
+  }
+  let n = 0;
+  for (const m of markets) {
+    const lead = groupOf.get(m.id);
+    if (members.get(lead).length > 1) { m.group = lead; if (lead === m.id) n++; } else delete m.group;
+  }
+  return n;
 }
 
 /* ---------- build ---------- */
@@ -395,6 +514,7 @@ export async function build({ prev = null, forex = null, env = {}, log = console
   VENUES.forEach((v, i) => {
     const res = results[i];
     if (res.status === 'fulfilled' && res.value.length) {
+      res.value.forEach((m, j) => { m.ord = j + 1; });   // the venue's own order (PredictIt's tab follows it)
       markets.push(...res.value);
       venues[v.key] = { state: 'ok', n: res.value.length, at: now };
       log(`  ${v.name}: ${res.value.length} markets`);
@@ -419,7 +539,10 @@ export async function build({ prev = null, forex = null, env = {}, log = console
   markets.sort((a, b) => b.interest - a.interest);
   markets.forEach((m, i) => { m.rank = i + 1; });
   const hist = updateHist(ok?.hist, markets, now);
+  await backfill({ fetchFn, markets, hist, now, log });
   fillChanges(markets, hist, now);
+  const groups = matchGroups(markets);
+  log(`  Matched ${groups} questions listed on more than one venue`);
   return { v: FMT, market: 'predictions', generated: now, venues, kalshi: kalshiMeta, usdPerGbp: r4(usdPerGbp), markets, hist };
 }
 

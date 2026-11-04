@@ -21,6 +21,11 @@ const JSON_ROUTES = { '/data.json': 'data', '/scorecard.json': 'scorecard', '/fo
 
 http.createServer(async (req, res) => {
   const path = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
+  // PREDICTIONS_FILE=path: preview the predictions page with a real predictions.json instead of the test data
+  if (path === '/predictions.json' && process.env.PREDICTIONS_FILE) {
+    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+    return res.end(await readFile(process.env.PREDICTIONS_FILE));
+  }
   if (JSON_ROUTES[path]) {
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
     return res.end(JSON.stringify(fixtures()[JSON_ROUTES[path]]));

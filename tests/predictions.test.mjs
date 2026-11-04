@@ -1,7 +1,7 @@
 // Unit tests for the prediction markets page data (scripts/build-predictions.mjs). Run: node --test tests/
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fromPolymarket, fromKalshi, fromPredictIt, fromManifold, fromBetfair, catOf, catFrom, headline, updateHist, histChange, interestOf, build, DAY } from '../scripts/build-predictions.mjs';
+import { fromPolymarket, fromKalshi, fromPredictIt, fromManifold, fromBetfair, catOf, catFrom, headline, updateHist, histChange, interestOf, matchGroups, normName, backfill, build, DAY } from '../scripts/build-predictions.mjs';
 import { health } from '../scripts/health.mjs';
 import { PAGES } from '../scripts/market-page.mjs';
 
@@ -165,4 +165,70 @@ test('health: one line for the prediction markets; Betfair not set up doesn\'t c
   assert.equal(row(null).state, 'down');
   assert.equal(health({}, now).sources.find(s => s.key === 'predictions'), undefined, 'not asked: no row');
   assert.ok(PAGES.includes('predictions'));
+});
+
+test('Polymarket: "Build your map" bundles are left out; an event with one option left open keeps its name', () => {
+  assert.equal(fromPolymarket({ slug: 'b', title: 'Which swing states will Republicans win? (Build Your Map)', markets: [{ outcomes: '["Yes","No"]', outcomePrices: '["0.5","0.5"]' }] }), null);
+  const r = fromPolymarket({ slug: 'f1', title: 'F1 Drivers’ Champion', markets: [
+    { groupItemTitle: 'Max', closed: true, outcomes: '["Yes","No"]', outcomePrices: '["0","1"]' },
+    { groupItemTitle: 'Lando', outcomes: '["Yes","No"]', outcomePrices: '["0.996","0.004"]', bestBid: 0.99, bestAsk: 0.999, clobTokenIds: '["t1","t2"]' },
+  ] });
+  assert.equal(r.head, 'Lando');
+  near(r.outcomes[0].sp, 0.009);
+  assert.deepEqual(r.src, { tok: 't1' }, 'where its price history lives');
+});
+
+test('Kalshi: the chance is the middle of bid and ask (not a stray last trade); the spread and ticker are kept', () => {
+  const r = fromKalshi({ event_ticker: 'E', series_ticker: 'S', title: 'Q?', markets: [
+    { ticker: 'E-A', last_price_dollars: '0.30', yes_bid_dollars: '0.50', yes_ask_dollars: '0.54', previous_yes_bid_dollars: '0.40', previous_yes_ask_dollars: '0.44' },
+  ] });
+  near(r.outcomes[0].p, 0.52);
+  near(r.outcomes[0].d1, 0.10);
+  near(r.outcomes[0].sp, 0.04);
+  assert.deepEqual(r.src, { tk: 'E-A', series: 'S' });
+});
+
+test('names: surnames match across the venues’ styles', () => {
+  assert.deepEqual(['Scott Colom (D)', 'Dems (Colom)', 'J.D. Vance', 'Vance', 'GOP (Hyde-Smith)', 'Cindy Hyde-Smith'].map(normName), ['colom', 'colom', 'vance', 'vance', 'smith', 'smith']);
+});
+
+test('matching: the same question on several venues is one group; different parties or places never match', () => {
+  const rec = (id, venue, title, outcomes, interest) => ({ id, venue, title, interest, outcomes: outcomes.map(([name, p]) => ({ name, p })) });
+  const ms = [
+    rec('pm:dem', 'polymarket', 'Democratic Presidential Nominee 2028', [['Gavin Newsom', 0.3], ['Jon Ossoff', 0.2], ['AOC', 0.1]], 900),
+    rec('ks:dem', 'kalshi', '2028 Democratic presidential nominee', [['Newsom', 0.31], ['Ossoff', 0.21], ['Shapiro', 0.05]], 500),
+    rec('pi:dem', 'predictit', 'Who will win the 2028 Democratic presidential nomination?', [['Newsom', 0.29], ['Ossoff', 0.2]], 0),
+    rec('pm:rep', 'polymarket', 'Republican Presidential Nominee 2028', [['J.D. Vance', 0.5], ['Marco Rubio', 0.2]], 800),
+    rec('ks:rep', 'kalshi', '2028 Republican presidential nominee', [['Vance', 0.52], ['Rubio', 0.19]], 400),
+    rec('mf:ak', 'manifold', 'Which party will win the 2026 Alaska Senate race?', [['Democrats', 0.6], ['Republicans', 0.4]], 10),
+    rec('pi:me', 'predictit', 'Which party will win the 2026 US Senate election in Maine?', [['Democrats', 0.7], ['Republicans', 0.3]], 0),
+    rec('pi:us', 'predictit', 'Which party will win the 2026 US Senate?', [['Democrats', 0.5], ['Republicans', 0.5]], 0),
+    rec('pm:yes', 'polymarket', 'Fed rate cut in December 2026?', [['Yes', 0.3]], 50),
+    rec('ks:yes', 'kalshi', 'Fed rate cut in December 2026?', [['Yes', 0.32]], 40),
+  ];
+  assert.equal(matchGroups(ms), 3);
+  const g = id => ms.find(m => m.id === id).group;
+  assert.equal(g('ks:dem'), 'pm:dem'); assert.equal(g('pi:dem'), 'pm:dem');
+  assert.equal(g('ks:rep'), 'pm:rep', 'Republican nominees together, not with the Democratic ones');
+  assert.equal(g('ks:yes'), 'pm:yes');
+  assert.equal(g('mf:ak'), undefined, 'Alaska ≠ Maine ≠ the whole Senate');
+  assert.equal(g('pi:me'), undefined); assert.equal(g('pi:us'), undefined);
+});
+
+test('backfill: missing days filled from Kalshi daily candles (mid of bid and ask), today left as the live price', async () => {
+  const now = Date.UTC(2026, 10, 4, 12), today = Math.floor(now / DAY);
+  const hist = { 'ks:E': { o: 'Yes', d: today, p: [0.6] } };
+  const end = d => (d + 1) * DAY / 1000;   // a candle is stamped at the end of its day
+  const fetchFn = async url => ({ ok: true, status: 200, json: async () => ({ candlesticks: [
+    { end_period_ts: end(today - 8), yes_bid: { close_dollars: '0.30' }, yes_ask: { close_dollars: '0.34' } },
+    { end_period_ts: end(today - 1), price: { close_dollars: '0.55' } },
+    { end_period_ts: end(today), price: { close_dollars: '0.99' } },
+  ] }) });
+  await backfill({ fetchFn, markets: [{ id: 'ks:E', venue: 'kalshi', src: { tk: 'E-A', series: 'S' } }], hist, now });
+  assert.equal(hist['ks:E'].d, today - 8);
+  near(hist['ks:E'].p[0], 0.32);
+  near(hist['ks:E'].p.at(-2), 0.55);
+  near(hist['ks:E'].p.at(-1), 0.6, 'today stays the live price');
+  near(histChange(hist['ks:E'], 7, today), 0.6 - 0.32);
+  assert.ok(hist['ks:E'].bf, 'asked at most once a day');
 });
