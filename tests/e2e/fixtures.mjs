@@ -235,6 +235,8 @@ export function makePredictionsFixture(now = Date.now()) {
     m('pi:8000', 'predictit', 'Who will win the 2028 presidential election?', 'Politics', [{ name: 'Vance', p: 0.31, d1: 0.02, d7: null, d30: null }], { vol24: null, vol: null, usd24: null }),
     m('mf:x', 'manifold', 'Will Bitcoin hit $200k in 2026?', 'Crypto', [{ name: 'Yes', p: 0.12, d1: 0.01, d7: null, d30: null }], { vol24: 5000, vol: 9e4, cur: 'MANA', usd24: 50 }),
   ];
+  for (const x of markets) { x.usd24 = x.cur === 'MANA' ? (x.vol24 ?? 0) / 100 : x.vol24; x.usdTotal = x.vol == null ? null : x.cur === 'MANA' ? x.vol / 100 : x.vol; x.interest = Math.round((x.usd24 || 0) + (x.usdTotal || 0) / 30); }
+  markets.sort((a, b) => b.interest - a.interest).forEach((x, i) => { x.rank = i + 1; });
   const ok = n => ({ state: 'ok', n, at: now });
   return {
     v: 1, market: 'predictions', generated: now - 60e3, usdPerGbp: 1.3, kalshi: { scanned: now, tickers: ['SEN'] },

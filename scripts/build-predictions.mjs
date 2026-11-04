@@ -28,6 +28,18 @@ const TOP = { polymarket: 120, kalshi: 120, predictit: 80, manifold: 100, betfai
 const MAX_OUTCOMES = 8;                       // per record; the rest is summarised as "+N more"
 const MANA_PER_USD = 100;                     // Manifold's long-standing M$100 = $1, only to rank its markets in "All"
 
+// The common yardstick, in US dollars on every venue: money bet in the last 24 hours (bet today) and since the market
+// opened (bet in total). Manifold's play money counts at M$100 = $1; Betfair's pounds at the day's rate.
+// Interest = bet today + a 30th of bet in total: today's money counts in full, and a market's long-run money as if it
+// were spread over a month, so a big market having a quiet day isn't pushed under a small one having a busy day.
+// PredictIt publishes no money figures, so its markets have no interest score and sit below the rest.
+const toUsd = (v, cur, usdPerGbp = 1.3) => v == null ? null : cur === 'MANA' ? v / MANA_PER_USD : cur === 'GBP' ? v * usdPerGbp : v;
+export function interestOf(m) {
+  const today = m.usd24 ?? toUsd(m.vol24, m.cur), total = m.usdTotal ?? toUsd(m.vol, m.cur);
+  if (today == null && total == null) return 0;
+  return (today || 0) + (total || 0) / 30;
+}
+
 export const VENUES = [
   { key: 'polymarket', name: 'Polymarket', cur: 'USD', site: 'https://polymarket.com/' },
   { key: 'kalshi', name: 'Kalshi', cur: 'USD', site: 'https://kalshi.com/' },
@@ -151,7 +163,7 @@ export function fromPolymarket(e) {
   return finish({
     id: 'pm:' + e.slug, venue: 'polymarket', title: String(e.title || markets[0].question),
     cat: catFrom(labels, e.title), url: `https://polymarket.com/event/${encodeURIComponent(e.slug)}`,
-    end: isoOf(e.endDate || markets[0].endDate), vol24: num(e.volume24hr) ?? 0, vol: num(e.volume), liq: num(e.liquidity), cur: 'USD',
+    end: isoOf(e.endDate || markets[0].endDate), vol24: num(e.volume24hr) ?? 0, vol: num(e.volume), liq: num(e.liquidity), oi: num(e.openInterest), cur: 'USD',
   }, outcomes, e.negRisk || markets.length === 1);
 }
 async function polymarket({ fetchFn }) {
@@ -161,14 +173,16 @@ async function polymarket({ fetchFn }) {
     for (const e of page || []) { const r = fromPolymarket(e); if (r) out.push(r); }
     if (!page?.length || page.length < 100) break;
   }
-  return out.sort((a, b) => b.vol24 - a.vol24).slice(0, TOP.polymarket);
+  return out.sort((a, b) => interestOf(b) - interestOf(a)).slice(0, TOP.polymarket);
 }
 
 /* ---------- Kalshi ---------- */
 const KALSHI = 'https://api.elections.kalshi.com/trade-api/v2';
 // One Kalshi event (with its markets) → one record. Prices are dollars per $1 contract, so they are probabilities.
 // The price is the last trade, or the middle of the bid and ask when it never traded; the 1-day change is against
-// previous_price (the price 24 hours ago). Volume is in contracts, each paying $1.
+// previous_price (the price 24 hours ago). Kalshi counts volume in contracts (each pays $1 if right); the money bet on a
+// contract is its price, so dollars = contracts × price: the last day's at the average of today's and yesterday's
+// price, the total and the open interest (money riding on it now) at today's. Approximate, but in dollars like the rest.
 export function fromKalshi(e) {
   const markets = (e.markets || []).filter(m => !m.status || ['active', 'open'].includes(m.status));
   if (!markets.length) return null;
@@ -180,25 +194,28 @@ export function fromKalshi(e) {
   };
   const prevOf = m => num(m.previous_price_dollars) ?? (num(m.previous_price) != null ? num(m.previous_price) / 100 : null);
   const outcomes = markets.map(m => {
-    const p = clamp01(price(m)), prev = prevOf(m);
+    const p = clamp01(price(m)), prev = prevOf(m), c24 = num(m.volume_24h_fp) ?? num(m.volume_24h) ?? 0;
+    const avg = p == null ? 0 : prev != null && prev > 0 ? (p + prev) / 2 : p;
     return {
       name: String(markets.length === 1 ? 'Yes' : m.yes_sub_title || m.subtitle || m.title || m.ticker),
       p, d1: p != null && prev != null && prev > 0 ? p - prev : null, d7: null, d30: null,
-      vol24: num(m.volume_24h_fp) ?? num(m.volume_24h) ?? 0,
+      vol24: c24 * avg, c24,
     };
   });
+  const pOf = m => clamp01(price(m)) || 0;
   const vol24 = outcomes.reduce((s, o) => s + (o.vol24 || 0), 0);
-  const vol = markets.reduce((s, m) => s + (num(m.volume_fp) ?? num(m.volume) ?? 0), 0);
-  const oi = markets.reduce((s, m) => s + (num(m.open_interest_fp) ?? num(m.open_interest) ?? 0), 0);
+  const contracts24 = outcomes.reduce((s, o) => s + o.c24, 0);
+  const vol = markets.reduce((s, m) => s + (num(m.volume_fp) ?? num(m.volume) ?? 0) * pOf(m), 0);
+  const oi = markets.reduce((s, m) => s + (num(m.open_interest_fp) ?? num(m.open_interest) ?? 0) * pOf(m), 0);
   const end = markets.map(m => m.expected_expiration_time || m.close_time).filter(Boolean).sort()[0];
   const series = String(e.series_ticker || e.event_ticker || '').toLowerCase();
   return finish({
-    id: 'ks:' + e.event_ticker, venue: 'kalshi', title: String(e.title) + (e.sub_title && !/^(before|in|by) 20\d\d$/i.test(e.sub_title) ? ` (${e.sub_title})` : ''),
+    id: 'ks:' + e.event_ticker, venue: 'kalshi', title: String(e.title) + (e.sub_title && !/^(before|in|by|on) /i.test(e.sub_title) && !/[()]/.test(e.sub_title) && !/ vs\.? /i.test(e.sub_title) ? ` (${e.sub_title})` : ''),
     cat: catFrom([e.category], e.title), url: `https://kalshi.com/markets/${encodeURIComponent(series)}`,
-    end: isoOf(end), vol24, vol, oi, cur: 'USD',
+    end: isoOf(end), vol24, vol, oi, contracts24: Math.round(contracts24), cur: 'USD',
   }, outcomes, e.mutually_exclusive || markets.length === 1);
 }
-// the full list, paged (200 events a page): the event tickers with the most contracts traded in 24 h (then open interest)
+// the full list, paged (200 events a page): the event tickers with the most interest (see interestOf)
 async function kalshiScan({ fetchFn, log }) {
   const t0 = Date.now(), all = [];
   let cursor = '', pages = 0;
@@ -209,7 +226,7 @@ async function kalshiScan({ fetchFn, log }) {
     cursor = d.cursor;
   } while (cursor && Date.now() - t0 < KALSHI_SCAN_BUDGET);
   log(`  Kalshi: scanned ${pages} pages, ${all.length} events in ${((Date.now() - t0) / 1000).toFixed(0)} s${cursor ? ' (stopped at the time limit)' : ''}`);
-  return all.sort((a, b) => b.vol24 - a.vol24 || (b.oi || 0) - (a.oi || 0)).slice(0, TOP.kalshi);
+  return all.sort((a, b) => interestOf(b) - interestOf(a)).slice(0, TOP.kalshi);
 }
 async function kalshi({ fetchFn, prev, now, log }) {
   const meta = prev?.kalshi;
@@ -258,7 +275,7 @@ export function fromManifold(m, full = null) {
   const base = {
     id: 'mf:' + m.id, venue: 'manifold', title: String(m.question), cat: catFrom(m.groupSlugs, m.question),
     url: m.url || `https://manifold.markets/${m.creatorUsername}/${m.slug}`, end: m.closeTime ? isoOf(m.closeTime) : null,
-    vol24: num(m.volume24Hours) ?? 0, vol: num(m.volume), liq: num(m.totalLiquidity), cur: 'MANA',
+    vol24: num(m.volume24Hours) ?? 0, vol: num(m.volume), liq: num(m.totalLiquidity), traders: num(m.uniqueBettorCount), cur: 'MANA',
   };
   if (m.outcomeType === 'BINARY') return finish(base, [{ name: 'Yes', p: clamp01(num(m.probability)), d1: null, d7: null, d30: null }], true);
   if (m.outcomeType === 'MULTIPLE_CHOICE' && full?.answers?.length) {
@@ -298,7 +315,7 @@ export function fromBetfair(cat, book, usdPerGbp) {
   return finish({
     id: 'bf:' + cat.marketId, venue: 'betfair', title, cat: catOf(title) === 'Other' ? 'Politics' : catOf(title),
     url: `https://www.betfair.com/exchange/plus/politics/market/${cat.marketId}`, end: isoOf(cat.marketStartTime || cat.event?.openDate),
-    vol24: null, vol: matched * usdPerGbp, matchedGbp: matched, cur: 'GBP',
+    vol24: null, vol: matched, cur: 'GBP',
   }, outcomes, exclusive);
 }
 async function betfair({ fetchFn, env, usdPerGbp }) {
@@ -393,7 +410,14 @@ export async function build({ prev = null, forex = null, env = {}, log = console
     } else venues[v.key] = { state: off ? 'off' : 'down', n: 0, at: null, err: why };
     log(`  ${v.name}: ${off ? 'off' : 'failed'} (${why})${old.length && !off ? `, keeping ${old.length} from the last update` : ''}`);
   });
-  for (const m of markets) m.usd24 = m.cur === 'MANA' ? (m.vol24 || 0) / MANA_PER_USD : m.vol24 ?? null;
+  for (const m of markets) {
+    const usd = v => { const x = toUsd(v, m.cur, usdPerGbp); return x == null ? null : Math.round(x); };
+    m.usd24 = usd(m.vol24); m.usdTotal = usd(m.vol);
+    m.interest = Math.round(interestOf(m));
+  }
+  // one ranking across every venue: #1 has the most interest; PredictIt (no money figures) keeps its feed order last
+  markets.sort((a, b) => b.interest - a.interest);
+  markets.forEach((m, i) => { m.rank = i + 1; });
   const hist = updateHist(ok?.hist, markets, now);
   fillChanges(markets, hist, now);
   return { v: FMT, market: 'predictions', generated: now, venues, kalshi: kalshiMeta, usdPerGbp: r4(usdPerGbp), markets, hist };

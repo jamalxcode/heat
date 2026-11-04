@@ -1,7 +1,7 @@
 // Unit tests for the prediction markets page data (scripts/build-predictions.mjs). Run: node --test tests/
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fromPolymarket, fromKalshi, fromPredictIt, fromManifold, fromBetfair, catOf, catFrom, headline, updateHist, histChange, build, DAY } from '../scripts/build-predictions.mjs';
+import { fromPolymarket, fromKalshi, fromPredictIt, fromManifold, fromBetfair, catOf, catFrom, headline, updateHist, histChange, interestOf, build, DAY } from '../scripts/build-predictions.mjs';
 import { health } from '../scripts/health.mjs';
 import { PAGES } from '../scripts/market-page.mjs';
 
@@ -37,7 +37,7 @@ test('Polymarket: a single market with named outcomes (Team A / Team B) gets bot
   assert.equal(r.cat, 'Sports', 'from the words when there are no tags');
 });
 
-test('Kalshi: dollar prices are probabilities, the 1-day change is against the previous price, mid when never traded', () => {
+test('Kalshi: dollar prices are probabilities, the 1-day change is against the previous price, mid when never traded; contracts become dollars', () => {
   const r = fromKalshi({
     event_ticker: 'KXSENATEMS-26', series_ticker: 'KXSENATEMS', title: 'Mississippi Senate winner?', sub_title: 'In 2026', category: 'Elections', mutually_exclusive: true,
     markets: [
@@ -51,7 +51,10 @@ test('Kalshi: dollar prices are probabilities, the 1-day change is against the p
   near(r.outcomes[0].d1, 0.78);
   near(r.outcomes[1].p, 0.08, 'never traded: the middle of bid and ask');
   assert.equal(r.outcomes[1].d1, null, 'no previous price: no change');
-  assert.equal(r.vol24, 1010);
+  assert.equal(r.contracts24, 1010);
+  near(r.vol24, 1000 * (0.92 + 0.14) / 2 + 10 * 0.08, 'dollars bet today: contracts × the average of today’s and yesterday’s price');
+  near(r.vol, 5000 * 0.92, 'in total: contracts × today’s price');
+  near(r.oi, 300 * 0.92);
   assert.equal(r.url, 'https://kalshi.com/markets/kxsenatems');
 });
 
@@ -91,9 +94,18 @@ test('Betfair: odds become chances (1 / odds), scaled to 100% in a win market; m
   const sum = 1 / 1.5 + 1 / 2.5;
   near(r.outcomes.find(o => o.name === 'A').p, Math.round(1 / 1.5 / sum * 1e4) / 1e4);
   near(r.outcomes.reduce((s, o) => s + o.p, 0), 1, 'adds up to 100%');
-  assert.equal(r.vol, 1300);
+  assert.equal(r.vol, 1000);
+  assert.equal(r.cur, 'GBP', 'pounds here; the build turns them into dollars');
   assert.equal(r.title, 'UK Politics: Next Prime Minister');
   assert.equal(r.cat, 'Politics');
+});
+
+test('interest: bet today + a 30th of bet in total, in dollars; play money at M$100 = $1; nothing published = 0', () => {
+  assert.equal(interestOf({ vol24: 1e6, vol: 3e7, cur: 'USD' }), 2e6);
+  assert.equal(interestOf({ vol24: 0, vol: 9e7, cur: 'USD' }), 3e6, 'a big market on a quiet day still ranks high');
+  assert.equal(interestOf({ vol24: 5e5, vol: 3e6, cur: 'MANA' }), 5e3 + 1e3);
+  assert.equal(interestOf({ vol24: null, vol: null, cur: 'USD' }), 0);
+  assert.equal(interestOf({ usd24: 10, usdTotal: 300 }), 20, 'the build’s dollar figures win when present');
 });
 
 test('topics: venue tags first, then the words of the question', () => {
@@ -136,6 +148,9 @@ test('build: venues in one file; a failing venue keeps its last markets (stale),
   assert.deepEqual(Object.fromEntries(Object.entries(d.venues).map(([k, v]) => [k, v.state])), { polymarket: 'ok', kalshi: 'ok', predictit: 'stale', manifold: 'ok', betfair: 'off' });
   assert.ok(d.markets.find(m => m.id === 'pi:1').stale);
   assert.equal(d.markets.find(m => m.id === 'mf:m1').usd24, 3, 'mana at M$100 = $1');
+  assert.deepEqual(d.markets.map(m => m.rank), d.markets.map((_, i) => i + 1), 'ranked by interest, #1 first');
+  assert.ok(d.markets.every((m, i) => !i || d.markets[i - 1].interest >= m.interest));
+  assert.equal(d.markets.at(-1).id, 'pi:1', 'no money figures: last');
   assert.deepEqual(d.kalshi.tickers, ['K1'], 'the scan remembers the top events for the next 10-minute refresh');
   assert.ok(d.hist['ks:K1'] && d.hist['mf:m1']);
 });

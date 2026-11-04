@@ -1048,15 +1048,32 @@ test.describe('predictions', () => {
     await page.goto('/predictions/');
   });
 
-  test('a tab per venue plus All; tiles grouped by topic, sized by volume; search tags of its own', async ({ page }) => {
+  test('a tab per venue plus All; ranked likeliest + most money (#1 big), or by interest, or by topic busiest first; search tags', async ({ page }) => {
     await expect(page).toHaveTitle(/Prediction Market Heatmap/);
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://heat.sala.company/predictions/');
     await expect(page.locator('#market a[aria-current="page"]')).toHaveText(/Predictions/);
     await expect(page.locator('#pvenue button')).toHaveText([/^All/, /Polymarket/, /Kalshi/, /PredictIt/, /Manifold/, /Betfair.*not set up/]);
     await expect(page.locator('#grid .ptile')).toHaveCount(5);
-    await expect(page.locator('#grid .r-group h3')).toHaveText([/Politics/, /Economy/, /Crypto/]);
-    await expect(page.locator('#grid .ptile').first()).toHaveAttribute('data-id', 'pm:mayor');   // the most traded first, and big
+    // likeliest + most money = the likeliest outcome's chance × log10(interest): mayor 71% × 6.9, Fed (70% no) × 6.2,
+    // Senate 55% × 6.6, Bitcoin (88% no) × 1.9, PredictIt (no money figures) last
+    expect(await page.locator('#grid .ptile').evaluateAll(els => els.map(e => e.dataset.id))).toEqual(['pm:mayor', 'pm:fed', 'ks:SEN', 'mf:x', 'pi:8000']);
+    await expect(page.locator('.ptile[data-id="pm:fed"]')).toContainText('70% no');                // 30% yes shown as its likelier side
+    await expect(page.locator('.ptile[data-id="pm:fed"]')).toContainText('+8.0 pp');               // and its move turned round
+    // interest = bet today + a 30th of bet in total: mayor $5M + $3M, Senate $2M + $1.67M, Fed $1M + $0.67M, Bitcoin $50 + $30
+    await page.locator('#prank').selectOption('interest');
+    expect(await page.locator('#grid .ptile').evaluateAll(els => els.map(e => e.dataset.id))).toEqual(['pm:mayor', 'ks:SEN', 'pm:fed', 'mf:x', 'pi:8000']);
+    await expect(page.locator('.ptile[data-id="pm:fed"]')).toContainText('30% yes');
     await expect(page.locator('#grid .ptile').first()).toHaveClass(/sz-l/);
+    await expect(page.locator('#grid .ptile').first()).toContainText('#1');
+    await expect(page.locator('#grid .ptile').first()).toContainText('$5M today · $90M total');
+    await expect(page.locator('.ptile[data-id="pi:8000"]')).toContainText('no money figures');
+    await page.locator('#pgroup').selectOption('cat');
+    await expect(page.locator('#grid .r-group h3')).toHaveText([/Politics/, /Economy/, /Crypto/]);
+    await page.locator('#prank').selectOption('today');
+    expect(await page.locator('#grid .r-group').first().locator('.ptile').evaluateAll(els => els.map(e => e.dataset.id))).toEqual(['pm:mayor', 'ks:SEN', 'pi:8000']);
+    await page.locator('#prank').selectOption('move');
+    await expect(page.locator('#grid .r-group').nth(1).locator('.ptile').first()).toHaveAttribute('data-id', 'pm:fed');
+    await page.locator('#prank').selectOption('sure');
     await expect(page.locator('#view, #colorBy, #legend')).toHaveCount(3);
     await expect(page.locator('#view')).toBeHidden();
   });
@@ -1070,7 +1087,7 @@ test.describe('predictions', () => {
     await expect(page.locator('#grid .p-note')).toContainText('isn’t connected yet');
     await page.goto('/predictions/?v=manifold');
     await expect(page.locator('#grid .ptile')).toHaveCount(1);
-    await expect(page.locator('#grid .ptile')).toContainText('M$5.0K');
+    await expect(page.locator('#grid .ptile')).toContainText('$50 today · $900 total play money');
   });
 
   test('colour follows the timeframe; a click opens every outcome with its moves; the table sorts', async ({ page }) => {
@@ -1082,14 +1099,18 @@ test.describe('predictions', () => {
     await expect(page.locator('#detail')).toHaveClass(/pinned/);
     await expect(page.locator('#detail .p-otbl tbody tr')).toHaveCount(2);
     await expect(page.locator('#detail .p-chart')).toBeVisible();
+    await expect(page.locator('#detail .kv')).toContainText('#1 of 5');
+    await expect(page.locator('#detail .kv')).toContainText('Bet in total$90M');
     await expect(page).toHaveURL(/m=pm%3Amayor/);
     await page.keyboard.press('Escape');
     await expect(page.locator('#detail')).not.toHaveClass(/pinned/);
     await page.locator('#pview button[data-v="table"]').click();
     await expect(page.locator('#grid tbody tr')).toHaveCount(5);
     await expect(page.locator('#grid tbody tr').first()).toHaveAttribute('data-id', 'pm:mayor');
+    await page.locator('#grid th[data-sort="total"]').click();
+    await expect(page.locator('#grid tbody tr').first()).toHaveAttribute('data-id', 'pm:mayor');   // $90M, the most
     await page.locator('#grid th[data-sort="p"]').click();
-    await expect(page.locator('#grid tbody tr').first()).toHaveAttribute('data-id', 'pm:mayor');   // 71%, the highest
+    await expect(page.locator('#grid tbody tr').first()).toHaveAttribute('data-id', 'mf:x');       // 88% (no), the surest
     await page.locator('#psearch').fill('bitcoin');
     await expect(page.locator('#grid tbody tr')).toHaveCount(1);
   });
