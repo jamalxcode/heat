@@ -626,12 +626,13 @@ test.describe('metals', () => {
     await expect(page.locator('#status')).toContainText(`${N}/${N} assets with indicators`);
   });
 
-  test('loads its own data and search tags; no scorecard, no pegged checkbox; the switch links all six pages', async ({ page }) => {
+  test('loads its own data and search tags; no scorecard, no pegged checkbox; the switch links all seven pages', async ({ page }) => {
     await expect(tiles(page)).toHaveCount(N);
     await expect(page).toHaveTitle(/Precious Metals Heatmap/);
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://heat.sala.company/metals/');
     await expect(page.locator('#market a[aria-current="page"]')).toHaveText(/Metals/);
-    await expect(page.locator('#market a')).toHaveCount(6);
+    await expect(page.locator('#market a')).toHaveCount(7);
+    await expect(page.locator('#market a[data-m="predictions"]')).toHaveAttribute('href', '/predictions/');
     await expect(page.locator('#market a[data-m="forex"]')).toHaveAttribute('href', '/forex/');
     await expect(page.locator('#view [data-v="score"]')).toBeHidden();
     await expect(page.locator('#pegged')).toBeHidden();
@@ -1031,11 +1032,65 @@ test.describe('phone', () => {
     await expect(popup).not.toHaveClass(/show/);
   });
 
-  test('every page fits the screen with the six-way market switch', async ({ page }) => {
-    for (const url of ['/', '/forex/', '/metals/', '/energy/', '/etfs/', '/rates/']) {
+  test('every page fits the screen with the seven-way market switch', async ({ page }) => {
+    for (const url of ['/', '/forex/', '/metals/', '/energy/', '/etfs/', '/rates/', '/predictions/']) {
       await page.goto(url);
-      await expect(page.locator('#grid .tile, #grid .rtile').first()).toBeVisible();
+      await expect(page.locator('#grid .tile, #grid .rtile, #grid .ptile').first()).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), url).toBe(true);
     }
+  });
+});
+
+// Prediction markets: the same page at /predictions/, drawing its own view from predictions.json (tests/e2e/fixtures.mjs:
+// five markets on four venues, Betfair not set up)
+test.describe('predictions', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/predictions/');
+  });
+
+  test('a tab per venue plus All; tiles grouped by topic, sized by volume; search tags of its own', async ({ page }) => {
+    await expect(page).toHaveTitle(/Prediction Market Heatmap/);
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://heat.sala.company/predictions/');
+    await expect(page.locator('#market a[aria-current="page"]')).toHaveText(/Predictions/);
+    await expect(page.locator('#pvenue button')).toHaveText([/^All/, /Polymarket/, /Kalshi/, /PredictIt/, /Manifold/, /Betfair.*not set up/]);
+    await expect(page.locator('#grid .ptile')).toHaveCount(5);
+    await expect(page.locator('#grid .r-group h3')).toHaveText([/Politics/, /Economy/, /Crypto/]);
+    await expect(page.locator('#grid .ptile').first()).toHaveAttribute('data-id', 'pm:mayor');   // the most traded first, and big
+    await expect(page.locator('#grid .ptile').first()).toHaveClass(/sz-l/);
+    await expect(page.locator('#view, #colorBy, #legend')).toHaveCount(3);
+    await expect(page.locator('#view')).toBeHidden();
+  });
+
+  test('venue tabs filter and go in the address; Betfair explains it is not set up', async ({ page }) => {
+    await page.locator('#pvenue button[data-v="polymarket"]').click();
+    await expect(page.locator('#grid .ptile')).toHaveCount(2);
+    await expect(page).toHaveURL(/\/predictions\/\?v=polymarket$/);
+    await page.locator('#pvenue button[data-v="betfair"]').click();
+    await expect(page.locator('#grid .ptile')).toHaveCount(0);
+    await expect(page.locator('#grid .p-note')).toContainText('isn’t connected yet');
+    await page.goto('/predictions/?v=manifold');
+    await expect(page.locator('#grid .ptile')).toHaveCount(1);
+    await expect(page.locator('#grid .ptile')).toContainText('M$5.0K');
+  });
+
+  test('colour follows the timeframe; a click opens every outcome with its moves; the table sorts', async ({ page }) => {
+    const mayor = page.locator('.ptile[data-id="pm:mayor"]');
+    await expect(mayor).toContainText('+5.0 pp');
+    await page.locator('#ptf button[data-v="1w"]').click();
+    await expect(mayor).toContainText('+12 pp');
+    await mayor.click();
+    await expect(page.locator('#detail')).toHaveClass(/pinned/);
+    await expect(page.locator('#detail .p-otbl tbody tr')).toHaveCount(2);
+    await expect(page.locator('#detail .p-chart')).toBeVisible();
+    await expect(page).toHaveURL(/m=pm%3Amayor/);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#detail')).not.toHaveClass(/pinned/);
+    await page.locator('#pview button[data-v="table"]').click();
+    await expect(page.locator('#grid tbody tr')).toHaveCount(5);
+    await expect(page.locator('#grid tbody tr').first()).toHaveAttribute('data-id', 'pm:mayor');
+    await page.locator('#grid th[data-sort="p"]').click();
+    await expect(page.locator('#grid tbody tr').first()).toHaveAttribute('data-id', 'pm:mayor');   // 71%, the highest
+    await page.locator('#psearch').fill('bitcoin');
+    await expect(page.locator('#grid tbody tr')).toHaveCount(1);
   });
 });

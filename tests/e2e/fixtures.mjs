@@ -222,3 +222,23 @@ export function makeFuelFixture(now = Date.now()) {
     ],
   };
 }
+
+// Prediction markets (predictions.json): four venues answering, Betfair not set up. Polymarket has a who-wins event
+// (pm:mayor) and a yes/no one; Kalshi, PredictIt and Manifold one market each. 24h volumes order them in "All".
+export function makePredictionsFixture(now = Date.now()) {
+  const DAY = 864e5, today = Math.floor(now / DAY);
+  const m = (id, venue, title, cat, outcomes, extra = {}) => ({ id, venue, title, cat, url: 'https://example.invalid/' + id, end: '2026-12-31', head: outcomes[0].name, exclusive: true, outcomes, more: 0, cur: 'USD', ...extra });
+  const markets = [
+    m('pm:mayor', 'polymarket', 'NYC mayor winner?', 'Politics', [{ name: 'Alice', p: 0.71, d1: 0.05, d7: 0.12, d30: -0.03 }, { name: 'Bob', p: 0.27, d1: -0.04, d7: null, d30: null }], { vol24: 5e6, vol: 9e7, liq: 2e6, usd24: 5e6 }),
+    m('pm:fed', 'polymarket', 'Fed cut in December?', 'Economy', [{ name: 'Yes', p: 0.3, d1: -0.08, d7: 0.01, d30: 0.2 }], { vol24: 1e6, vol: 2e7, usd24: 1e6 }),
+    m('ks:SEN', 'kalshi', 'Senate control after the midterms?', 'Politics', [{ name: 'Democrats', p: 0.55, d1: 0.02, d7: null, d30: null }, { name: 'Republicans', p: 0.45, d1: -0.02, d7: null, d30: null }], { vol24: 2e6, vol: 5e7, oi: 1e6, usd24: 2e6 }),
+    m('pi:8000', 'predictit', 'Who will win the 2028 presidential election?', 'Politics', [{ name: 'Vance', p: 0.31, d1: 0.02, d7: null, d30: null }], { vol24: null, vol: null, usd24: null }),
+    m('mf:x', 'manifold', 'Will Bitcoin hit $200k in 2026?', 'Crypto', [{ name: 'Yes', p: 0.12, d1: 0.01, d7: null, d30: null }], { vol24: 5000, vol: 9e4, cur: 'MANA', usd24: 50 }),
+  ];
+  const ok = n => ({ state: 'ok', n, at: now });
+  return {
+    v: 1, market: 'predictions', generated: now - 60e3, usdPerGbp: 1.3, kalshi: { scanned: now, tickers: ['SEN'] },
+    venues: { polymarket: ok(2), kalshi: ok(1), predictit: ok(1), manifold: ok(1), betfair: { state: 'off', n: 0, at: null, err: 'not connected: needs a Betfair API key' } },
+    markets, hist: { 'pm:mayor': { o: 'Alice', d: today - 3, p: [0.6, 0.64, 0.66, 0.71] } },
+  };
+}
