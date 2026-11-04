@@ -19,3 +19,5 @@ package-lock.json
 /metals/
 /tv.json
 /health.json
+/predictions.json
+/predictions/

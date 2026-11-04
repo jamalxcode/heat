@@ -141,8 +141,10 @@ export async function run() {
   }
 }
 if (M.custom) {
-  // the rates page has its own view (app/rates.mjs): none of the price pipeline below runs there
-  import('./rates.mjs').then(r => r.start());
+  // the rates and prediction-market pages have their own views (app/rates.mjs, app/predictions.mjs): none of the price
+  // pipeline below runs there
+  if (M.key === 'predictions') import('./predictions.mjs').then(p => p.start());
+  else import('./rates.mjs').then(r => r.start());
 } else {
   run();
   // TradingView symbols known to exist (checked at deploy by scripts/tradingview.mjs), for the popup's chart link.

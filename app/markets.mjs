@@ -154,6 +154,14 @@ MARKETS.rates = {
   bins: { '1d': [2, 5, 10, 20], '1w': [5, 12, 25, 40], '1m': [10, 25, 50, 80] },
 };
 
-export const MARKET = ['forex', 'metals', 'energy', 'etfs', 'rates'].find(m => location.pathname.startsWith('/' + m)) || 'crypto';
+// Prediction markets: Polymarket, Kalshi, PredictIt, Manifold and Betfair (scripts/build-predictions.mjs). Probabilities,
+// not prices, so like rates the page draws its own view (app/predictions.mjs); the bins are percentage points.
+MARKETS.predictions = {
+  ...MARKETS.metals,
+  key: 'predictions', data: '/predictions.json', custom: true, noun: 'markets', one: 'market', nameCol: 'Market',
+  bins: { '1d': [1, 3, 6, 10], '1w': [2, 5, 10, 20], '1m': [3, 8, 15, 25] },
+};
+
+export const MARKET = ['forex', 'metals', 'energy', 'etfs', 'rates', 'predictions'].find(m => location.pathname.startsWith('/' + m)) || 'crypto';
 export const M = MARKETS[MARKET];
 export const TF = tf => M.label[tf];                       // what a timeframe is called on this market (24h / 1d …)

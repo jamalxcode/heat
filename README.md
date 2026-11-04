@@ -6,6 +6,17 @@ A crypto heatmap of the top 100 coins by market cap, with stablecoins, tokenized
 
 > ⚠️ **Work in progress. Use at your own risk.** Data can be late, wrong or missing, and nothing here is financial advice. Prices are **not real-time**: they refresh every 10 minutes.
 
+## Prediction markets
+
+**[heat.sala.company/predictions/](https://heat.sala.company/predictions/)** shows the most traded questions on **Polymarket, Kalshi, PredictIt, Manifold and Betfair**, with a subtab for each venue and an **All** tab of the 200 most traded across every venue (`scripts/build-predictions.mjs` → `predictions.json`, drawn by `app/predictions.mjs`).
+
+- **Tile:** one question on one venue. The big number is the chance of the outcome shown: "yes" for a yes/no question, the likeliest when the outcomes exclude each other, otherwise the most traded one. **Colour** is how much that chance moved over 1 day / 1 week / 1 month, in percentage points. **Size** is 24-hour volume. Click for every outcome, its moves and the last 35 days.
+- **Changes:** from the venue when it gives them (Polymarket all three, Kalshi and PredictIt the day, Manifold's multiple-choice answers); otherwise from the daily history this file keeps, so 1w / 1m fill in over the first month.
+- **Kalshi** lists 20,000+ open events: the full list is scanned hourly and the 120 most traded are refreshed every 10 minutes.
+- **Manifold** is play money (ranked in All at M$100 = $1). **PredictIt** publishes no volume.
+- **Betfair** needs its Exchange API: add the repository secrets `BETFAIR_APP_KEY`, `BETFAIR_USERNAME` and `BETFAIR_PASSWORD`. Without them its tab says it isn't set up. Betfair may refuse logins from US servers, where GitHub's runners are.
+- A venue that fails keeps its last markets (marked ⚠ late); the sources line in the footer shows each venue's state.
+
 ## What's on a tile
 
 - **Heat color**: 24h, 7d or 30d price change. Falling gets darker and gloomier red, down to near-black. Near flat is white. Rising goes from whitish blue through bright blue to a rich sea blue.
