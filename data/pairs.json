@@ -660,6 +660,13 @@
    "MEXC": "SUN",
    "Gate.io": "SUN",
    "KuCoin": "SUN"
+  },
+  "kite-2": {
+   "Binance": "KITE",
+   "OKX": "KITE",
+   "KuCoin": "KITE",
+   "MEXC": "KITE",
+   "Gate.io": "KITE"
   }
  }
 }
