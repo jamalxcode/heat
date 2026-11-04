@@ -1057,15 +1057,24 @@ test.describe('predictions', () => {
     // likeliest + most money = the likeliest outcome's chance × log10(interest): mayor 71% × 6.9, Fed (70% no) × 6.2,
     // Senate 55% × 6.6, Bitcoin (88% no) × 1.9, PredictIt (no money figures) last
     expect(await page.locator('#grid .ptile').evaluateAll(els => els.map(e => e.dataset.id))).toEqual(['pm:mayor', 'pm:fed', 'ks:SEN', 'mf:x', 'pi:8000']);
-    await expect(page.locator('.ptile[data-id="pm:fed"]')).toContainText('70% no');                // 30% yes shown as its likelier side
+    await expect(page.locator('.ptile[data-id="pm:fed"] .pt-ans')).toHaveText('No');                // 30% yes shown as its likelier side
+    await expect(page.locator('.ptile[data-id="pm:fed"] .pt-p')).toHaveText('70%');
     await expect(page.locator('.ptile[data-id="pm:fed"]')).toContainText('+8.0 pp');               // and its move turned round
     // interest = bet today + a 30th of bet in total: mayor $5M + $3M, Senate $2M + $1.67M, Fed $1M + $0.67M, Bitcoin $50 + $30
     await page.locator('#prank').selectOption('interest');
     expect(await page.locator('#grid .ptile').evaluateAll(els => els.map(e => e.dataset.id))).toEqual(['pm:mayor', 'ks:SEN', 'pm:fed', 'mf:x', 'pi:8000']);
-    await expect(page.locator('.ptile[data-id="pm:fed"]')).toContainText('30% yes');
+    await expect(page.locator('.ptile[data-id="pm:fed"] .pt-ans')).toHaveText('Yes');
+    await expect(page.locator('.ptile[data-id="pm:fed"] .pt-p')).toHaveText('30%');
     await expect(page.locator('#grid .ptile').first()).toHaveClass(/sz-l/);
     await expect(page.locator('#grid .ptile').first()).toContainText('#1');
-    await expect(page.locator('#grid .ptile').first()).toContainText('$5M today · $90M total');
+    // question, answer, chance, money bet today; the total in the foot
+    const top = page.locator('#grid .ptile').first();
+    await expect(top.locator('.pt-title')).toHaveText('NYC mayor winner?');
+    await expect(top.locator('.pt-ans')).toHaveText('Alice');
+    await expect(top.locator('.pt-p')).toHaveText('71%');
+    await expect(top.locator('.pt-amt')).toHaveText('$5M bet today');
+    await expect(top.locator('.pt-foot')).toContainText('$90M total');
+    await expect(page.locator('.ptile[data-id="pi:8000"] .pt-ans')).toHaveText('Vance');      // a one-option market isn't a yes/no
     await expect(page.locator('.ptile[data-id="pi:8000"]')).toContainText('no money figures');
     await page.locator('#pgroup').selectOption('cat');
     await expect(page.locator('#grid .r-group h3')).toHaveText([/Politics/, /Economy/, /Crypto/]);
@@ -1087,7 +1096,7 @@ test.describe('predictions', () => {
     await expect(page.locator('#grid .p-note')).toContainText('isn’t connected yet');
     await page.goto('/predictions/?v=manifold');
     await expect(page.locator('#grid .ptile')).toHaveCount(1);
-    await expect(page.locator('#grid .ptile')).toContainText('$50 today · $900 total play money');
+    await expect(page.locator('#grid .ptile')).toContainText('$900 total play money');
   });
 
   test('colour follows the timeframe; a click opens every outcome with its moves; the table sorts', async ({ page }) => {

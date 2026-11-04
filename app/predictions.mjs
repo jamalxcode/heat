@@ -50,7 +50,7 @@ const interest = m => m.interest ?? ((today$(m) || 0) + (total$(m) || 0) / 30);
 // behind the market in digits (log10 of interest in dollars: $1K = 3, $1M = 6), so the surest outcomes come first and,
 // among equally sure ones, those with the most money bet; a sure thing with little money behind it sits lower.
 function likeliest(m) {
-  if (m.outcomes.length === 1) {
+  if (m.outcomes.length === 1 && /^yes$/i.test(m.outcomes[0].name)) {
     const o = m.outcomes[0], no = o.p != null && o.p < 0.5;
     if (!no) return { name: headLabel(m), p: o.p, d1: o.d1, d7: o.d7, d30: o.d30, no: false };
     const neg = v => v == null ? null : -v;
@@ -75,7 +75,7 @@ const heat = v => {
   const t = M.bins[tf], a = Math.abs(v * 100), k = a < t[0] ? 0 : a < t[1] ? 1 : a < t[2] ? 2 : a < t[3] ? 3 : 4;
   return k === 0 ? 'h0' : (v > 0 ? 'h' : 'h-') + k;
 };
-const headLabel = m => m.head === 'Yes' && m.outcomes.length === 1 ? 'Yes' : m.head;
+const headLabel = m => m.head;
 
 /* ---------- which records ---------- */
 function shown() {
@@ -95,13 +95,14 @@ function sizes(ms) {
 
 /* ---------- tiles ---------- */
 function tileHTML(m, size) {
-  const h = shownOutcome(m), ch = h[tfKey()], multi = m.outcomes.length > 1, yn = !multi;
+  const h = shownOutcome(m), ch = h[tfKey()], yn = m.outcomes.length === 1 && /^yes$/i.test(m.outcomes[0].name);
   const label = `${m.title}: ${h.name} ${pct(h.p)}, ${tf} ${fmtPP(ch)}, ${VNAME[m.venue]}`;
   return `<button class="ptile sz-${size} ${heat(ch)}${m.id === sel ? ' sel' : ''}${m.stale ? ' stale' : ''}" data-id="${esc(m.id)}" data-coin="1" aria-haspopup="dialog" aria-label="${esc(label)}">
     <span class="pt-top"><span class="pt-id"><span class="pv pv-${m.venue}" title="${VNAME[m.venue]}">${VTAG[m.venue]}</span>${pos.get(m.id) && weight(m) > 0 ? `<span class="pt-rank" title="#${pos.get(m.id)} by ${esc(SORTS.find(x => x[0] === rankBy)[1].toLowerCase())}">#${pos.get(m.id)}</span>` : ''}</span><span class="pt-chg">${fmtPP(ch)}</span></span>
     <span class="pt-title">${esc(m.title)}</span>
-    <span class="pt-head">${multi ? `<span class="pt-o">${esc(h.name)}</span>` : ''}<b class="pt-p">${pct(h.p)}</b>${yn ? `<span class="pt-o"> ${h.no ? 'no' : 'yes'}</span>` : ''}</span>
-    <span class="pt-foot">${esc(volText(m))}${m.end ? ` · ends ${dayLabel(m.end)}` : ''}${m.stale ? ' · ⚠ not refreshed' : ''}</span>
+    <span class="pt-ans">${esc(yn ? (h.no ? 'No' : 'Yes') : h.name)}</span>
+    <span class="pt-nums"><b class="pt-p">${pct(h.p)}</b>${today$(m) != null ? `<span class="pt-amt">${money(today$(m), 'USD')} bet today</span>` : total$(m) != null ? `<span class="pt-amt">${money(total$(m), 'USD')} bet</span>` : ''}</span>
+    <span class="pt-foot">${total$(m) != null ? `${money(total$(m), 'USD')} total${playNote(m)}` : 'no money figures published'}${m.end ? ` · ends ${dayLabel(m.end)}` : ''}${m.stale ? ' · ⚠ not refreshed' : ''}</span>
   </button>`;
 }
 function grid(ms) {
