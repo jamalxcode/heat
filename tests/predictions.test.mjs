@@ -232,3 +232,18 @@ test('backfill: missing days filled from Kalshi daily candles (mid of bid and as
   near(histChange(hist['ks:E'], 7, today), 0.6 - 0.32);
   assert.ok(hist['ks:E'].bf, 'asked at most once a day');
 });
+
+test('backfill: Polymarket price history, trying its other request forms when one comes back empty', async () => {
+  const now = Date.UTC(2026, 10, 4, 12), today = Math.floor(now / DAY);
+  const hist = { 'pm:x': { o: 'Yes', d: today, p: [0.5] } };
+  const asked = [];
+  const fetchFn = async url => {
+    asked.push(url);
+    const history = url.includes('interval=max') ? [{ t: (today - 3) * DAY / 1000 + 3600, p: 0.4 }, { t: (today - 3) * DAY / 1000 + 7200, p: 0.42 }] : [];
+    return { ok: true, status: 200, json: async () => ({ history }) };
+  };
+  await backfill({ fetchFn, markets: [{ id: 'pm:x', venue: 'polymarket', src: { tok: '123' } }], hist, now });
+  assert.ok(asked[0].includes('interval=1m') && asked[1].includes('interval=max'), 'the first form was empty, so the next was tried');
+  assert.equal(hist['pm:x'].d, today - 3);
+  near(hist['pm:x'].p[0], 0.42, 'the day’s last point');
+});

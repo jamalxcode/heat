@@ -97,6 +97,10 @@ const decidedWhy = m => m.end && m.end < todayIso() ? `past its end date (${dayL
 const membersOf = m => m.group ? groups.get(m.group) || [m] : [m];
 const priceOn = (x, name, yn) => {
   if (yn) { const o = x.outcomes[0]; return isYesNo(x) ? o : null; }
+  // a number in the outcome ("Below 45", "45", "52+") must match in full: "Below 45" isn't "exactly 45"; a person is
+  // matched by surname ("Scott Colom (D)" ≈ "Colom")
+  const full = n => String(n).toLowerCase().replace(/\([^)]{0,3}\)/g, ' ').replace(/[^a-z0-9+<> ]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if (/\d/.test(name)) return x.outcomes.find(o => full(o.name) === full(name)) || null;
   const k = normName(name);
   return x.outcomes.find(o => normName(o.name) === k) || null;
 };

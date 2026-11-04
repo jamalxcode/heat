@@ -405,8 +405,19 @@ async function pastPrices(fetchFn, src, now) {
       if (p != null && c.end_period_ts) out.set(dayOfTs(c.end_period_ts), clamp01(p));
     }
   } else if (src.tok) {
-    const d = await getJSON(fetchFn, `https://clob.polymarket.com/prices-history?market=${encodeURIComponent(src.tok)}&startTs=${start}&endTs=${end}&fidelity=1440`, { tries: 2 });
-    for (const x of d.history || []) { const p = num(x.p); if (p != null && x.t) out.set(Math.floor(x.t * 1000 / DAY), clamp01(p)); }
+    // Polymarket's prices-history takes either a time range or a named interval, and answers some combinations with an
+    // empty history: try the forms in turn and keep the first that has points (several points a day: the day's last)
+    const base = `https://clob.polymarket.com/prices-history?market=${encodeURIComponent(src.tok)}`;
+    let lastErr = null;
+    for (const q of [`&interval=1m&fidelity=1440`, `&interval=max&fidelity=1440`, `&startTs=${start}&endTs=${end}&fidelity=1440`, `&interval=1m&fidelity=60`]) {
+      try {
+        const d = await getJSON(fetchFn, base + q, { tries: 1 });
+        const pts = (d.history || []).filter(x => num(x.p) != null && x.t).sort((a, b) => a.t - b.t);
+        for (const x of pts) out.set(Math.floor(x.t * 1000 / DAY), clamp01(num(x.p)));
+        if (out.size) break;
+      } catch (e) { lastErr = e; }
+    }
+    if (!out.size && lastErr) throw lastErr;
   }
   return out;
 }
@@ -415,20 +426,25 @@ export async function backfill({ fetchFn, markets, hist, now, log = () => {} }) 
   const want = markets.filter(m => m.src && !m.stale && hist[m.id] && hist[m.id].p.filter(v => v != null).length < BACKFILL_MIN_DAYS && !(now - (hist[m.id].bf || 0) < DAY));
   const pick = ['kalshi', 'polymarket'].flatMap(v => want.filter(m => m.venue === v).slice(0, BACKFILL_PER_RUN));
   let filled = 0;
+  const why = {};                        // the first reason each venue's history came back empty, for the log
   await pool(pick, 4, async m => {
     const h = hist[m.id];
     h.bf = now;
     try {
       const past = await pastPrices(fetchFn, m.src, now);
-      if (!past.size) return;
+      if (!past.size) { why[m.venue] ??= 'no past prices returned'; return; }
       const days = new Map(h.p.map((v, i) => [h.d + i, v]).filter(x => x[1] != null));
       for (const [d, v] of past) if (d >= from && d < today && !days.has(d)) days.set(d, v);   // today stays the live price
       const first = Math.min(...days.keys());
       h.d = first; h.p = Array.from({ length: today - first + 1 }, (_, i) => days.get(first + i) ?? null);
       filled++;
-    } catch { /* tried again tomorrow */ }
+    } catch (e) { why[m.venue] ??= String(e.message || e).slice(0, 160); /* tried again tomorrow */ }
   });
-  if (pick.length) log(`  History: backfilled ${filled}/${pick.length} markets from the venues' past prices`);
+  if (pick.length) {
+    const by = v => { const n = pick.filter(m => m.venue === v); return n.length ? `${v} ${n.filter(m => (hist[m.id].p.filter(x => x != null).length) > 1).length}/${n.length}` : null; };
+    log(`  History: backfilled ${filled}/${pick.length} markets from the venues' past prices (${['kalshi', 'polymarket'].map(by).filter(Boolean).join(', ')})`
+      + Object.entries(why).map(([v, w]) => `; ${v}: ${w}`).join(''));
+  }
 }
 
 /* ---------- the same question on several venues ---------- */
