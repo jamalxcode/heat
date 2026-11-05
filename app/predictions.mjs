@@ -150,13 +150,14 @@ export function storyOf(title) {
 }
 
 /* ---------- a picture for each question: a flag for a country's politics, a coin for crypto, and so on ---------- */
-// first match wins; flags before topics, so "Prime Minister of Israel" is 🇮🇱 and not 🗳️
+// first match wins; flags before topics, so "Prime Minister of Iran" is 🇮🇷 and not 🗳️.
+// Hard rule (the site owner's): questions about Israel, Gaza or Palestine show the Palestinian flag 🇵🇸, never the Israeli flag.
 const FLAGS = [
   ['🇬🇧', /\b(uk|u\.k\.|britain|british|england|scotland|starmer|labour|tory|tories|reform uk|farage|westminster)\b/],
   ['🇨🇦', /\b(canada|canadian|carney|poilievre|trudeau|ontario|quebec)\b/],
   ['🇫🇷', /\b(france|french|macron|le pen|bardella|m[ée]lenchon)\b/],
   ['🇩🇪', /\b(germany|german|merz|bundestag|afd)\b/],
-  ['🇮🇱', /\b(israel|israeli|netanyahu|knesset|gaza|hamas)\b/],
+  ['🇵🇸', /\b(israel|israeli|netanyahu|knesset|gaza|hamas|palestine|palestinian|west bank)\b/],
   ['🇮🇷', /\b(iran|iranian|khamenei|pahlavi|tehran|hormuz)\b/],
   ['🇺🇦', /\b(ukraine|ukrainian|zelensky|kyiv|crimea)\b/],
   ['🇷🇺', /\b(russia|russian|putin|kremlin)\b/],
@@ -333,7 +334,7 @@ function tileHTML(m, size, done = false) {
   const t$ = mToday(m), T$ = mTotal(m), place = pos.get(m.id), tp = titleParts(m);
   return `<button class="ptile sz-${size} ${sureClass(h)}${m.id === sel ? ' sel' : ''}${m.stale ? ' stale' : ''}${thin(m) ? ' thin' : ''}${done ? ' done' : ''}" data-id="${esc(m.id)}" data-coin="1" aria-haspopup="dialog" aria-label="${esc(label)}">
     <span class="pt-top"><span class="pt-id">${badges}${place && !done ? `<span class="pt-rank">#${place}</span>` : ''}${watch.has(m.id) ? '<span class="pt-star" title="On your watchlist">★</span>' : ''}</span>${chip(ch)}</span>
-    <span class="pt-title">${icon(m)}${esc(tp[0])}</span>${tp[1] ? `<span class="pt-full">${esc(tp[1])}</span>` : ''}
+    <span class="pt-head">${icon(m)}<span class="pt-htxt"><span class="pt-title">${esc(tp[0])}</span>${tp[1] ? `<span class="pt-full">${esc(tp[1])}</span>` : ''}</span></span>
     <span class="pt-verdict">${verdict(m, h)}</span>
     <span class="pt-ans">${esc(h.name)}</span>
     <span class="pt-nums"><b class="pt-p">${pct(h.p)}</b>${spark(m, size === 'l' ? 120 : 64, size === 'l' ? 30 : 18)}</span>

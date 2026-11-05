@@ -1060,7 +1060,8 @@ test.describe('predictions', () => {
     await expect(top).toHaveClass(/sz-l/);
     await expect(top).toHaveClass(/c2/);                                                            // 71% sure: the middle shade
     await expect(top.locator('.pt-rank')).toHaveText('#1');
-    await expect(top.locator('.pt-title')).toHaveText('🇺🇸NYC mayor winner?');                    // a flag for US politics, then the headline
+    await expect(top.locator('.pt-title')).toHaveText('NYC mayor winner?');
+    await expect(top.locator('.pt-head > .p-ico')).toHaveText('🇺🇸');                             // a big flag for US politics beside the headline
     await expect(top.locator('.pt-full')).toHaveCount(0);                                         // short already: no second line
     await expect(top.locator('.p-end')).toHaveText(/yrs\+ left$/);                                // the time-left ring
     await expect(top.locator('.p-end')).toHaveClass(/e-far/);
