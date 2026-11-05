@@ -177,6 +177,9 @@ export function fromPolymarket(e) {
     end: isoOf(e.endDate || markets[0].endDate), vol24: num(e.volume24hr) ?? 0, vol: num(e.volume), liq: num(e.liquidity), oi: num(e.openInterest), cur: 'USD',
   }, outcomes, e.negRisk || (markets.length === 1 && !multiEvent));
 }
+// single games and matches ("Lakers vs Celtics", "76ers at Pistons, Nov 4", "…: Spread") are left out: they settle
+// within hours, crowd out the questions people follow, and made the file bigger; season-long sports (champions, MVPs) stay
+export const isGame = r => r.cat === 'Sports' && /\bvs?\.?\s|\s@\s|\bat\b.*,\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.? \d/i.test(r.title);
 async function polymarket({ fetchFn }) {
   const out = [];
   for (const offset of [0, 100]) {
@@ -184,7 +187,7 @@ async function polymarket({ fetchFn }) {
     for (const e of page || []) { const r = fromPolymarket(e); if (r) out.push(r); }
     if (!page?.length || page.length < 100) break;
   }
-  return out.sort((a, b) => interestOf(b) - interestOf(a)).slice(0, TOP.polymarket);
+  return out.filter(r => !isGame(r)).sort((a, b) => interestOf(b) - interestOf(a)).slice(0, TOP.polymarket);
 }
 
 /* ---------- Kalshi ---------- */
@@ -240,7 +243,7 @@ async function kalshiScan({ fetchFn, log }) {
     cursor = d.cursor;
   } while (cursor && Date.now() - t0 < KALSHI_SCAN_BUDGET);
   log(`  Kalshi: scanned ${pages} pages, ${all.length} events in ${((Date.now() - t0) / 1000).toFixed(0)} s${cursor ? ' (stopped at the time limit)' : ''}`);
-  return all.sort((a, b) => interestOf(b) - interestOf(a)).slice(0, TOP.kalshi);
+  return all.filter(r => !isGame(r)).sort((a, b) => interestOf(b) - interestOf(a)).slice(0, TOP.kalshi);
 }
 async function kalshi({ fetchFn, prev, now, log }) {
   const meta = prev?.kalshi;
@@ -258,7 +261,7 @@ async function kalshi({ fetchFn, prev, now, log }) {
     } catch { /* gone or busy: skipped this time */ }
   });
   if (recs.length < meta.tickers.length / 2) throw new Error(`only ${recs.length}/${meta.tickers.length} Kalshi events answered`);
-  return { recs: recs.sort((a, b) => b.vol24 - a.vol24), meta };
+  return { recs: recs.filter(r => !isGame(r)).sort((a, b) => b.vol24 - a.vol24), meta };
 }
 
 /* ---------- PredictIt ---------- */
@@ -309,7 +312,7 @@ async function manifold({ fetchFn }) {
     let full = null;
     if (m.outcomeType === 'MULTIPLE_CHOICE') try { full = await getJSON(fetchFn, `https://api.manifold.markets/v0/market/${encodeURIComponent(m.id)}`, { tries: 2 }); } catch { return; }
     const r = fromManifold(m, full);
-    if (r) out.push(r);
+    if (r && !isGame(r)) out.push(r);
   });
   return out.sort((a, b) => b.vol24 - a.vol24);
 }
@@ -394,7 +397,9 @@ function fillChanges(recs, hist, now) {
 // (daily candles) and Polymarket (prices-history) publish their past prices: for a record with under 25 days of history
 // the missing days are filled from there, at most BACKFILL_PER_RUN records per venue per update (so a first run
 // doesn't hammer them), and each record is asked at most once a day.
-const BACKFILL_PER_RUN = 40, BACKFILL_MIN_DAYS = 25;
+// per run: Polymarket answers freely; Kalshi refuses bursts (429), so fewer and two at a time. The markets come in
+// order of interest, so the most-traded questions get their history first.
+const BACKFILL_PER_RUN = { polymarket: 80, kalshi: 40 }, BACKFILL_CONC = { polymarket: 4, kalshi: 2 }, BACKFILL_MIN_DAYS = 25;
 const dayOfTs = s => Math.floor((s * 1000 - 1) / DAY);   // a candle stamped at the end of its day belongs to that day
 async function pastPrices(fetchFn, src, now) {
   const end = Math.floor(now / 1000), start = end - KEEP_DAYS * 86400, out = new Map();
@@ -425,22 +430,26 @@ async function pastPrices(fetchFn, src, now) {
 export async function backfill({ fetchFn, markets, hist, now, log = () => {} }) {
   const today = Math.floor(now / DAY), from = today - KEEP_DAYS + 1;
   const want = markets.filter(m => m.src && !m.stale && hist[m.id] && hist[m.id].p.filter(v => v != null).length < BACKFILL_MIN_DAYS && !(now - (hist[m.id].bf || 0) < DAY));
-  const pick = ['kalshi', 'polymarket'].flatMap(v => want.filter(m => m.venue === v).slice(0, BACKFILL_PER_RUN));
+  const pick = ['kalshi', 'polymarket'].flatMap(v => want.filter(m => m.venue === v).slice(0, BACKFILL_PER_RUN[v]));
   let filled = 0;
   const why = {};                        // the first reason each venue's history came back empty, for the log
-  await pool(pick, 4, async m => {
+  const one = async m => {
     const h = hist[m.id];
-    h.bf = now;
     try {
       const past = await pastPrices(fetchFn, m.src, now);
-      if (!past.size) { why[m.venue] ??= 'no past prices returned'; return; }
+      if (!past.size) { why[m.venue] ??= 'no past prices returned'; h.bf = now; return; }
       const days = new Map(h.p.map((v, i) => [h.d + i, v]).filter(x => x[1] != null));
       for (const [d, v] of past) if (d >= from && d < today && !days.has(d)) days.set(d, v);   // today stays the live price
       const first = Math.min(...days.keys());
       h.d = first; h.p = Array.from({ length: today - first + 1 }, (_, i) => days.get(first + i) ?? null);
       filled++;
-    } catch (e) { why[m.venue] ??= String(e.message || e).slice(0, 160); /* tried again tomorrow */ }
-  });
+      h.bf = now;
+    } catch (e) {
+      why[m.venue] ??= String(e.message || e).slice(0, 160);
+      if (!/\b429\b/.test(String(e.message || e))) h.bf = now;   // refused for going too fast: tried again next run, else tomorrow
+    }
+  };
+  await Promise.all(['kalshi', 'polymarket'].map(v => pool(pick.filter(m => m.venue === v), BACKFILL_CONC[v], one)));
   if (pick.length) {
     const by = v => { const n = pick.filter(m => m.venue === v); return n.length ? `${v} ${n.filter(m => (hist[m.id].p.filter(x => x != null).length) > 1).length}/${n.length}` : null; };
     log(`  History: backfilled ${filled}/${pick.length} markets from the venues' past prices (${['kalshi', 'polymarket'].map(by).filter(Boolean).join(', ')})`
@@ -538,6 +547,34 @@ export function matchGroups(markets) {
   return n;
 }
 
+/* ---------- track record: what the market said a week before each question settled ---------- */
+// When a question's answer reaches 97% (or a yes/no falls to 3%), it's logged once: for every outcome with a known
+// 1-week change, its chance a week before (now − the week's change) and whether it happened (97%+ = yes, 3% or less =
+// no; anything between is left out). Over many questions this says how good the prices are: of answers priced 80–90% a
+// week out, how many happened. Real money only; kept across updates (the last RESULTS_MAX).
+export const SETTLED = 0.97, RESULTS_MAX = 3000;
+export function settle(markets, prev = [], now = Date.now()) {
+  const out = Array.isArray(prev) ? [...prev] : [], seen = new Set(out.map(r => r.id)), day = Math.floor(now / DAY);
+  for (const m of markets) {
+    if (seen.has(m.id) || m.stale || m.cur === 'MANA') continue;
+    const yn = m.outcomes.length === 1 && /^yes$/i.test(m.outcomes[0].name);
+    const done = m.outcomes.some(o => (o.p ?? 0) >= SETTLED) || (yn && (m.outcomes[0].p ?? 1) <= 1 - SETTLED);
+    if (!done) continue;
+    const pairs = [];
+    for (const o of m.outcomes) {
+      if (o.p == null || o.d7 == null) continue;
+      const won = o.p >= SETTLED ? 1 : o.p <= 1 - SETTLED ? 0 : null;
+      if (won == null) continue;
+      pairs.push([r4(Math.min(1, Math.max(0, o.p - o.d7))), won]);
+    }
+    if (!pairs.length) continue;
+    const w = yn ? (m.outcomes[0].p >= SETTLED ? 'Yes' : 'No') : (m.outcomes.find(o => o.p >= SETTLED)?.name ?? null);
+    out.push({ id: m.id, t: m.title, v: m.venue, d: day, w, pairs });
+    seen.add(m.id);
+  }
+  return out.slice(-RESULTS_MAX);
+}
+
 /* ---------- build ---------- */
 export async function build({ prev = null, forex = null, env = {}, log = console.log, now = Date.now(), fetchFn = fetch } = {}) {
   const usdPerGbp = (() => {
@@ -587,7 +624,9 @@ export async function build({ prev = null, forex = null, env = {}, log = console
   fillChanges(markets, hist, now);
   const groups = matchGroups(markets);
   log(`  Matched ${groups} questions listed on more than one venue`);
-  return { v: FMT, market: 'predictions', generated: now, venues, kalshi: kalshiMeta, usdPerGbp: r4(usdPerGbp), markets, hist };
+  const settledLog = settle(markets, ok?.results, now);
+  log(`  Track record: ${settledLog.length} settled questions logged`);
+  return { v: FMT, market: 'predictions', generated: now, venues, kalshi: kalshiMeta, usdPerGbp: r4(usdPerGbp), markets, hist, results: settledLog };
 }
 
 /* ---------- CLI (Node only) ---------- */

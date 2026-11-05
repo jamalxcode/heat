@@ -248,6 +248,8 @@ export function makePredictionsFixture(now = Date.now()) {
     // a both-ways price ladder ("↓ 2,000" is a fall) and a daily weather question whose day was yesterday
     m('pm:eth', 'polymarket', 'What price will Ethereum hit in 2026?', 'Crypto', [{ name: '↓ 2,000', p: 0.27, d1: 0, d7: null, d30: null }, { name: '↑ 3,000', p: 0.25, d1: 0, d7: null, d30: null }], { exclusive: false, vol24: 8, vol: 240 }),
     m('ks:RAIN', 'kalshi', `Where will it rain on ${new Date(now - DAY).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}?`, 'Climate', [{ name: 'Tampa', p: 0.3, d1: 0, d7: null, d30: null }, { name: 'Miami', p: 0.2, d1: 0, d7: null, d30: null }], { exclusive: false, vol24: 5e4, vol: 6e4, end: new Date(now + DAY).toISOString().slice(0, 10) }),
+    // called: 95% after +35 points this week (60% a week before: no upset), not yet settled
+    m('pm:call', 'polymarket', 'Ohio Senate winner?', 'Politics', [{ name: 'Sherrod Brown', p: 0.95, d1: 0.2, d7: 0.35, d30: null }, { name: 'Jon Husted', p: 0.05, d1: -0.2, d7: -0.35, d30: null }], { vol24: 4e5, vol: 2e6 }),
     m('mf:x', 'manifold', 'Will Bitcoin hit $200k in 2026?', 'Crypto', [{ name: 'Yes', p: 0.12, d1: 0.01, d7: null, d30: null }], { vol24: 5000, vol: 9e4, cur: 'MANA', traders: 40 }),
   ];
   for (const x of markets) { x.usd24 = x.vol24 == null ? null : x.cur === 'MANA' ? x.vol24 / 100 : x.vol24; x.usdTotal = x.vol == null ? null : x.cur === 'MANA' ? x.vol / 100 : x.vol; x.interest = Math.round((x.usd24 || 0) + (x.usdTotal || 0) / 30); }
@@ -256,6 +258,8 @@ export function makePredictionsFixture(now = Date.now()) {
   return {
     v: 1, market: 'predictions', generated: now - 60e3, usdPerGbp: 1.3, kalshi: { scanned: now, tickers: ['SEN'] },
     venues: { polymarket: ok(3), kalshi: ok(3), predictit: ok(2), manifold: ok(1), betfair: { state: 'off', n: 0, at: null, err: 'not connected: needs a Betfair API key' } },
+    // the track record: 40 settled answers, those priced 70–90% a week before happening 3 times in 4
+    results: [{ id: 'pm:old', t: 'An old question', v: 'polymarket', d: today - 3, w: 'Yes', pairs: Array.from({ length: 40 }, (_, i) => [i < 20 ? 0.8 : 0.05, i < 15 ? 1 : 0]) }],
     markets, hist: { 'pm:mayor': { o: 'Alice', d: today - 3, p: [0.6, 0.64, 0.66, 0.71] } },
   };
 }

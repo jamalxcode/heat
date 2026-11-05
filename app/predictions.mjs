@@ -152,8 +152,12 @@ function titleDate(m) {
   return `${y}-${String(MONTHS.indexOf(last[1].toLowerCase().slice(0, 3)) + 1).padStart(2, '0')}-${(last[3] || last[2]).padStart(2, '0')}`;
 }
 const datePassed = m => { const d = titleDate(m); return d != null && d < todayIso() && (!m.end || d <= m.end); };
-const decided = m => (m.end && m.end < todayIso()) || datePassed(m) || certainty(m) >= DECIDED;
-const decidedWhy = m => m.end && m.end < todayIso() ? `past its end date (${dayLabel(m.end)}): waiting for the result` : datePassed(m) ? `its date (${dayLabel(titleDate(m))}) has passed: waiting for the result` : `${pct(certainty(m))} sure already`;
+// "called": 90%+ after moving 30+ points in a week — an election counted, a result in, the venue not yet settled; it
+// leaves the open questions for the Just decided row ("Mississippi Senate: Colom 96%, +85 this week")
+const CALLED = 0.9, CALLED_MOVE = 0.3;
+const called = m => { const h = shownOutcome(m); return (h.p ?? 0) >= CALLED && (h.d7 ?? 0) >= CALLED_MOVE; };
+const decided = m => (m.end && m.end < todayIso()) || datePassed(m) || certainty(m) >= DECIDED || called(m);
+const decidedWhy = m => m.end && m.end < todayIso() ? `past its end date (${dayLabel(m.end)}): waiting for the result` : datePassed(m) ? `its date (${dayLabel(titleDate(m))}) has passed: waiting for the result` : certainty(m) < DECIDED && called(m) ? `called: ${pts(shownOutcome(m).d7)} this week to ${pct(shownOutcome(m).p)}, not yet settled` : `${pct(certainty(m))} sure already`;
 // tile colour: how sure the market is about the answer shown (c0 toss-up … c4 near certain); a long shot is just as sure
 // the other way, so a ladder step at 9% is coloured like 91%
 // shade by how likely the shown answer is: c4 (85%+) darkest … c0 (under 25%) lightest; one blue hue, read by lightness
@@ -402,7 +406,7 @@ function tileHTML(m, size, done = false, also = []) {
     <span class="pt-head">${icon(m)}<span class="pt-htxt"><span class="pt-title">${esc(tp[0])}</span>${tp[1] ? `<span class="pt-full">${esc(tp[1])}</span>` : ''}</span></span>
     <span class="pt-verdict">${verdict(m, h)}</span>
     <span class="pt-ans">${esc(answer(m, h))}</span>
-    <span class="pt-nums"><b class="pt-p">${pct(h.p)}</b>${spark(m, size === 'l' ? 120 : 64, size === 'l' ? 30 : 18)}</span>
+    <span class="pt-nums"><b class="pt-p">${pct(h.p)}</b>${spark(m, size === 'l' ? 120 : 64, size === 'l' ? 30 : 18)}${(d => d != null && Math.abs(d) >= SINCE_MIN ? `<span class="pt-since" title="Since your last visit (${esc(sinceWhen())})">${arrow(d)}${pts(d).replace(' pts', '')} since ${esc(sinceWhen())}</span>` : '')(done ? null : sinceMove(m, h))}</span>
     ${size !== 's' && !done ? raceHTML(m, h) : ''}
     ${cmp ? `<span class="pt-cmp${cmp.spread >= DIFFER ? ' differ' : ''}" title="The same answer on each venue${cmp.spread >= DIFFER ? `: they differ by ${Math.round(cmp.gap * 100)} points` : ''}">${cmp.spread >= DIFFER ? '⚡ ' : ''}${cmp.rows.map(r => `${VTAG[r.x.venue]} ${pct(r.p)}`).join(' · ')}</span>` : ''}
     ${also.length ? alsoHTML(m, also, size) : ''}
@@ -437,6 +441,22 @@ function grid(ms, top = false) {
   return `<div class="grid pgrid">${ms.slice(0, cut).map(m => tileHTML(m, sz.get(m.id), false, also.get(m.id) || [])).join('')}</div>`
     + (left ? `<p class="p-morewrap"><button class="btn p-more" id="pmore">Show ${Math.min(SHOW_STEP, left)} more <span class="r-muted">· ${left} left</span></button></p>` : '');
 }
+// how good the markets are: every settled answer's chance a week before, in bands, against how often it happened
+const TRACK_MIN = 30;
+function trackHTML() {
+  const rs = Array.isArray(P.results) ? P.results : [], pairs = rs.flatMap(r => r.pairs || []);
+  const open = store.get('hm.predTrack') === true;
+  const head = `<summary><b>How good are the markets?</b> <span class="r-muted">${rs.length} settled question${rs.length === 1 ? '' : 's'} logged${rs.length ? ` since ${dayOf(Math.min(...rs.map(r => r.d)))}` : ''}</span></summary>`;
+  if (pairs.length < TRACK_MIN) return `<details class="p-decided p-track" id="ptrack"${open ? ' open' : ''}>${head}<p class="r-muted">Building up: each question that settles adds what every answer was priced at a week before and whether it happened. With ${TRACK_MIN}+ answers this shows how often an answer priced, say, 80–90% a week out came true (${pairs.length} so far).</p></details>`;
+  const bands = [[0, 0.1], [0.1, 0.3], [0.3, 0.5], [0.5, 0.7], [0.7, 0.9], [0.9, 1.01]].map(([lo, hi]) => {
+    const g = pairs.filter(([q]) => q >= lo && q < hi), hit = g.filter(([, w]) => w).length;
+    return { lo, hi: Math.min(hi, 1), n: g.length, rate: g.length ? hit / g.length : null, avg: g.length ? g.reduce((t, [q]) => t + q, 0) / g.length : null };
+  });
+  return `<details class="p-decided p-track" id="ptrack"${open ? ' open' : ''}>${head}
+    <p class="r-muted">Every answer of a settled question, by what it was priced at a week before: how often it happened. A well-priced market's answers at 80% happen about 80% of the time.</p>
+    <table class="r-tbl p-ttbl"><thead><tr><th>Priced a week before</th><th>Answers</th><th>Happened</th><th></th></tr></thead><tbody>${bands.map(b => `<tr><td>${Math.round(b.lo * 100)}–${Math.round(b.hi * 100)}%</td><td>${b.n}</td><td>${b.rate == null ? '—' : `<b>${Math.round(b.rate * 100)}%</b> <span class="r-muted">(avg price ${Math.round(b.avg * 100)}%)</span>`}</td><td class="p-pbar">${b.rate == null ? '' : `<span style="width:${Math.round(b.rate * 100)}%"></span>`}</td></tr>`).join('')}</tbody></table>
+    <p class="r-src">From each venue’s own 1-week price change when the question settled (97%+ for the answer). Real money only. Small bands are noisy.</p></details>`;
+}
 function decidedHTML(done) {
   if (!done.length) return '';
   const open = store.get('hm.predDone') === true;
@@ -468,18 +488,22 @@ function mapHTML(live) {
   const ms = live.filter(m => mInterest(m) > 0), left = live.length - ms.length;
   if (!ms.length) return '<p class="p-empty">No money figures to draw a map from.</p>';
   const W = Math.max(320, $('#grid').clientWidth || 1000), H = Math.round(Math.max(420, Math.min(900, W * (innerWidth <= 640 ? 1.6 : 0.62))));
-  const byCat = CATS.map(c => ({ c, ms: ms.filter(m => m.cat === c) })).filter(x => x.ms.length).map(x => ({ ...x, v: x.ms.reduce((s, m) => s + mInterest(m), 0) }));
+  // with Mix topics on, area is the square root of the money, so politics doesn't swallow the map and smaller topics are
+  // readable; off, area is the money itself
+  const area = m => mix ? Math.sqrt(mInterest(m)) : mInterest(m);
+  const byCat = CATS.map(c => ({ c, ms: ms.filter(m => m.cat === c) })).filter(x => x.ms.length).map(x => ({ ...x, v: x.ms.reduce((s, m) => s + area(m), 0) }));
   let html = '';
   for (const b of squarify(byCat, 0, 0, W, H)) {
     const head = b.h > 40 && b.w > 70 ? 16 : 0;
     html += `<div class="pm-block" style="left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px">${head ? `<span class="pm-cat">${esc(b.c)}</span>` : ''}</div>`;
-    for (const r of squarify(b.ms.map(m => ({ m, v: mInterest(m) })), b.x + 1, b.y + 1 + head, b.w - 2, b.h - 2 - head)) {
+    for (const r of squarify(b.ms.map(m => ({ m, v: area(m) })), b.x + 1, b.y + 1 + head, b.w - 2, b.h - 2 - head)) {
       const m = r.m, h = shownOutcome(m), area = r.w * r.h, sz = area > 26000 ? 'big' : area > 9000 ? 'mid' : area > 2500 ? 'small' : 'tiny';
       html += `<button class="pm-tile ${sureClass(h)} pm-${sz}${m.id === sel ? ' sel' : ''}" data-id="${esc(m.id)}" data-coin="1" style="left:${r.x + 1}px;top:${r.y + 1}px;width:${Math.max(0, r.w - 2)}px;height:${Math.max(0, r.h - 2)}px" title="${esc(`${m.title}: ${verdict(m, h)} ${h.name} ${pct(h.p)} · ${money(mInterest(m), 'USD')} interest`)}" aria-label="${esc(`${m.title}: ${verdict(m, h)}, ${h.name}, ${pct(h.p)}`)}">`
-        + `${sz === 'tiny' ? `<span class="pm-title">${iconOf(m.title, m.cat)}</span>` : `<span class="pm-title">${icon(m)}${esc(shortTitle(fullTitle(m, h)))}</span>`}<span class="pm-ans">${sz === 'tiny' ? '' : esc(answer(m, h)) + ' '}<b>${pct(h.p)}</b></span>${sz === 'big' || sz === 'mid' ? `<span class="pm-foot">${chip(h[tfKey()])} ${endHTML(m)} ${money(mToday(m), 'USD')} today</span>` : ''}</button>`;
+        // small rectangles: the icon and the chance only (a cut-off "Mojtab…" helps nobody); the rest on hover and click
+        + `${sz === 'tiny' || sz === 'small' ? `<span class="pm-title">${iconOf(m.title, m.cat)}</span>` : `<span class="pm-title">${icon(m)}${esc(shortTitle(fullTitle(m, h)))}</span>`}<span class="pm-ans">${sz === 'tiny' || sz === 'small' ? '' : esc(answer(m, h)) + ' '}<b>${pct(h.p)}</b></span>${sz === 'big' || sz === 'mid' ? `<span class="pm-foot">${chip(h[tfKey()])} ${endHTML(m)} ${money(mToday(m), 'USD')} today</span>` : ''}</button>`;
     }
   }
-  return `<div class="p-map" style="height:${H}px">${html}</div><p class="r-muted p-mapnote">Each rectangle’s area is the money on that question (bet today + a 30th of all money bet); blocks are topics; darker and bold = likelier; lighter and italic = less likely.${left ? ` ${left} question${left > 1 ? 's' : ''} without money figures (PredictIt) aren’t drawn.` : ''}</p>`;
+  return `<div class="p-map" style="height:${H}px">${html}</div><p class="r-muted p-mapnote">Each rectangle’s area is the money on that question (bet today + a 30th of all money bet${mix ? '; with Mix topics on, its square root, so smaller topics stay readable' : ''}); blocks are topics; darker and bold = likelier; lighter and italic = less likely.${left ? ` ${left} question${left > 1 ? 's' : ''} without money figures (PredictIt) aren’t drawn.` : ''}</p>`;
 }
 
 /* ---------- just decided: results of the last days, with what the market said a week before ---------- */
@@ -494,15 +518,49 @@ function recentHTML(done) {
   return `<section class="p-recent" aria-label="Just decided"><h3 class="p-recent-h">Just decided <span class="r-muted">${rows.length} · results of the last days, and what the market said a week before</span></h3><div class="p-row">${rows.map(({ m, h, was }) => {
     // an upset only where the answer is a name or a yes/no: on a margin or seat ladder the step shown changes, so "a week
     // ago 6%" is about a different line, not a surprise winner
-    const called = (h.p ?? 0) >= DECIDED, numeric = !h.yn && /\d/.test(h.name), upset = was != null && was < 0.5 && !isLadder(m) && !h.step && !numeric;
-    return `<button class="p-news p-res${upset ? ' upset' : ''}" data-id="${esc(m.id)}" data-coin="1"><span class="p-news-k">${called ? '✓ Decided' : '⏳ Awaiting the result'}${upset ? ' · upset' : ''}</span><span class="p-news-t">${icon(m)}${esc(shortTitle(fullTitle(m, h)))}</span><span class="p-news-l"><b>${esc(called ? resultWord(m, h) : answer(m, h))}</b> ${pct(h.p)}${was != null && !isLadder(m) && !numeric ? ` · a week ago <b>${pct(was)}</b>` : ''}</span></button>`;
+    const settled = (h.p ?? 0) >= DECIDED, isCalled = !settled && called(m), numeric = !h.yn && /\d/.test(h.name), upset = was != null && was < 0.5 && !isLadder(m) && !h.step && !numeric;
+    return `<button class="p-news p-res${upset ? ' upset' : ''}" data-id="${esc(m.id)}" data-coin="1"><span class="p-news-k">${settled ? '✓ Decided' : isCalled ? '📣 Called · not yet settled' : '⏳ Awaiting the result'}${upset ? ' · upset' : ''}</span><span class="p-news-t">${icon(m)}${esc(shortTitle(fullTitle(m, h)))}</span><span class="p-news-l"><b>${esc(settled || isCalled ? resultWord(m, h) : answer(m, h))}</b> ${pct(h.p)}${was != null && !isLadder(m) && !numeric ? ` · a week ago <b>${pct(was)}</b>` : ''}</span></button>`;
   }).join('')}</div></section>`;
+}
+
+/* ---------- since your last visit: what moved while you were away (kept in this browser only) ---------- */
+// Each visit saves every question's leading answer and chance. A visit an hour or more after the saved one compares
+// against it (the comparison is kept for that browser session, so reloading doesn't lose it) and saves anew.
+const VISIT_GAP = 60 * 60e3, SINCE_MIN = 0.05;
+let visitBase = null;                       // { at, p: { id: [head name, chance] } } of the last visit, or null
+function snapshot() { const p = {}; for (const m of P.markets) { const o = headOf(m); if (o?.p != null) p[m.id] = [o.name, Math.round(o.p * 1000) / 1000]; } return { at: P.generated || Date.now(), p }; }
+function startVisit() {
+  const ss = k => { try { return JSON.parse(sessionStorage.getItem(k)); } catch { return null; } };
+  const keep = v => { try { sessionStorage.setItem('hm.predBase', JSON.stringify(v)); } catch { /* blocked */ } };
+  const last = store.get('hm.predVisit');
+  if (last?.p && Date.now() - last.at >= VISIT_GAP) { visitBase = last; keep(last); store.set('hm.predVisit', snapshot()); }
+  else { visitBase = ss('hm.predBase'); if (!last?.p) store.set('hm.predVisit', snapshot()); }
+}
+// the shown answer's move since the last visit, or null (only when the same answer led then)
+function sinceMove(m, h = shownOutcome(m)) {
+  const b = visitBase?.p?.[m.id], o = headOf(m);
+  if (!b || !o || b[0] !== o.name || o.p == null) return null;
+  const dHead = o.p - b[1];
+  if (h.name === o.name && !h.no) return dHead;
+  if (h.no && (h.yn || h.step) && h.name === (h.yn ? 'No' : o.name)) return -dHead;
+  return null;
+}
+const sinceWhen = () => { if (!visitBase) return ''; const t = new Date(visitBase.at), ago = Date.now() - visitBase.at; return ago < 20 * 3600e3 ? t.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : ago < 6 * DAY ? t.toLocaleDateString([], { weekday: 'short' }) : t.toLocaleDateString([], { day: 'numeric', month: 'short' }); };
+function sinceHTML(live) {
+  if (!visitBase) return '';
+  const rows = live.filter(m => !isPlay(m)).map(m => ({ m, h: shownOutcome(m) })).map(r => ({ ...r, d: sinceMove(r.m, r.h) }))
+    .filter(r => r.d != null && Math.abs(r.d) >= SINCE_MIN).sort((a, b) => Math.abs(b.d) * lg(b.m) - Math.abs(a.d) * lg(a.m))
+    .filter((r, i, all) => { const k = storyOf(r.m.title) || r.m.group || r.m.id; return all.findIndex(x => (storyOf(x.m.title) || x.m.group || x.m.id) === k) === i; })   // one card per story
+    .slice(0, 8);
+  if (!rows.length) return `<p class="p-since-none r-muted">Since your last visit (${esc(sinceWhen())}): nothing moved 5 points or more.</p>`;
+  return `<section class="p-recent p-since" aria-label="Since your last visit"><h3 class="p-recent-h">Since your last visit <span class="r-muted">${esc(sinceWhen())} · the biggest moves, saved in this browser</span></h3><div class="p-row">${rows.map(({ m, h, d }) => `<button class="p-news" data-id="${esc(m.id)}" data-coin="1"><span class="p-news-k"><span class="pt-chg ${heat(d)}">${arrow(d)}${pts(d)}</span></span><span class="p-news-t">${icon(m)}${esc(shortTitle(fullTitle(m, h)))}</span><span class="p-news-l">${esc(answer(m, h))} ${pct(h.p - d)} → <b>${pct(h.p)}</b></span></button>`).join('')}</div></section>`;
 }
 
 /* ---------- the Today strip: the news at a glance ---------- */
 function todayHTML(live) {
   const real = live.filter(m => !isPlay(m) && !m.stale);
-  const pick = (f, ok = () => true) => real.filter(ok).reduce((a, m) => !a || f(m) > f(a) ? m : a, null);
+  const used = new Set(), key = m => m.group || m.id;   // each card a different question
+  const pick = (f, ok = () => true) => { const m = real.filter(x => !used.has(key(x)) && ok(x)).reduce((a, x) => !a || f(x) > f(a) ? x : a, null); if (m) used.add(key(m)); return m; };
   const cards = [];
   const mover = pick(m => Math.abs(shownOutcome(m).d1 ?? 0), m => mInterest(m) >= MOVER_MIN * 10 && Math.abs(shownOutcome(m).d1 ?? 0) >= 0.03);
   if (mover) { const h = shownOutcome(mover); cards.push(['Biggest swing today', mover, `${esc(answer(mover, h))} ${arrow(h.d1)}${pts(h.d1)} to <b>${pct(h.p)}</b>`]); }
@@ -591,11 +649,11 @@ function render() {
   $('#pfiltBtn').innerHTML = `⚙ Filters${n ? ` <span class="n">${n}</span>` : ''}`;
   const note = merged() ? VENUES.map(v => P.venues?.[v[0]]?.state === 'stale' ? venueNote(v[0]) : '').join('') : venueNote(venue);
   const all = [...live, ...done];
-  const intro = !query && viewAs !== 'table' ? recentHTML(done) + todayHTML(live) + watchHTML() : '';
+  const intro = !query && viewAs !== 'table' ? recentHTML(done) + sinceHTML(live) + todayHTML(live) + watchHTML() : '';
   if (!all.length) main.innerHTML = note + intro + (query ? `<p class="p-empty">No question matches “${esc(query)}”.</p>` : order === 'disagree' ? '<p class="p-empty">No question is priced 5 or more points apart on two venues right now.</p>' : '<p class="p-empty">No open questions in the topics shown.</p>');
   else if (viewAs === 'table') main.innerHTML = note + tableHTML(all);
-  else if (viewAs === 'map') main.innerHTML = note + intro + mapHTML(live) + decidedHTML(done);
-  else main.innerHTML = note + intro + sectionsHTML(live) + decidedHTML(done);
+  else if (viewAs === 'map') main.innerHTML = note + intro + mapHTML(live) + decidedHTML(done) + trackHTML();
+  else main.innerHTML = note + intro + sectionsHTML(live) + decidedHTML(done) + trackHTML();
   main.className = '';
   $('#plegend').innerHTML = `<span class="p-key"><span class="p-sw c0"></span><i class="lk-lo">unlikely</i> <span class="p-sw c1"></span><span class="p-sw c2"></span><span class="p-sw c3"></span><span class="p-sw c4"></span> <b class="lk-hi">likely</b></span> · move ${TFS.find(t => t[0] === tf)[2]}: <span class="p-key-chg q2">▲ more likely</span> <span class="p-key-chg q-2">▼ less</span> · ${esc(ORDERS.find(x => x[0] === order)[2])}${venue === 'predictit' && ['sure', 'money', 'close'].includes(order) ? ' (PredictIt publishes no money: its own order)' : ''}`;
   const q = new URLSearchParams();
@@ -672,6 +730,7 @@ function detailHTML(m) {
   return `<div class="r-card r-pop p-pop">
     <div class="p-pophead"><span class="p-popven">${membersOf(m).filter(x => merged() || x === m).map(x => `<span class="pv pv-${x.venue}" title="${VNAME[x.venue]}">${VTAG[x.venue]}</span>`).join('')}</span>
       <button class="btn p-watchbtn" data-watch="${esc(m.id)}" aria-pressed="${watch.has(m.id)}">${watch.has(m.id) ? '★ Watching' : '☆ Watch'}</button>
+      <button class="btn p-linkbtn" title="Copy a link that opens this question">🔗 Copy link</button>
       <button class="btn p-fullbtn" aria-pressed="${full}" title="${full ? 'Back to the small view' : 'Full screen'}">${full ? '⤡ Smaller' : '⤢ Full view'}</button></div>
     <h2 class="p-q">${icon(m)}${esc(titleParts(m)[0])}</h2>${titleParts(m)[1] ? `<p class="p-qfull">${esc(titleParts(m)[1])}</p>` : ''}
     <p class="p-say${likeFont(h)}"><span class="p-say-v">${verdict(m, h)}:</span> <b class="p-say-a">${esc(answer(m, h))}</b> <b class="p-say-p">${pct(h.p)}</b></p>
@@ -716,8 +775,12 @@ function openPopup(id) {
   $('#scrim').classList.add('show');
   S.pinned = 'pred:' + id; sel = id;
   box.querySelector('.x').focus({ preventScroll: true });
+  const h = shownOutcome(m);
+  document.title = `${titleParts(m)[0]}: ${answer(m, h)} ${pct(h.p)} · Predictions · heat.sala.company`;   // history and bookmarks say the question
   render();
 }
+let pageTitle = '';
+const linkTo = id => `${location.origin}${location.pathname}?m=${encodeURIComponent(id)}`;
 
 /* ---------- fresh line and loading ---------- */
 function renderFresh() {
@@ -736,7 +799,9 @@ async function load() {
     if (!r.ok) throw new Error('predictions.json ' + r.status);
     const d = await r.json();
     if (d?.market !== 'predictions' || !Array.isArray(d.markets)) throw new Error('no prediction markets');
+    const first = !P;
     P = d; loadedAt = Date.now();
+    if (first) startVisit();
     groups = new Map();
     for (const m of P.markets) if (m.group) { if (!groups.has(m.group)) groups.set(m.group, []); groups.get(m.group).push(m); }
     for (const ms of groups.values()) ms.sort((a, b) => interest(b) - interest(a));
@@ -797,7 +862,7 @@ export function start() {
   let qt = 0;
   on('#psearch', 'input', e => { clearTimeout(qt); qt = setTimeout(() => { query = e.target.value.trim(); render(); }, 150); });
   on('#phelpBtn', 'click', e => { const open = $('#phelp').hidden; $('#phelp').hidden = !open; e.currentTarget.setAttribute('aria-expanded', open); e.currentTarget.textContent = open ? '✕ Hide' : 'ⓘ How to read'; });
-  $('#grid').addEventListener('toggle', e => { if (e.target.id === 'pdone') store.set('hm.predDone', e.target.open); }, true);
+  $('#grid').addEventListener('toggle', e => { if (e.target.id === 'pdone') store.set('hm.predDone', e.target.open); if (e.target.id === 'ptrack') store.set('hm.predTrack', e.target.open); }, true);
   on('#grid', 'click', e => {
     const th = e.target.closest('th[data-sort]');
     if (th) { const k = th.dataset.sort; sortBy = { key: k, dir: sortBy.key === k ? -sortBy.dir : ['rank', 'title', 'venue', 'head', 'end', 'cat'].includes(k) ? 1 : -1 }; render(); return; }
@@ -811,11 +876,18 @@ export function start() {
     const w = e.target.closest('[data-watch]');
     if (w) { const id = w.dataset.watch; if (watch.has(id)) watch.delete(id); else watch.add(id); store.set('hm.predWatch', [...watch]); openPopup(id); return; }
     if (e.target.closest('.p-fullbtn')) { full = !full; openPopup(sel); return; }
+    const lb = e.target.closest('.p-linkbtn');
+    if (lb) {
+      const url = linkTo(sel), done = ok => { lb.textContent = ok ? '✓ Copied' : url; setTimeout(() => { lb.textContent = '🔗 Copy link'; }, 2500); };
+      (navigator.clipboard?.writeText(url) ?? Promise.reject()).then(() => done(true), () => done(false));
+      return;
+    }
     const r = e.target.closest('[data-rel]');
     if (r) openPopup(r.dataset.rel);
   });
   // closed by the shared handlers (×, Escape, the backdrop): forget the question, leave full view, update the address
-  new MutationObserver(() => { if (sel && !$('#detail').classList.contains('pinned')) { sel = null; full = false; $('#detail').classList.remove('p-full'); render(); } })
+  pageTitle = document.title;
+  new MutationObserver(() => { if (sel && !$('#detail').classList.contains('pinned')) { sel = null; full = false; $('#detail').classList.remove('p-full'); document.title = pageTitle; render(); } })
     .observe($('#detail'), { attributes: true, attributeFilter: ['class'] });
   load().then(() => { if (linked) openPopup(linked); });
   let rz = 0;

@@ -1082,8 +1082,8 @@ test.describe('predictions', () => {
   });
 
   test('Today picks out the news; each card opens its question', async ({ page }) => {
-    await expect(page.locator('.p-today .p-news-k')).toHaveText(['Biggest swing today', 'Most money today', 'Closest big call', 'Venues disagree']);
-    expect(await page.locator('.p-today .p-news').evaluateAll(els => els.map(e => e.dataset.id))).toEqual(['pm:fed', 'pm:mayor', 'ks:SEN', 'ks:SEN']);
+    await expect(page.locator('.p-today .p-news-k')).toHaveText(['Biggest swing today', 'Most money today', 'Closest big call']);   // Senate is already the close call: no second card for it
+    expect(await page.locator('.p-today .p-news').evaluateAll(els => els.map(e => e.dataset.id))).toEqual(['pm:fed', 'pm:mayor', 'ks:SEN']);
     await page.locator('.p-today .p-news').first().click();
     await expect(page.locator('#detail')).toHaveClass(/pinned/);
     await expect(page.locator('#detail .p-q')).toHaveText('🏦Fed cut in December?');
@@ -1162,8 +1162,8 @@ test.describe('predictions', () => {
 
   test('just decided, race bars, "by …?" filled, PredictIt needs 8 points to disagree', async ({ page }) => {
     // NC-05 ended yesterday at 98%; a week before, the winner was at 24%: an upset
-    const res = page.locator('.p-recent .p-res');
-    await expect(res).toHaveCount(1);
+    const res = page.locator('.p-recent .p-res[data-id="ks:WON"]');
+    await expect(page.locator('.p-recent .p-res')).toHaveCount(2);
     await expect(res.locator('.p-news-k')).toHaveText('✓ Decided · upset');
     await expect(res.locator('.p-news-l')).toHaveText('Chuck Hubbard 98% · a week ago 24%');
     // a race on the big tile: the top three as bars
@@ -1190,9 +1190,44 @@ test.describe('predictions', () => {
     await expect(page.locator('.ptile[data-id="pm:by"] .pt-foot')).not.toContainText('no money');
   });
 
+  test('called races leave the grid; since your last visit; copy link and title; the track record', async ({ page }) => {
+    // Ohio: 95% after +50 this week → called, in Just decided, not among the open questions
+    await expect(page.locator('#grid > .grid .ptile[data-id="pm:call"]')).toHaveCount(0);
+    await expect(page.locator('.p-res[data-id="pm:call"] .p-news-k')).toHaveText('📣 Called · not yet settled');
+    await expect(page.locator('.p-res[data-id="pm:call"] .p-news-l b').first()).toHaveText('Sherrod Brown');
+    // Today: never the same question twice
+    const today = await page.locator('.p-today .p-news').evaluateAll(els => els.map(e => e.dataset.id));
+    expect(new Set(today).size).toBe(today.length);
+    // a popup: copy link, and the tab title says the question
+    await page.locator('.ptile[data-id="pm:mayor"]').click();
+    await expect(page).toHaveTitle(/^NYC mayor winner\?: Alice 71% · Predictions/);
+    await expect(page.locator('#detail .p-linkbtn')).toHaveText('🔗 Copy link');
+    await page.locator('#detail .p-linkbtn').click();
+    await expect(page.locator('#detail .p-linkbtn')).toHaveText(/✓ Copied|\/predictions\/\?m=pm%3Amayor/);
+    await page.keyboard.press('Escape');
+    await expect(page).toHaveTitle(/Prediction Market Heatmap/);
+    // the track record: 20 answers at 80% a week before, 15 happened
+    await page.locator('#ptrack summary').click();
+    await expect(page.locator('#ptrack tbody tr').nth(4)).toContainText('70–90%');
+    await expect(page.locator('#ptrack tbody tr').nth(4)).toContainText('20');
+    await expect(page.locator('#ptrack tbody tr').nth(4)).toContainText('75%');
+  });
+
+  test('since your last visit: the biggest moves since the saved visit, and a chip on the tile', async ({ page }) => {
+    await page.evaluate(() => { localStorage.setItem('hm.predVisit', JSON.stringify({ at: Date.now() - 3 * 3600e3, p: { 'pm:mayor': ['Alice', 0.6], 'pm:fed': ['Yes', 0.3] } })); sessionStorage.clear(); });
+    await page.reload();
+    const card = page.locator('.p-since .p-news[data-id="pm:mayor"]');
+    await expect(card).toContainText('Alice 60% → 71%');
+    await expect(page.locator('.p-since .p-news[data-id="pm:fed"]')).toHaveCount(0);              // didn't move
+    await expect(page.locator('.ptile[data-id="pm:mayor"] .pt-since')).toContainText('▲ +11 since');
+    await page.reload();                                                                          // same session: still compared with that visit
+    await expect(page.locator('.p-since .p-news[data-id="pm:mayor"]')).toHaveCount(1);
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('hm.predVisit')).p['pm:mayor'][1])).toBe(0.71);   // and this visit saved
+  });
+
   test('Filters: decided row, topics, play money, single games; money map, stories and table views', async ({ page }) => {
     await expect(page.locator('#pfilters')).toBeHidden();
-    await expect(page.locator('#pdone .ptile')).toHaveCount(2);
+    await expect(page.locator('#pdone .ptile')).toHaveCount(3);
     await expect(page.locator('#pdone .ptile[data-id="ks:DONE"] .pt-foot')).toContainText('99% sure already');
     await expect(page.locator('.ptile[data-id="mf:x"]')).toHaveCount(0);
     await expect(page.locator('.ptile[data-id="ks:GAME"]')).toHaveCount(0);
@@ -1206,8 +1241,8 @@ test.describe('predictions', () => {
     await expect(page.locator('#pfiltBtn .n')).toHaveText('3');                                   // play money, games shown, politics hidden
     await page.locator('#ptopics button[data-topic="Politics"]').click();
     await page.locator('#pview button[data-v="map"]').click();
-    // area = money (the map doesn't stack stories); the thin $120 one alone in its topic is too small to draw
-    expect((await ids(page, '.p-map .pm-tile')).sort()).toEqual(['ks:GAME', 'ks:SEN', 'pm:fed', 'pm:mayor', 'pm:seats']);
+    // area = the square root of the money with Mix topics on, so even the small ones get a rectangle (the map doesn't stack stories)
+    expect((await ids(page, '.p-map .pm-tile')).sort()).toEqual(['ks:GAME', 'ks:SEN', 'mf:x', 'pm:by', 'pm:eth', 'pm:fed', 'pm:mayor', 'pm:seats', 'pm:thin']);
     await expect(page.locator('.p-mapnote')).toContainText('1 question without money figures');
     await page.locator('.pm-tile[data-id="pm:mayor"]').click();
     await expect(page.locator('#detail .p-q')).toHaveText('🇺🇸NYC mayor winner?');

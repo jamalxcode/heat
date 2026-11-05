@@ -163,6 +163,8 @@ jobs:
           cat predictions.log || true
           [ -f predictions.done ] || echo "::warning::prediction markets build still running after the wait: republishing the last predictions.json"
           [ -s _site/predictions.json ] || curl -sf "${{ steps.pages.outputs.base_url }}/predictions.json" -o _site/predictions.json || true
+          # a static page per top question (search engines, link previews), added to the sitemap
+          node scripts/question-pages.mjs _site/predictions.json _site/predictions/q _site/sitemap.xml || echo "::warning::question pages not built"
 
       # TradingView chart links: check which symbols exist there (cached in tv.json, so only new or expired ones are
       # looked up), so the popup never links to a "symbol not found" page. A failure keeps the last tv.json.

@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { fromPolymarket, fromKalshi, fromPredictIt, fromManifold, fromBetfair, catOf, catFrom, headline, updateHist, histChange, interestOf, matchGroups, normName, backfill, build, DAY } from '../scripts/build-predictions.mjs';
 import { health } from '../scripts/health.mjs';
 import { nameScore, bestMatch } from '../app/names.mjs';
-import { districtOf } from '../scripts/build-predictions.mjs';
+import { districtOf, settle, isGame } from '../scripts/build-predictions.mjs';
+import { buildPages, slugOf } from '../scripts/question-pages.mjs';
 import { PAGES } from '../scripts/market-page.mjs';
 
 const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg ?? ''} ${a} ≈ ${b}`);
@@ -282,4 +283,47 @@ test('backfill: Polymarket price history, trying its other request forms when on
   assert.ok(asked[0].includes('interval=1m') && asked[1].includes('interval=max'), 'the first form was empty, so the next was tried');
   assert.equal(hist['pm:x'].d, today - 3);
   near(hist['pm:x'].p[0], 0.42, 'the day’s last point');
+});
+
+test('track record: a settled question logs every answer\'s week-before price and whether it happened, once', () => {
+  const rec = (id, title, outcomes, extra = {}) => ({ id, venue: 'polymarket', title, cur: 'USD', exclusive: true, outcomes: outcomes.map(([name, p, d7]) => ({ name, p, d7 })), ...extra });
+  const ms = [
+    rec('pm:won', 'Who wins?', [['Ann', 0.98, 0.6], ['Bob', 0.02, -0.58], ['Cy', 0.01, null]]),
+    rec('pm:no', 'Will it happen?', [['Yes', 0.02, -0.3]]),
+    rec('pm:open', 'Still open?', [['Yes', 0.6, 0.1]]),
+    rec('mf:play', 'Play money?', [['Yes', 0.99, 0.5]], { cur: 'MANA', venue: 'manifold' }),
+  ];
+  const log = settle(ms, [], Date.UTC(2026, 10, 5));
+  assert.deepEqual(log.map(r => r.id), ['pm:won', 'pm:no'], 'open and play-money questions are left out');
+  assert.deepEqual(log[0].pairs, [[0.38, 1], [0.6, 0]], 'Ann was 38% a week before and won; Bob 60% and lost; Cy has no week change');
+  assert.equal(log[0].w, 'Ann');
+  assert.deepEqual(log[1].pairs, [[0.32, 0]]); assert.equal(log[1].w, 'No');
+  assert.equal(settle(ms, log).length, 2, 'logged once');
+});
+
+test('single games are left out of the build; season-long sports stay', () => {
+  const r = (title, cat = 'Sports') => ({ title, cat });
+  assert.ok(isGame(r('Lakers vs Celtics')) && isGame(r('Chicago vs New York: Spread')) && isGame(r('Philadelphia 76ers at Detroit Pistons, Nov 4')));
+  assert.ok(!isGame(r('NBA: 2027 Champion')) && !isGame(r('Heisman Trophy Winner (2026-27 season)')) && !isGame(r('Russia vs Ukraine ceasefire', 'World')));
+});
+
+test('question pages: the top open questions, one per question, with their answer, venues and a live link', () => {
+  const m = (id, venue, title, outcomes, extra = {}) => ({ id, venue, title, cat: 'Politics', url: 'https://example.invalid/' + id, cur: 'USD', exclusive: true, outcomes: outcomes.map(([name, p, d7 = 0]) => ({ name, p, d7 })), interest: 1000, usd24: 100, usdTotal: 5000, end: '2028-11-07', ...extra });
+  const P = { generated: Date.UTC(2026, 10, 5), markets: [
+    m('pm:dem', 'polymarket', 'Democratic Presidential Nominee 2028', [['Jon Ossoff', 0.26], ['Gavin Newsom', 0.14]], { group: 'pm:dem', interest: 9000 }),
+    m('ks:dem', 'kalshi', '2028 Democratic presidential nominee', [['Jon Ossoff', 0.28], ['Gavin Newsom', 0.13]], { group: 'pm:dem' }),
+    m('pm:ipo', 'polymarket', 'Anthropic IPO by...?', [['November 20, 2026', 0.57], ['December 31, 2026', 0.7]], { exclusive: false, interest: 5000 }),
+    m('pm:done', 'polymarket', 'Mississippi Senate winner?', [['Scott Colom', 0.96, 0.85]], { interest: 8000 }),
+    m('ks:game', 'kalshi', 'Lakers vs Celtics', [['Lakers', 0.6]], { cat: 'Sports', interest: 7000 }),
+  ] };
+  const { list, pages, index } = buildPages(P);
+  assert.deepEqual(list.map(o => o.m.id), ['pm:dem', 'pm:ipo'], 'one page per question; called races and games left out');
+  assert.equal(list[1].slug, 'anthropic-ipo-by', 'the address comes from the raw title, so it stays put');
+  const dem = pages[0].html;
+  assert.match(dem, /<title>Democratic Presidential Nominee 2028 Odds: Jon Ossoff 26%/);
+  assert.match(dem, /Polymarket<\/a><\/td><td class="n">26%/); assert.match(dem, /Kalshi<\/a><\/td><td class="n">28%/);
+  assert.match(dem, /href="\/predictions\/\?m=pm%3Adem"/);
+  assert.match(pages[1].html, /<h1>Anthropic IPO by November 20, 2026\?<\/h1>/, 'the step nearest 50% written in');
+  assert.match(index, /href="\/predictions\/q\/anthropic-ipo-by\/"/);
+  assert.equal(slugOf('Who’ll win: NYC (2026)?'), 'wholl-win-nyc-2026');
 });
