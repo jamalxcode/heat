@@ -1053,9 +1053,9 @@ test.describe('predictions', () => {
     await expect(page).toHaveTitle(/Prediction Market Heatmap/);
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://heat.sala.company/predictions/');
     await expect(page.locator('#pvenue button')).toHaveText([/^All/, /Polymarket/, /Kalshi/, /PredictIt/, /Manifold/]);
-    await expect(page.locator('#porder button')).toHaveText(['Surest bets', 'Biggest bets', 'Close calls', 'Big movers', 'Ending soon', 'Venues disagree']);
-    // surest bets: certainty × log10(interest): mayor 71% × 6.9, Fed (70% no) × 6.2, Senate (merged) 55% × 6.6, thin, PredictIt (no money) last
-    await expect.poll(() => ids(page)).toEqual(['pm:mayor', 'pm:fed', 'ks:SEN', 'pm:thin', 'pi:8000']);
+    await expect(page.locator('#porder button')).toHaveText(['Biggest bets', 'Surest bets', 'Close calls', 'Big movers', 'Ending soon', 'Venues disagree']);
+    await expect(page.locator('#porder button[aria-pressed="true"]')).toHaveText('Biggest bets');   // the first tab mixes likely and unlikely
+    await expect.poll(() => ids(page)).toEqual(['pm:mayor', 'ks:SEN', 'pm:fed', 'pm:thin', 'pi:8000']);
     const top = page.locator('#grid > .grid .ptile').first();
     await expect(top).toHaveClass(/sz-l/);
     await expect(top).toHaveClass(/c3/);                                                            // 71%: the second-darkest shade, bold
@@ -1073,7 +1073,7 @@ test.describe('predictions', () => {
     await expect(top.locator('.pt-chg')).toHaveClass(/q2/);                                        // teal chip: more likely
     await expect(top.locator('.pt-foot')).toContainText('$5M today · $90M total');
     const fed = page.locator('.ptile[data-id="pm:fed"]');
-    await expect(fed.locator('.pt-ans')).toHaveText('No');                                         // 30% yes shown as its likelier side
+    await expect(fed.locator('.pt-ans')).toHaveText('No, it won’t');                               // 30% yes shown as its likelier side, in words
     await expect(fed.locator('.pt-p')).toHaveText('70%');
     await expect(fed.locator('.pt-chg')).toHaveText('▲ +8 pts');                                   // its move turned round
     await expect(page.locator('.ptile[data-id="pi:8000"] .pt-ans')).toHaveText('Vance');           // one named option isn't a yes/no
@@ -1093,8 +1093,9 @@ test.describe('predictions', () => {
     await page.locator('#porder button[data-o="close"]').click();
     await expect.poll(() => ids(page)).toEqual(['ks:SEN', 'pm:mayor', 'pm:fed', 'pm:thin', 'pi:8000']);
     await expect(page).toHaveURL(/o=close/);
-    await page.locator('#porder button[data-o="money"]').click();
-    await expect.poll(() => ids(page)).toEqual(['pm:mayor', 'ks:SEN', 'pm:fed', 'pm:thin', 'pi:8000']);
+    // surest bets: certainty × log10(interest): mayor 71% × 6.9, Fed (70% no) × 6.2, Senate (merged) 55% × 6.6, thin, PredictIt (no money) last
+    await page.locator('#porder button[data-o="sure"]').click();
+    await expect.poll(() => ids(page)).toEqual(['pm:mayor', 'pm:fed', 'ks:SEN', 'pm:thin', 'pi:8000']);
     await page.locator('#porder button[data-o="disagree"]').click();
     await expect.poll(() => ids(page)).toEqual(['ks:SEN']);
     const sen = page.locator('.ptile[data-id="ks:SEN"]');
@@ -1130,6 +1131,29 @@ test.describe('predictions', () => {
     await expect(page.locator('.ptile[data-id="pm:mayor"] .pt-star').first()).toBeVisible();
   });
 
+  test('story cards, short-term prices off, blanks filled, yes/no in words, no verdict on small tiles', async ({ page }) => {
+    // the Senate seats question rides on the Senate control card instead of a tile of its own
+    await expect(page.locator('#grid > .grid .ptile[data-id="pm:seats"]')).toHaveCount(0);
+    const sen = page.locator('.ptile[data-id="ks:SEN"]');
+    await expect(sen.locator('.pt-also-k')).toHaveText(/Senate control · 2 questions/i);
+    await expect(sen.locator('.pt-more')).toHaveText([/Democrats’ Senate seats after Midterms\s*Below 50 62%/]);
+    await sen.locator('.pt-more').click();                                                        // a line opens its own question
+    await expect(page.locator('#detail .p-q')).toContainText('Democrats’ Senate seats after Midterms');
+    await page.keyboard.press('Escape');
+    // yes/no in words; small tiles drop the verdict word
+    const fed = page.locator('.ptile[data-id="pm:fed"]');
+    await expect(fed.locator('.pt-ans')).toHaveText('No, it won’t');
+    await expect(page.locator('.ptile.sz-s .pt-verdict').first()).toBeHidden();
+    // short-term price bets are off to start with; switched on, the blank in the title is filled with the step shown
+    await expect(page.locator('.ptile[data-id="pm:btc"]')).toHaveCount(0);
+    await filters(page);
+    await page.locator('#ptopics button[data-topic="short"]').click();
+    const btc = page.locator('.ptile[data-id="pm:btc"]');
+    await expect(btc.locator('.pt-title')).toHaveText('Bitcoin above 80,000 on November 5?');
+    await expect(btc.locator('.pt-ans')).toHaveText('Yes');
+    await expect(btc.locator('.pt-p')).toHaveText('60%');
+  });
+
   test('Filters: decided row, topics, play money, single games; money map, stories and table views', async ({ page }) => {
     await expect(page.locator('#pfilters')).toBeHidden();
     await expect(page.locator('#pdone .ptile')).toHaveCount(1);
@@ -1146,15 +1170,16 @@ test.describe('predictions', () => {
     await expect(page.locator('#pfiltBtn .n')).toHaveText('3');                                   // play money, games shown, politics hidden
     await page.locator('#ptopics button[data-topic="Politics"]').click();
     await page.locator('#pview button[data-v="map"]').click();
-    // area = money: the four with real money get rectangles; $80–$120 ones are too small to draw
-    expect((await ids(page, '.p-map .pm-tile')).sort()).toEqual(['ks:GAME', 'ks:SEN', 'pm:fed', 'pm:mayor']);
+    // area = money (the map doesn't stack stories); the thin $120 one alone in its topic is too small to draw
+    expect((await ids(page, '.p-map .pm-tile')).sort()).toEqual(['ks:GAME', 'ks:SEN', 'pm:fed', 'pm:mayor', 'pm:seats']);
     await expect(page.locator('.p-mapnote')).toContainText('1 question without money figures');
     await page.locator('.pm-tile[data-id="pm:mayor"]').click();
     await expect(page.locator('#detail .p-q')).toHaveText('🇺🇸NYC mayor winner?');
     await page.keyboard.press('Escape');
     await page.locator('#pview button[data-v="tiles"]').click();
     await page.locator('#pgroup').selectOption('story');
-    await expect(page.locator('#grid .r-group h3').last()).toContainText('Other questions');      // each story here has one question
+    await expect(page.locator('#grid .p-story h3')).toHaveText([/^Senate control\s+2 questions/]);   // grouped by story: laid out, not stacked
+    await expect(page.locator('#grid .r-group h3').last()).toContainText('Other questions');
     await page.locator('#pview button[data-v="table"]').click();
     await page.locator('#grid th[data-sort="total"]').click();
     await expect(page.locator('#grid tbody tr').first()).toHaveAttribute('data-id', 'pm:mayor');

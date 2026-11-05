@@ -28,8 +28,8 @@ const TFS = [['1d', 'd1', 'today', '1 day'], ['1w', 'd7', 'this week', '1 week']
 const COLS = [['rank', '#'], ['title', 'Question'], ['venue', 'Venue'], ['head', 'Answer'], ['p', 'Chance'], ['chg', 'Move'], ['today', 'Bet today'], ['total', 'Bet in total'], ['end', 'Ends'], ['cat', 'Topic']];
 // the tabs: each answers a reader's question
 const ORDERS = [
-  ['sure', 'Surest bets', 'The most certain open questions with the most money behind them'],
   ['money', 'Biggest bets', 'Where the most money is: bet today plus a 30th of all money bet'],
+  ['sure', 'Surest bets', 'The most certain open questions with the most money behind them'],
   ['close', 'Close calls', 'Questions near 50/50 with a lot of money on them'],
   ['movers', 'Big movers', 'The biggest moves in the chance shown'],
   ['ending', 'Ending soon', 'Questions that resolve soonest'],
@@ -43,9 +43,10 @@ let venue = (v => ['all', ...VENUES.map(x => x[0])].includes(v) ? v : null)(Q.ge
 let tf = pref('hm.predTf', TFS.map(t => t[0]), '1d');
 let viewAs = pref('hm.predView2', ['tiles', 'map', 'table'], 'tiles');
 let groupBy = pref('hm.predGroup2', ['none', 'cat', 'story'], 'none');
-let order = (o => ORDERS.some(x => x[0] === o) ? o : null)(Q.get('o')) || pref('hm.predOrder', ORDERS.map(x => x[0]), 'sure');
+let order = (o => ORDERS.some(x => x[0] === o) ? o : null)(Q.get('o')) || pref('hm.predOrder', ORDERS.map(x => x[0]), 'money');
 let play = store.get('hm.predPlay') === true;                         // Manifold's play money in "All" (off by default)
-const hidden = new Set(Array.isArray(store.get('hm.predHide')) ? store.get('hm.predHide') : ['games']);   // topics switched off
+const hidden = new Set(Array.isArray(store.get('hm.predHide')) ? store.get('hm.predHide') : ['games', 'short']);   // topics switched off
+if (!store.get('hm.predShort1')) { hidden.add('short'); store.set('hm.predShort1', true); store.set('hm.predHide', [...hidden]); }   // new filter: off once for everyone
 const watch = new Set(Array.isArray(store.get('hm.predWatch')) ? store.get('hm.predWatch') : []);       // the watchlist
 let sortBy = { key: 'rank', dir: 1 };
 
@@ -96,6 +97,12 @@ function verdict(m, h = shownOutcome(m)) {
   if (!h.yn && !isLadder(m) && m.exclusive && m.outcomes.length > 2 && p < 0.6) return 'Front-runner';   // a two-way race at 55% is a toss-up
   return p >= 0.9 ? 'Almost certain' : p >= 0.75 ? 'Likely' : p >= 0.6 ? 'Leaning' : p > 0.4 ? 'Toss-up' : p > 0.25 ? 'Unlikely' : p > 0.1 ? 'Very unlikely' : 'Long shot';
 }
+// "Bitcoin above ___ on November 5?" reads "Bitcoin above 80,000 on November 5?" with the step shown, answered yes;
+// yes/no answers say it in words ("No, it won't"), so "Clarity Act signed?" → "No" isn't a double negative to work out
+const blank = m => /_{2,}/.test(m.title) && !isYesNo(m);
+const cleanStep = n => String(n).replace(/^[↑↓≥≤><\s]+/, '').trim();
+const fullTitle = (m, h = shownOutcome(m)) => (blank(m) ? m.title.replace(/_{2,}/, cleanStep(h.name)) : m.title).replace(/\u200b/g, '');
+const answer = (m, h = shownOutcome(m)) => h.yn ? (h.no ? 'No, it won’t' : 'Yes, it will') : blank(m) ? 'Yes' : h.name;
 // how sure the market already is (for "decided")
 function certainty(m) {
   if (isYesNo(m)) { const p = m.outcomes[0].p ?? 0.5; return Math.max(p, 1 - p); }
@@ -124,7 +131,11 @@ const heat = v => {
   const t = M.bins[tf], a = Math.abs(v * 100), k = a < t[0] ? 0 : a < t[1] ? 1 : a < t[2] ? 2 : a < t[3] ? 3 : 4;
   return k === 0 ? 'q0' : (v > 0 ? 'q' : 'q-') + k;
 };
-const topicOf = m => m.cat === 'Sports' && /\bvs\.?\b|\bv\b/i.test(m.title) ? 'games' : m.cat;   // single games apart from sport
+// short-term price bets ("BTC price on Nov 6 at 5pm", "Ethereum above ___ on November 5", 15-minute contracts, tweet
+// counts) are trading products rather than news: their own topic, off to start with, like single games
+const SHORTQ = /\b(price|above|below|hit|reach|close|up or down|between|range|tweets?|\d{1,2}\s?(am|pm)|\d+ min|hourly)\b|\$|_{2,}/i;
+const isShort = m => { const d = daysLeft(m); return d != null && d <= 3 && !['Politics', 'World'].includes(m.cat) && SHORTQ.test(m.title); };
+const topicOf = m => m.cat === 'Sports' && /\bvs\.?\b|\bv\b/i.test(m.title) ? 'games' : isShort(m) ? 'short' : m.cat;   // single games apart from sport
 
 /* ---------- stories: related questions together ---------- */
 // "Alaska Senate (party)", "Alaska Senate (person)" and "which party wins Alaska" are one story; so are every 2028
@@ -141,9 +152,9 @@ export function storyOf(title) {
   if (/\bsenate\b/.test(t) && /\b(seats?|control|majority)\b/.test(t)) return 'Senate control';
   if (/\bhouse\b/.test(t) && /\b(seats?|control|majority|popular vote)\b/.test(t)) return 'House control';
   if (/\b(blue|red) wave\b|\bmidterms?\b/.test(t)) return '2026 midterms';
-  if (/\biran\b/.test(t)) return 'Iran';
-  if (/\b(russia|ukraine|putin|zelensky|crimea)\b/.test(t)) return 'Russia and Ukraine';
-  if (/\b(israel|gaza|hamas|netanyahu)\b/.test(t)) return 'Israel';
+  if (/\b(iran|iranian|khamenei|pahlavi|hormuz)\b/.test(t)) return 'Iran';
+  if (/\b(russia|russian|ukraine|ukrainian|putin|zelensky|crimea)\b/.test(t)) return 'Russia and Ukraine';
+  if (/\b(israel|israeli|gaza|hamas|netanyahu|beirut|hezbollah)\b/.test(t)) return 'Israel and Gaza';
   if (/\b(venezuela|maduro)\b/.test(t)) return 'Venezuela';
   if (/\b(bitcoin|btc)\b/.test(t)) return 'Bitcoin price';
   if (/\b(ethereum|eth)\b/.test(t)) return 'Ethereum price';
@@ -230,7 +241,7 @@ export function shortTitle(title) {
   return capFirst(s);
 }
 // the shortened headline and, when it differs, the full question
-const titleParts = m => { const s = shortTitle(m.title), full = String(m.title).replace(/\u200b/g, ''); const k = x => x.toLowerCase().replace(/[^a-z0-9]+/g, ''); return [s, k(s) === k(full) ? '' : full]; };
+const titleParts = m => { const full = fullTitle(m), s = shortTitle(full); const k = x => x.toLowerCase().replace(/[^a-z0-9]+/g, ''); return [s, k(s) === k(full) ? '' : full]; };
 
 /* ---------- time left: a ring that fills up as the end date nears ---------- */
 // days to go on a log scale over a year, so a week and a month look different while next year still shows a sliver
@@ -330,7 +341,7 @@ function spark(m, w = 64, ht = 18) {
 
 /* ---------- tiles ---------- */
 const chip = v => `<span class="pt-chg ${heat(v)}" title="Move ${TFS.find(t => t[0] === tf)[2]}">${arrow(v)}${pts(v)}</span>`;
-function tileHTML(m, size, done = false) {
+function tileHTML(m, size, done = false, also = []) {
   const h = shownOutcome(m), ch = h[tfKey()], cmp = merged() ? comparison(m) : null;
   const badges = (cmp ? cmp.rows.map(r => r.x) : [m]).map(x => `<span class="pv pv-${x.venue}" title="${VNAME[x.venue]}">${VTAG[x.venue]}</span>`).join('');
   const label = `${m.title}: ${verdict(m, h)}, ${h.name}, ${pct(h.p)}. Move ${TFS.find(t => t[0] === tf)[2]} ${pts(ch)}. ${(cmp ? cmp.rows.map(r => VNAME[r.x.venue]) : [VNAME[m.venue]]).join(', ')}`;
@@ -339,15 +350,37 @@ function tileHTML(m, size, done = false) {
     <span class="pt-top"><span class="pt-id">${badges}${place && !done ? `<span class="pt-rank">#${place}</span>` : ''}${watch.has(m.id) ? '<span class="pt-star" title="On your watchlist">★</span>' : ''}</span>${chip(ch)}</span>
     <span class="pt-head">${icon(m)}<span class="pt-htxt"><span class="pt-title">${esc(tp[0])}</span>${tp[1] ? `<span class="pt-full">${esc(tp[1])}</span>` : ''}</span></span>
     <span class="pt-verdict">${verdict(m, h)}</span>
-    <span class="pt-ans">${esc(h.name)}</span>
+    <span class="pt-ans">${esc(answer(m, h))}</span>
     <span class="pt-nums"><b class="pt-p">${pct(h.p)}</b>${spark(m, size === 'l' ? 120 : 64, size === 'l' ? 30 : 18)}</span>
     ${cmp ? `<span class="pt-cmp${cmp.spread >= DIFFER ? ' differ' : ''}" title="The same answer on each venue${cmp.spread >= DIFFER ? `: they differ by ${Math.round(cmp.spread * 100)} points` : ''}">${cmp.spread >= DIFFER ? '⚡ ' : ''}${cmp.rows.map(r => `${VTAG[r.x.venue]} ${pct(r.p)}`).join(' · ')}</span>` : ''}
+    ${also.length ? alsoHTML(m, also, size) : ''}
     <span class="pt-foot">${done ? esc(decidedWhy(m)) : `${endHTML(m, size === 'l')}${t$ != null ? `<b>${money(t$, 'USD')}</b> today · ` : ''}${T$ != null ? `${money(T$, 'USD')} total${playNote(m)}` : 'no money figures'}${thin(m) ? ' · thin market' : ''}`}${m.stale ? ' · ⚠ not refreshed' : ''}</span>
   </button>`;
 }
+// one card per story: the first question of a story (in the tab's order) leads, the others ride along as short lines
+// under it ("also: leader change 23%"), so Iran or Bitcoin doesn't fill a whole screen; grouping by story lays them out
+function stack(ms) {
+  const lead = new Map(), also = new Map(), out = [];
+  for (const m of ms) {
+    const s = storyOf(m.title);
+    if (s && lead.has(s)) { also.get(lead.get(s)).push(m); continue; }
+    if (s) lead.set(s, m.id);
+    also.set(m.id, []); out.push(m);
+  }
+  return { out, also };
+}
+function alsoHTML(m, also, size) {
+  const n = size === 's' ? 1 : 3, rest = also.length - n;
+  return `<span class="pt-also" aria-label="Related: ${esc(also.map(x => fullTitle(x)).join('; '))}"><span class="pt-also-k">${esc(storyOf(m.title))} · ${also.length + 1} questions</span>${also.slice(0, n).map(x => { const h = shownOutcome(x); return `<span class="pt-more" data-id="${esc(x.id)}" title="${esc(fullTitle(x, h))}"><span class="pt-more-t">${esc(shortTitle(fullTitle(x, h)))}</span> <b class="${sureClass(h)}">${esc(answer(x, h))} ${pct(h.p)}</b></span>`; }).join('')}${rest > 0 ? `<span class="pt-more-n">+${rest} more in the popup</span>` : ''}</span>`;
+}
 function grid(ms) {
+  let also = new Map();
+  if (groupBy !== 'story') {
+    ({ out: ms, also } = stack(ms));
+    if (groupBy === 'none') { pos.clear(); ms.forEach((m, i) => pos.set(m.id, i + 1)); }
+  }
   const sz = sizes(ms);
-  return `<div class="grid pgrid">${ms.map(m => tileHTML(m, sz.get(m.id))).join('')}</div>`;
+  return `<div class="grid pgrid">${ms.map(m => tileHTML(m, sz.get(m.id), false, also.get(m.id) || [])).join('')}</div>`;
 }
 function decidedHTML(done) {
   if (!done.length) return '';
@@ -388,7 +421,7 @@ function mapHTML(live) {
     for (const r of squarify(b.ms.map(m => ({ m, v: mInterest(m) })), b.x + 1, b.y + 1 + head, b.w - 2, b.h - 2 - head)) {
       const m = r.m, h = shownOutcome(m), area = r.w * r.h, sz = area > 26000 ? 'big' : area > 9000 ? 'mid' : area > 2500 ? 'small' : 'tiny';
       html += `<button class="pm-tile ${sureClass(h)} pm-${sz}${m.id === sel ? ' sel' : ''}" data-id="${esc(m.id)}" data-coin="1" style="left:${r.x + 1}px;top:${r.y + 1}px;width:${Math.max(0, r.w - 2)}px;height:${Math.max(0, r.h - 2)}px" title="${esc(`${m.title}: ${verdict(m, h)} ${h.name} ${pct(h.p)} · ${money(mInterest(m), 'USD')} interest`)}" aria-label="${esc(`${m.title}: ${verdict(m, h)}, ${h.name}, ${pct(h.p)}`)}">`
-        + `${sz === 'tiny' ? `<span class="pm-title">${iconOf(m.title, m.cat)}</span>` : `<span class="pm-title">${icon(m)}${esc(shortTitle(m.title))}</span>`}<span class="pm-ans">${sz === 'tiny' ? '' : esc(h.name) + ' '}<b>${pct(h.p)}</b></span>${sz === 'big' || sz === 'mid' ? `<span class="pm-foot">${chip(h[tfKey()])} ${endHTML(m)} ${money(mToday(m), 'USD')} today</span>` : ''}</button>`;
+        + `${sz === 'tiny' ? `<span class="pm-title">${iconOf(m.title, m.cat)}</span>` : `<span class="pm-title">${icon(m)}${esc(shortTitle(fullTitle(m, h)))}</span>`}<span class="pm-ans">${sz === 'tiny' ? '' : esc(answer(m, h)) + ' '}<b>${pct(h.p)}</b></span>${sz === 'big' || sz === 'mid' ? `<span class="pm-foot">${chip(h[tfKey()])} ${endHTML(m)} ${money(mToday(m), 'USD')} today</span>` : ''}</button>`;
     }
   }
   return `<div class="p-map" style="height:${H}px">${html}</div><p class="r-muted p-mapnote">Each rectangle’s area is the money on that question (bet today + a 30th of all money bet); blocks are topics; darker and bold = likelier; lighter and italic = less likely.${left ? ` ${left} question${left > 1 ? 's' : ''} without money figures (PredictIt) aren’t drawn.` : ''}</p>`;
@@ -400,17 +433,17 @@ function todayHTML(live) {
   const pick = (f, ok = () => true) => real.filter(ok).reduce((a, m) => !a || f(m) > f(a) ? m : a, null);
   const cards = [];
   const mover = pick(m => Math.abs(shownOutcome(m).d1 ?? 0), m => mInterest(m) >= MOVER_MIN * 10 && Math.abs(shownOutcome(m).d1 ?? 0) >= 0.03);
-  if (mover) { const h = shownOutcome(mover); cards.push(['Biggest swing today', mover, `${esc(h.name)} ${arrow(h.d1)}${pts(h.d1)} to <b>${pct(h.p)}</b>`]); }
+  if (mover) { const h = shownOutcome(mover); cards.push(['Biggest swing today', mover, `${esc(answer(mover, h))} ${arrow(h.d1)}${pts(h.d1)} to <b>${pct(h.p)}</b>`]); }
   const big = pick(m => mToday(m) ?? 0);
-  if (big) { const h = shownOutcome(big); cards.push(['Most money today', big, `<b>${money(mToday(big), 'USD')}</b> · ${esc(h.name)} ${pct(h.p)}`]); }
+  if (big) { const h = shownOutcome(big); cards.push(['Most money today', big, `<b>${money(mToday(big), 'USD')}</b> · ${esc(answer(big, h))} ${pct(h.p)}`]); }
   const close = pick(m => closeness(m) * lg(m), m => closeness(m) >= 0.7 && mInterest(m) >= MOVER_MIN * 10);
-  if (close) { const h = shownOutcome(close); cards.push(['Closest big call', close, `${esc(h.name)} <b>${pct(h.p)}</b> · ${money(mInterest(close), 'USD')} interest`]); }
+  if (close) { const h = shownOutcome(close); cards.push(['Closest big call', close, `${esc(answer(close, h))} <b>${pct(h.p)}</b> · ${money(mInterest(close), 'USD')} interest`]); }
   if (merged()) {
     const dis = pick(m => comparison(m)?.spread ?? 0, m => (comparison(m)?.spread ?? 0) >= DIFFER);
     if (dis) { const c = comparison(dis); cards.push(['Venues disagree', dis, `⚡ ${c.rows.map(r => `${VTAG[r.x.venue]} ${pct(r.p)}`).join(' · ')}`]); }
   }
   if (!cards.length) return '';
-  return `<section class="p-today" aria-label="Today at a glance">${cards.map(([k, m, line]) => `<button class="p-news" data-id="${esc(m.id)}" data-coin="1"><span class="p-news-k">${k}</span><span class="p-news-t">${icon(m)}${esc(shortTitle(m.title))}</span><span class="p-news-l">${line}</span></button>`).join('')}</section>`;
+  return `<section class="p-today" aria-label="Today at a glance">${cards.map(([k, m, line]) => `<button class="p-news" data-id="${esc(m.id)}" data-coin="1"><span class="p-news-k">${k}</span><span class="p-news-t">${icon(m)}${esc(shortTitle(fullTitle(m)))}</span><span class="p-news-l">${line}</span></button>`).join('')}</section>`;
 }
 
 /* ---------- table ---------- */
@@ -420,8 +453,8 @@ function tableHTML(ms) {
   const th = COLS.map(([k, l]) => `<th scope="col" data-sort="${k}" aria-sort="${sortBy.key === k ? (sortBy.dir > 0 ? 'ascending' : 'descending') : 'none'}">${l}${sortBy.key === k ? (sortBy.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('');
   return `<div class="r-tblwrap"><table class="r-tbl p-tbl"><thead><tr>${th}</tr></thead><tbody>${rows.map(m => {
     const h = shownOutcome(m), ch = h[tfKey()], vs = merged() ? membersOf(m) : [m];
-    return `<tr class="r-row${decided(m) ? ' done' : ''}" data-id="${esc(m.id)}" tabindex="0"><td>${pos.get(m.id) ?? (decided(m) ? '✓' : '—')}</td><td class="p-tt">${watch.has(m.id) ? '★ ' : ''}${icon(m)}${esc(m.title)}</td><td>${vs.map(x => `<span class="pv pv-${x.venue}" title="${VNAME[x.venue]}">${VTAG[x.venue]}</span>`).join(' ')}${vs.length === 1 ? ' ' + VNAME[m.venue] : ''}</td>
-      <td class="p-tt"><span class="r-muted">${verdict(m, h)}:</span> ${esc(h.name)}</td><td class="${likeFont(h)}"><b>${pct(h.p)}</b></td><td><span class="cell-heat ${heat(ch)}">${arrow(ch)}${pts(ch)}</span></td><td>${money(mToday(m), 'USD')}</td><td>${money(mTotal(m), 'USD')}${playNote(m) ? ' <span class="r-muted">play</span>' : ''}</td><td>${endHTML(m) || '—'}</td><td>${esc(m.cat)}</td></tr>`;
+    return `<tr class="r-row${decided(m) ? ' done' : ''}" data-id="${esc(m.id)}" tabindex="0"><td>${pos.get(m.id) ?? (decided(m) ? '✓' : '—')}</td><td class="p-tt">${watch.has(m.id) ? '★ ' : ''}${icon(m)}${esc(fullTitle(m, h))}</td><td>${vs.map(x => `<span class="pv pv-${x.venue}" title="${VNAME[x.venue]}">${VTAG[x.venue]}</span>`).join(' ')}${vs.length === 1 ? ' ' + VNAME[m.venue] : ''}</td>
+      <td class="p-tt"><span class="r-muted">${verdict(m, h)}:</span> ${esc(answer(m, h))}</td><td class="${likeFont(h)}"><b>${pct(h.p)}</b></td><td><span class="cell-heat ${heat(ch)}">${arrow(ch)}${pts(ch)}</span></td><td>${money(mToday(m), 'USD')}</td><td>${money(mTotal(m), 'USD')}${playNote(m) ? ' <span class="r-muted">play</span>' : ''}</td><td>${endHTML(m) || '—'}</td><td>${esc(m.cat)}</td></tr>`;
   }).join('')}</tbody></table></div>`;
 }
 
@@ -436,11 +469,11 @@ function venueNote(v) {
 /* ---------- render ---------- */
 function topicChips() {
   const b = base(), n = k => b.filter(m => topicOf(m) === k).length;
-  const keys = [...CATS, 'games'].filter(k => n(k));
-  return keys.map(k => `<button class="chip" data-topic="${k}" aria-pressed="${!hidden.has(k)}" title="${hidden.has(k) ? 'Show' : 'Hide'} ${k === 'games' ? 'single games and matches' : k}">${k === 'games' ? 'Single games' : esc(k)} <span class="n">${n(k)}</span></button>`).join('')
+  const keys = [...CATS, 'games', 'short'].filter(k => n(k)), NAME = { games: ['Single games', 'single games and matches'], short: ['Short-term prices', 'price bets ending within 3 days (BTC at 5pm, above ___ tomorrow…)'] };
+  return keys.map(k => `<button class="chip" data-topic="${k}" aria-pressed="${!hidden.has(k)}" title="${hidden.has(k) ? 'Show' : 'Hide'} ${NAME[k]?.[1] || k}">${NAME[k]?.[0] || esc(k)} <span class="n">${n(k)}</span></button>`).join('')
     + (merged() ? `<label class="check p-play" title="Manifold is play money: its odds aren't backed by real bets"><input type="checkbox" id="pplay"${play ? ' checked' : ''}> Play money</label>` : '');
 }
-const filterCount = () => [...hidden].filter(k => k !== 'games').length + (hidden.has('games') ? 0 : 1) + (play ? 1 : 0) + (tf !== '1d' ? 1 : 0) + (groupBy !== 'none' ? 1 : 0) + (viewAs !== 'tiles' ? 1 : 0);
+const filterCount = () => [...hidden].filter(k => k !== 'games' && k !== 'short').length + (hidden.has('games') ? 0 : 1) + (hidden.has('short') ? 0 : 1) + (play ? 1 : 0) + (tf !== '1d' ? 1 : 0) + (groupBy !== 'none' ? 1 : 0) + (viewAs !== 'tiles' ? 1 : 0);
 function watchHTML() {
   const ms = P.markets.filter(m => watch.has(m.id));
   if (!ms.length) return '';
@@ -468,7 +501,7 @@ function render() {
   if (!P) return;
   const vs = VENUES.filter(([k]) => P.venues?.[k]?.state !== 'off');   // Betfair's tab only once it's set up
   if (!vs.some(v => v[0] === venue) && venue !== 'all') venue = 'all';
-  if (order === 'disagree' && !merged()) order = 'sure';
+  if (order === 'disagree' && !merged()) order = 'money';
   const { live, done } = shown(), main = $('#grid');
   $('#pvenue').innerHTML = [['all', 'All'], ...vs.map(v => [v[0], v[1]])].map(([k, l]) => {
     const st = k === 'all' ? 'ok' : P.venues?.[k]?.state || 'down';
@@ -494,7 +527,7 @@ function render() {
   $('#plegend').innerHTML = `<span class="p-key"><span class="p-sw c0"></span><i class="lk-lo">unlikely</i> <span class="p-sw c1"></span><span class="p-sw c2"></span><span class="p-sw c3"></span><span class="p-sw c4"></span> <b class="lk-hi">likely</b></span> · move ${TFS.find(t => t[0] === tf)[2]}: <span class="p-key-chg q2">▲ more likely</span> <span class="p-key-chg q-2">▼ less</span> · ${esc(ORDERS.find(x => x[0] === order)[2])}${venue === 'predictit' && ['sure', 'money', 'close'].includes(order) ? ' (PredictIt publishes no money: its own order)' : ''}`;
   const q = new URLSearchParams();
   if (venue !== 'all') q.set('v', venue);
-  if (order !== 'sure') q.set('o', order);
+  if (order !== 'money') q.set('o', order);
   if (sel) q.set('m', sel);
   const url = location.pathname + (q.toString() ? '?' + q : '');
   if (url !== location.pathname + location.search) history.replaceState(null, '', url);
@@ -536,7 +569,7 @@ function relatedHTML(m) {
   const ids = new Set(membersOf(m).map(x => x.id));
   const rel = P.markets.filter(x => !ids.has(x.id) && (!x.group || x.group === x.id) && storyOf(x.title) === story && (play || !isPlay(x))).sort((a, b) => interest(b) - interest(a)).slice(0, 8);
   if (!rel.length) return '';
-  return `<h3>More on ${esc(story)}</h3><ul class="p-related">${rel.map(x => { const h = shownOutcome(x); return `<li><button class="p-rel" data-rel="${esc(x.id)}"><span class="pv pv-${x.venue}" aria-hidden="true">${VTAG[x.venue]}</span> <span>${esc(x.title)}</span> <b>${esc(h.name)} ${pct(h.p)}</b></button></li>`; }).join('')}</ul>`;
+  return `<h3>More on ${esc(story)}</h3><ul class="p-related">${rel.map(x => { const h = shownOutcome(x); return `<li><button class="p-rel" data-rel="${esc(x.id)}"><span class="pv pv-${x.venue}" aria-hidden="true">${VTAG[x.venue]}</span> <span>${esc(fullTitle(x, h))}</span> <b>${esc(answer(x, h))} ${pct(h.p)}</b></button></li>`; }).join('')}</ul>`;
 }
 function detailHTML(m) {
   const h = shownOutcome(m), s = series(m), jumps = s ? bigMoves(s).slice(0, 3) : [];
@@ -561,8 +594,8 @@ function detailHTML(m) {
     <div class="p-pophead"><span class="p-popven">${membersOf(m).filter(x => merged() || x === m).map(x => `<span class="pv pv-${x.venue}" title="${VNAME[x.venue]}">${VTAG[x.venue]}</span>`).join('')}</span>
       <button class="btn p-watchbtn" data-watch="${esc(m.id)}" aria-pressed="${watch.has(m.id)}">${watch.has(m.id) ? '★ Watching' : '☆ Watch'}</button>
       <button class="btn p-fullbtn" aria-pressed="${full}" title="${full ? 'Back to the small view' : 'Full screen'}">${full ? '⤡ Smaller' : '⤢ Full view'}</button></div>
-    <h2 class="p-q">${icon(m)}${esc(shortTitle(m.title))}</h2>${titleParts(m)[1] ? `<p class="p-qfull">${esc(m.title)}</p>` : ''}
-    <p class="p-say${likeFont(h)}"><span class="p-say-v">${verdict(m, h)}:</span> <b class="p-say-a">${esc(h.name)}</b> <b class="p-say-p">${pct(h.p)}</b></p>
+    <h2 class="p-q">${icon(m)}${esc(titleParts(m)[0])}</h2>${titleParts(m)[1] ? `<p class="p-qfull">${esc(titleParts(m)[1])}</p>` : ''}
+    <p class="p-say${likeFont(h)}"><span class="p-say-v">${verdict(m, h)}:</span> <b class="p-say-a">${esc(answer(m, h))}</b> <b class="p-say-p">${pct(h.p)}</b></p>
     <p class="p-moves">${moves}${m.end ? `<span class="p-mv">${endHTML(m, true)} <span class="r-muted">${dayLabel(m.end)}</span></span>` : ''}</p>
     ${m.stale ? '<p class="r-says">⚠ This venue didn’t answer in the latest update: these are its last known prices.</p>' : ''}
     ${chartHTML(m)}
@@ -639,8 +672,8 @@ async function load() {
 
 const HELP = `<div class="leg-more p-help" id="phelp" hidden>
   <p><b>A tile</b> says what the market thinks: the question, a verdict (almost certain, likely, leaning, toss-up, unlikely, long shot; “front-runner” for the leader of a crowded field), the answer and its chance, the trend over the last weeks, and the money bet. A chance is the price of a contract that pays 1 if it happens: 62% means traders pay 62¢ for a dollar if it does. For yes/no questions the likelier side is shown (2% yes is “No 98%”); on a ladder (“above 50 seats”, “by 31 October”) the step nearest 50%.</p>
-  <p><b>Colour is how sure the market is</b>: light for a toss-up, dark for near certain. <b>The chip is the move</b> today, this week or this month, in points (40% → 52% is ▲ +12 pts): teal when the answer became more likely, amber when less. No blue or red, so nothing reads as a party.</p>
-  <p><b>The tabs</b> ask a question: <b>Surest bets</b> (the most certain open questions with the most money), <b>Biggest bets</b>, <b>Close calls</b> (near 50/50, lots of money), <b>Big movers</b>, <b>Ending soon</b>, and in “All”, <b>Venues disagree</b>. <b>Today</b> picks out the biggest swing, the most money, the closest big call and the widest disagreement.</p>
+  <p><b>Colour is how likely the answer shown is</b>: dark and bold for likely, light and italic for unlikely (one blue hue, so it reads the same with colour blindness). <b>The chip is the move</b> today, this week or this month, in points (40% → 52% is ▲ +12 pts): teal when the answer became more likely, amber when less. No blue or red, so nothing reads as a party.</p>
+  <p><b>The tabs</b> ask a question: <b>Biggest bets</b> (the first tab), <b>Surest bets</b> (the most certain open questions with the most money), <b>Close calls</b> (near 50/50, lots of money), <b>Big movers</b>, <b>Ending soon</b>, and in “All”, <b>Venues disagree</b>. <b>Today</b> picks out the biggest swing, the most money, the closest big call and the widest disagreement.</p>
   <p><b>Money</b> is in US dollars on every venue: bet today (24 hours) and in total; interest = bet today + a 30th of the total. It’s approximate: Kalshi counts contracts (turned into dollars at their price) and each venue counts trades its own way. Manifold is play money, left out of “All” unless ticked in Filters. PredictIt publishes no money figures. A faded tile is a <b>thin market</b> (under $1K), where one small trade can move the price.</p>
   <p><b>Views</b> (in Filters): tiles; a <b>money map</b> where each question’s area is the money on it, in blocks by topic; or a table. Tiles can be grouped by topic or by <b>story</b> (all the Alaska Senate questions together, all of 2028, Senate control…). Questions at least ${Math.round(DECIDED * 100)}% sure or past their end date fold into a row at the bottom.</p>
   <p><b>Click a question</b> for the answer first, a 35-day chart with its biggest moves, each venue’s price, every outcome, related questions and the fine print; ☆ Watch keeps it at the top of the page (saved in this browser), ⤢ makes it full screen. The same question on several venues is one tile in “All” (⚡ when they differ by ${Math.round(DIFFER * 100)}+ points), matched by wording: a best guess. Not real-time, refreshed every 10 minutes, and not advice.</p></div>`;

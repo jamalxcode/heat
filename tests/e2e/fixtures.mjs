@@ -239,6 +239,9 @@ export function makePredictionsFixture(now = Date.now()) {
     m('pm:thin', 'polymarket', 'Will a tiny thing happen?', 'Other', [{ name: 'Yes', p: 0.4, d1: 0, d7: null, d30: null }], { vol24: 100, vol: 600 }),
     m('ks:DONE', 'kalshi', 'Blue wave in 2026?', 'Politics', [{ name: 'Yes', p: 0.99, d1: 0.3, d7: null, d30: null }], { vol24: 3e6, vol: 1e7 }),
     m('ks:GAME', 'kalshi', 'Lakers vs Celtics', 'Sports', [{ name: 'Lakers', p: 0.6, d1: 0, d7: null, d30: null }, { name: 'Celtics', p: 0.4, d1: 0, d7: null, d30: null }], { vol24: 4e6, vol: 5e6 }),
+    // a second Senate-control question (a story card's extra line) and a short-term price bet with a blank in its title
+    m('pm:seats', 'polymarket', 'How many Senate seats will Democrats hold after the Midterms?', 'Politics', [{ name: 'Below 50', p: 0.62, d1: 0, d7: null, d30: null }, { name: '50 or more', p: 0.38, d1: 0, d7: null, d30: null }], { vol24: 2, vol: 60 }),
+    m('pm:btc', 'polymarket', 'Bitcoin above ___ on November 5?', 'Crypto', [{ name: '↑ 80,000', p: 0.6, d1: 0, d7: null, d30: null }, { name: '↑ 84,000', p: 0.1, d1: 0, d7: null, d30: null }], { exclusive: false, vol24: 60, vol: 600, end: new Date(now + DAY).toISOString().slice(0, 10) }),
     m('mf:x', 'manifold', 'Will Bitcoin hit $200k in 2026?', 'Crypto', [{ name: 'Yes', p: 0.12, d1: 0.01, d7: null, d30: null }], { vol24: 5000, vol: 9e4, cur: 'MANA', traders: 40 }),
   ];
   for (const x of markets) { x.usd24 = x.vol24 == null ? null : x.cur === 'MANA' ? x.vol24 / 100 : x.vol24; x.usdTotal = x.vol == null ? null : x.cur === 'MANA' ? x.vol / 100 : x.vol; x.interest = Math.round((x.usd24 || 0) + (x.usdTotal || 0) / 30); }
