@@ -90,7 +90,10 @@ function shownOutcome(m) {
     if (o.p != null && o.p < 0.5) return { name: 'No', p: 1 - o.p, d1: neg(o.d1), d7: neg(o.d7), d30: neg(o.d30), no: true, yn: true };
     return { ...o, name: 'Yes', yn: true };
   }
-  return { ...(isLadder(m) ? nearHalf(m) : m.exclusive ? topOf(m) : headOf(m)) };
+  const o = isLadder(m) ? nearHalf(m) : m.exclusive ? topOf(m) : headOf(m);
+  // a step written into the question ("Netanyahu out by June 30, 2027?") is a yes/no: show its likelier side
+  if (blank(m)) return o.p != null && o.p < 0.5 ? { name: o.name, p: 1 - o.p, d1: neg(o.d1), d7: neg(o.d7), d30: neg(o.d30), no: true, step: true } : { ...o, step: true };
+  return { ...o };
 }
 // The verdict, in words that are right whatever the question: how sure the market is about the answer shown. The leader
 // of a crowded field is its front-runner even at 30%; a ladder step can be unlikely.
@@ -101,11 +104,27 @@ function verdict(m, h = shownOutcome(m)) {
 }
 // "Bitcoin above ___ on November 5?" reads "Bitcoin above 80,000 on November 5?" with the step shown, answered yes;
 // yes/no answers say it in words ("No, it won't"), so "Clarity Act signed?" → "No" isn't a double negative to work out
-const blank = m => !isYesNo(m) && (/_{2,}/.test(m.title) || (isLadder(m) && /(\.\.\.|…)\s*\??\s*$/.test(m.title)));
+const blank = m => !isYesNo(m) && (/_{2,}/.test(m.title) || ((isLadder(m) || m.outcomes.length === 1) && /(\.\.\.|…)\s*\??\s*$/.test(m.title)));
 const cleanStep = n => String(n).replace(/^[↑↓≥≤><\s]+/, '').trim();
 // "Netanyahu out by...?" with the step "June 30, 2027" → "Netanyahu out by June 30, 2027?"
 const fullTitle = (m, h = shownOutcome(m)) => (blank(m) ? m.title.replace(/_{2,}/, cleanStep(h.name)).replace(/\s*(\.\.\.|…)\s*(\??)\s*$/, (x, d, q) => ' ' + cleanStep(h.name) + (q || '?')) : m.title).replace(/\u200b/g, '');
-const answer = (m, h = shownOutcome(m)) => h.yn ? (h.no ? 'No, it won’t' : 'Yes, it will') : blank(m) ? 'Yes' : h.name;
+// "↑ 90,000" / "↓ 2,000" on "What price will Bitcoin hit?" → "reaches $90,000" / "falls to $2,000"; a bare number on
+// a ladder takes the question's unit ("56" → "56 seats")
+const dollars = m => /\b(price|bitcoin|btc|ethereum|eth|solana|crude|oil|wti|gold|silver|fdv|market cap|ipo)\b/i.test(m.title) || m.cat === 'Crypto';
+const UNITS = [[/\bseats?\b/i, 'seats'], [/\b(tweets?|posts?)\b/i, 'posts'], [/\b(bps|basis points)\b/i, 'bps'], [/\b(degrees|temperature|°)/i, '°F'], [/\bmargin\b/i, 'pts'], [/\bvotes?\b/i, 'votes']];
+function inWords(m, name) {
+  const s = String(name).trim(), arrow = s.match(/^([↑↓])\s*(.+)$/);
+  if (arrow) { const v = arrow[2].trim(), $ = dollars(m) && /^[\d,.]+[kmb]?$/i.test(v) ? '$' : ''; return (arrow[1] === '↑' ? 'reaches ' : 'falls to ') + $ + v; }
+  if (/^(above |below |over |under |at least |at most |more than |fewer than |less than )?[\d,.]+(\+| or more| or fewer| or less)?$|^[\d,.]+\s*[-–]\s*[\d,.]+$/i.test(s)) {
+    const u = UNITS.find(([re]) => re.test(m.title));
+    if (u && !s.toLowerCase().includes(u[1])) return `${s} ${u[1]}`;
+    if (!u && dollars(m) && /\d{3}/.test(s)) return s.replace(/([\d,.]+)/, '$$$1');
+  }
+  return s;
+}
+const answer = (m, h = shownOutcome(m)) => h.yn || h.step ? (h.no ? 'No, it won’t' : 'Yes, it will') : inWords(m, h.name);
+// for a decided question the same, in the past: "Yes" / "No" / the name
+const resultWord = (m, h) => h.yn || h.step ? (h.no ? 'No' : 'Yes') : inWords(m, h.name);
 // how sure the market already is (for "decided")
 function certainty(m) {
   if (isYesNo(m)) { const p = m.outcomes[0].p ?? 0.5; return Math.max(p, 1 - p); }
@@ -120,8 +139,21 @@ function closeness(m) {
   const ps = m.outcomes.map(o => o.p ?? 0).sort((a, b) => b - a);
   return (1 - (ps[0] - (ps[1] ?? 0))) * Math.min(1, ps[0] + (ps[1] ?? 0));
 }
-const decided = m => (m.end && m.end < todayIso()) || certainty(m) >= DECIDED;
-const decidedWhy = m => m.end && m.end < todayIso() ? `past its end date (${dayLabel(m.end)}): waiting for the result` : `${pct(certainty(m))} sure already`;
+// the last date named in a question ("Where will it rain on Nov 4, 2026?", "… October 30 - November 6, 2026?"), as
+// ISO, the year from the question or else from the market's end; null when it names none
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+function titleDate(m) {
+  // "November 2-8": the range's last day counts
+  const re = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b(?:\s*[-–]\s*(\d{1,2})\b)?(?:,?\s+(20\d\d))?/gi;
+  let last = null, x;
+  while ((x = re.exec(m.title))) last = x;
+  if (!last) return null;
+  const y = last[4] || (m.end || todayIso()).slice(0, 4);
+  return `${y}-${String(MONTHS.indexOf(last[1].toLowerCase().slice(0, 3)) + 1).padStart(2, '0')}-${(last[3] || last[2]).padStart(2, '0')}`;
+}
+const datePassed = m => { const d = titleDate(m); return d != null && d < todayIso() && (!m.end || d <= m.end); };
+const decided = m => (m.end && m.end < todayIso()) || datePassed(m) || certainty(m) >= DECIDED;
+const decidedWhy = m => m.end && m.end < todayIso() ? `past its end date (${dayLabel(m.end)}): waiting for the result` : datePassed(m) ? `its date (${dayLabel(titleDate(m))}) has passed: waiting for the result` : `${pct(certainty(m))} sure already`;
 // tile colour: how sure the market is about the answer shown (c0 toss-up … c4 near certain); a long shot is just as sure
 // the other way, so a ladder step at 9% is coloured like 91%
 // shade by how likely the shown answer is: c4 (85%+) darkest … c0 (under 25%) lightest; one blue hue, read by lightness
@@ -136,7 +168,7 @@ const heat = v => {
 };
 // short-term price bets ("BTC price on Nov 6 at 5pm", "Ethereum above ___ on November 5", 15-minute contracts, tweet
 // counts) are trading products rather than news: their own topic, off to start with, like single games
-const SHORTQ = /\b(price|above|below|hit|reach|close|up or down|between|range|tweets?|\d{1,2}\s?(am|pm)|\d+ min|hourly)\b|\$|_{2,}/i;
+const SHORTQ = /\b(price|above|below|hit|reach|close|up or down|between|range|tweets?|\d{1,2}\s?(am|pm)|\d+ min|hourly|rain|snow|temperature|high temp|weather)\b|\$|_{2,}/i;
 const isShort = m => { const d = daysLeft(m); return d != null && d <= 3 && !['Politics', 'World'].includes(m.cat) && SHORTQ.test(m.title); };
 const topicOf = m => m.cat === 'Sports' && /\bvs\.?\b|\bv\b/i.test(m.title) ? 'games' : isShort(m) ? 'short' : m.cat;   // single games apart from sport
 
@@ -231,7 +263,7 @@ export function shortTitle(title) {
   const q = /\?$/.test(s);
   s = s.replace(/\?$/, '');
   let r;
-  if ((r = s.match(/^What (?:price )?will (.+?) hit (?:in |by |on )?(.+)$/i))) s = `${r[1].replace(/\s*\((\w+)\)$/, '')} peak ${r[2]}`;
+  if ((r = s.match(/^What (?:price )?will (.+?) hit (in |by |on )?(.+)$/i))) s = `${r[1].replace(/\s*\((\w+)\)$/, '')} price ${(r[2] || 'in ').trim()} ${r[3]}`;
   else if ((r = s.match(/^(.+?) price on (.+?)( at .+)?$/i))) s = `${r[1]} price on ${r[2]}`;
   else if ((r = s.match(/^How many (.+?) will (.+?) (hold|win|have|get)( after| in| by)? (the )?(.+)$/i))) s = `${r[2]}’ ${r[1]}${r[4] ? r[4] : ' in'} ${r[6]}`.replace(/s’ /, 's’ ').replace(/([^s])’ /, '$1’s ');
   else if ((r = s.match(/^How many (.+)$/i))) s = `Number of ${r[1]}`;
@@ -460,8 +492,10 @@ function recentHTML(done) {
   }).filter(r => r.recent).sort((a, b) => mInterest(b.m) - mInterest(a.m)).slice(0, 10);
   if (!rows.length) return '';
   return `<section class="p-recent" aria-label="Just decided"><h3 class="p-recent-h">Just decided <span class="r-muted">${rows.length} · results of the last days, and what the market said a week before</span></h3><div class="p-row">${rows.map(({ m, h, was }) => {
-    const called = (h.p ?? 0) >= DECIDED, upset = was != null && was < 0.5;
-    return `<button class="p-news p-res${upset ? ' upset' : ''}" data-id="${esc(m.id)}" data-coin="1"><span class="p-news-k">${called ? '✓ Decided' : '⏳ Awaiting the result'}${upset ? ' · upset' : ''}</span><span class="p-news-t">${icon(m)}${esc(shortTitle(fullTitle(m, h)))}</span><span class="p-news-l"><b>${esc(answer(m, h))}</b> ${pct(h.p)}${was != null ? ` · a week ago <b>${pct(was)}</b>` : ''}</span></button>`;
+    // an upset only where the answer is a name or a yes/no: on a margin or seat ladder the step shown changes, so "a week
+    // ago 6%" is about a different line, not a surprise winner
+    const called = (h.p ?? 0) >= DECIDED, numeric = !h.yn && /\d/.test(h.name), upset = was != null && was < 0.5 && !isLadder(m) && !h.step && !numeric;
+    return `<button class="p-news p-res${upset ? ' upset' : ''}" data-id="${esc(m.id)}" data-coin="1"><span class="p-news-k">${called ? '✓ Decided' : '⏳ Awaiting the result'}${upset ? ' · upset' : ''}</span><span class="p-news-t">${icon(m)}${esc(shortTitle(fullTitle(m, h)))}</span><span class="p-news-l"><b>${esc(called ? resultWord(m, h) : answer(m, h))}</b> ${pct(h.p)}${was != null && !isLadder(m) && !numeric ? ` · a week ago <b>${pct(was)}</b>` : ''}</span></button>`;
   }).join('')}</div></section>`;
 }
 
@@ -579,8 +613,14 @@ function bigMoves(s) {
   for (let i = 1; i < s.length; i++) { const chg = s[i][1] - s[i - 1][1]; if (Math.abs(chg) >= 0.05) out.push({ day: s[i][0], chg, to: s[i][1] }); }
   return out.sort((a, b) => Math.abs(b.chg) - Math.abs(a.chg));
 }
+// while the daily history is short (under a week), a rough line from the venue's own 1-day, 1-week and 1-month changes
+function roughSeries(m, h = shownOutcome(m)) {
+  const t = Math.floor(Date.now() / DAY), pts = [[t - 30, h.d30], [t - 7, h.d7], [t - 1, h.d1]].filter(([, d]) => d != null).map(([day, d]) => [day, h.p - d]).filter(([, v]) => v >= 0 && v <= 1);
+  return pts.length ? [...pts, [t, h.p]] : null;
+}
 function chartHTML(m) {
-  const s = series(m);
+  let s = series(m), rough = false;
+  if (!s || s.length < 7) { const r = roughSeries(m); if (r && (!s || r[0][0] < s[0][0])) { s = r; rough = true; } }
   if (!s) return '<p class="r-muted">The history of this answer builds up from the first day it’s tracked here.</p>';
   const w = 440, ht = 150, x0 = s[0][0], x1 = s.at(-1)[0];
   const X = d => 30 + (d - x0) / (x1 - x0 || 1) * (w - 40), Y = v => ht - 18 - v * (ht - 30);
@@ -589,9 +629,9 @@ function chartHTML(m) {
   const jumps = bigMoves(s).slice(0, 3);
   return `<svg class="r-chart p-chart" viewBox="0 0 ${w} ${ht}" role="img" aria-label="${esc(`Chance of ${shownOutcome(m).name}, last ${s.length} days`)}">
     ${[0, 0.25, 0.5, 0.75, 1].map(v => `<line x1="30" x2="${w - 10}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--grid)"/><text x="26" y="${Y(v) + 3}" text-anchor="end" font-size="9" fill="var(--muted)">${v * 100}%</text>`).join('')}
-    <path d="${area}" fill="var(--ink)" opacity=".07"/><path d="${d}" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round"/>
-    ${jumps.map(j => `<circle cx="${X(j.day).toFixed(1)}" cy="${Y(j.to).toFixed(1)}" r="3.5" fill="${j.chg > 0 ? '#16807a' : '#b05f18'}"/>`).join('')}
-    <text x="30" y="${ht - 4}" font-size="9" fill="var(--muted)">${dayOf(x0)}</text><text x="${w - 10}" y="${ht - 4}" text-anchor="end" font-size="9" fill="var(--muted)">${dayOf(x1)}</text></svg>`;
+    <path d="${area}" fill="var(--ink)" opacity=".07"/><path d="${d}" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round"${rough ? ' stroke-dasharray="5 4"' : ''}/>${rough ? s.map(([dd, v]) => `<circle cx="${X(dd).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="3" fill="var(--ink)"/>`).join('') : ''}
+    ${(rough ? [] : jumps).map(j => `<circle cx="${X(j.day).toFixed(1)}" cy="${Y(j.to).toFixed(1)}" r="3.5" fill="${j.chg > 0 ? '#16807a' : '#b05f18'}"/>`).join('')}
+    <text x="30" y="${ht - 4}" font-size="9" fill="var(--muted)">${dayOf(x0)}</text><text x="${w - 10}" y="${ht - 4}" text-anchor="end" font-size="9" fill="var(--muted)">${dayOf(x1)}</text></svg>${rough ? '<p class="r-muted p-rough">Dashed: a rough line from the venue’s own 1-day, 1-week and 1-month changes, while the daily history here fills in.</p>' : ''}`;
 }
 function compareHTML(m) {
   const cmp = comparison(m);

@@ -407,7 +407,7 @@ async function pastPrices(fetchFn, src, now) {
     }
   } else if (src.tok) {
     // Polymarket's prices-history takes either a time range or a named interval, and answers some combinations with an
-    // empty history: try the forms in turn and keep the first that has points (several points a day: the day's last)
+    // empty or near-empty history: try the forms in turn until one gives 5+ days (several points a day: the day's last)
     const base = `https://clob.polymarket.com/prices-history?market=${encodeURIComponent(src.tok)}`;
     let lastErr = null;
     for (const q of [`&interval=1m&fidelity=1440`, `&interval=max&fidelity=1440`, `&startTs=${start}&endTs=${end}&fidelity=1440`, `&interval=1m&fidelity=60`]) {
@@ -415,7 +415,7 @@ async function pastPrices(fetchFn, src, now) {
         const d = await getJSON(fetchFn, base + q, { tries: 1 });
         const pts = (d.history || []).filter(x => num(x.p) != null && x.t).sort((a, b) => a.t - b.t);
         for (const x of pts) out.set(Math.floor(x.t * 1000 / DAY), clamp01(num(x.p)));
-        if (out.size) break;
+        if (out.size >= 5) break;          // a day or two only (some forms answer just the latest points): try the next
       } catch (e) { lastErr = e; }
     }
     if (!out.size && lastErr) throw lastErr;

@@ -245,6 +245,9 @@ export function makePredictionsFixture(now = Date.now()) {
     // decided yesterday, an upset (24% a week before); a ladder whose "by...?" title takes the step shown
     m('ks:WON', 'kalshi', 'NC-05 House winner?', 'Politics', [{ name: 'Chuck Hubbard', p: 0.98, d1: 0.5, d7: 0.74, d30: null }, { name: 'Virginia Foxx', p: 0.02, d1: -0.5, d7: -0.74, d30: null }], { vol24: 9e5, vol: 3e6, end: new Date(now - DAY).toISOString().slice(0, 10) }),
     m('pm:by', 'polymarket', 'Netanyahu out by...?', 'World', [{ name: 'June 30, 2027', p: 0.43, d1: 0, d7: null, d30: null }, { name: 'December 31, 2026', p: 0.2, d1: 0, d7: null, d30: null }], { exclusive: false, vol24: 10, vol: 300 }),
+    // a both-ways price ladder ("↓ 2,000" is a fall) and a daily weather question whose day was yesterday
+    m('pm:eth', 'polymarket', 'What price will Ethereum hit in 2026?', 'Crypto', [{ name: '↓ 2,000', p: 0.27, d1: 0, d7: null, d30: null }, { name: '↑ 3,000', p: 0.25, d1: 0, d7: null, d30: null }], { exclusive: false, vol24: 8, vol: 240 }),
+    m('ks:RAIN', 'kalshi', `Where will it rain on ${new Date(now - DAY).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}?`, 'Climate', [{ name: 'Tampa', p: 0.3, d1: 0, d7: null, d30: null }, { name: 'Miami', p: 0.2, d1: 0, d7: null, d30: null }], { exclusive: false, vol24: 5e4, vol: 6e4, end: new Date(now + DAY).toISOString().slice(0, 10) }),
     m('mf:x', 'manifold', 'Will Bitcoin hit $200k in 2026?', 'Crypto', [{ name: 'Yes', p: 0.12, d1: 0.01, d7: null, d30: null }], { vol24: 5000, vol: 9e4, cur: 'MANA', traders: 40 }),
   ];
   for (const x of markets) { x.usd24 = x.vol24 == null ? null : x.cur === 'MANA' ? x.vol24 / 100 : x.vol24; x.usdTotal = x.vol == null ? null : x.cur === 'MANA' ? x.vol / 100 : x.vol; x.interest = Math.round((x.usd24 || 0) + (x.usdTotal || 0) / 30); }
