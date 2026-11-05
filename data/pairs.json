@@ -667,6 +667,11 @@
    "KuCoin": "KITE",
    "MEXC": "KITE",
    "Gate.io": "KITE"
+  },
+  "gnosis": {
+   "Binance": "GNO",
+   "MEXC": "GNO",
+   "Gate.io": "GNO"
   }
  }
 }
