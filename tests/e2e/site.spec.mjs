@@ -1058,7 +1058,7 @@ test.describe('predictions', () => {
     await expect.poll(() => ids(page)).toEqual(['pm:mayor', 'pm:fed', 'ks:SEN', 'pm:thin', 'pi:8000']);
     const top = page.locator('#grid > .grid .ptile').first();
     await expect(top).toHaveClass(/sz-l/);
-    await expect(top).toHaveClass(/c2/);                                                            // 71% sure: the middle shade
+    await expect(top).toHaveClass(/c3/);                                                            // 71%: the second-darkest shade, bold
     await expect(top.locator('.pt-rank')).toHaveText('#1');
     await expect(top.locator('.pt-title')).toHaveText('NYC mayor winner?');
     await expect(top.locator('.pt-head > .p-ico')).toHaveText('🇺🇸');                             // a big flag for US politics beside the headline

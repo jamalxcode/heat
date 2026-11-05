@@ -401,15 +401,28 @@ td.p-pbar b { position: relative; z-index: 1; padding-left: 4px; }
 tr.r-row.done { opacity: .65; }
 @media (max-width: 640px) {
 }
-/* prediction tiles are coloured by how sure the market is (c0 toss-up … c4 near certain), one calm slate hue */
-.c0 { --tint: #ecebe6; --tint-ink: #1d1c1a; } .c1 { --tint: #dbe2e7; --tint-ink: #17222b; } .c2 { --tint: #b7c7d3; --tint-ink: #12202b; }
-.c3 { --tint: #7f9bb1; --tint-ink: #fff; } .c4 { --tint: #405f78; --tint-ink: #fff; }
-:root[data-theme="dark"] .c0 { --tint: #2b2b29; --tint-ink: #f4f3ee; } :root[data-theme="dark"] .c1 { --tint: #2e3740; --tint-ink: #f4f3ee; } :root[data-theme="dark"] .c2 { --tint: #364a5a; --tint-ink: #f4f3ee; }
-:root[data-theme="dark"] .c3 { --tint: #47657e; --tint-ink: #fff; } :root[data-theme="dark"] .c4 { --tint: #6f93b0; --tint-ink: #0c1620; }
+/* prediction tiles are shaded by how likely the shown answer is (c0 under 25% … c4 85%+): one blue hue stepping in
+   lightness only, so it reads the same with any colour blindness; light mode: likelier = darker; dark mode: likelier =
+   stronger (brighter, more saturated), unlikely fades into the page */
+.c0 { --tint: #f1f4f7; --tint-ink: #4f5b66; } .c1 { --tint: #d8e3ed; --tint-ink: #34434f; } .c2 { --tint: #a7c0d6; --tint-ink: #10202d; }
+.c3 { --tint: #3d6d97; --tint-ink: #fff; } .c4 { --tint: #15304a; --tint-ink: #fff; }
+:root[data-theme="dark"] .c0 { --tint: #1f2225; --tint-ink: #98a2ab; } :root[data-theme="dark"] .c1 { --tint: #27323c; --tint-ink: #b4bec7; } :root[data-theme="dark"] .c2 { --tint: #335069; --tint-ink: #eef3f7; }
+:root[data-theme="dark"] .c3 { --tint: #3f77ab; --tint-ink: #fff; } :root[data-theme="dark"] .c4 { --tint: #8fc0ea; --tint-ink: #08182a; }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .c0 { --tint: #2b2b29; --tint-ink: #f4f3ee; } :root:not([data-theme="light"]) .c1 { --tint: #2e3740; --tint-ink: #f4f3ee; } :root:not([data-theme="light"]) .c2 { --tint: #364a5a; --tint-ink: #f4f3ee; }
-  :root:not([data-theme="light"]) .c3 { --tint: #47657e; --tint-ink: #fff; } :root:not([data-theme="light"]) .c4 { --tint: #6f93b0; --tint-ink: #0c1620; }
+  :root:not([data-theme="light"]) .c0 { --tint: #1f2225; --tint-ink: #98a2ab; } :root:not([data-theme="light"]) .c1 { --tint: #27323c; --tint-ink: #b4bec7; } :root:not([data-theme="light"]) .c2 { --tint: #335069; --tint-ink: #eef3f7; }
+  :root:not([data-theme="light"]) .c3 { --tint: #3f77ab; --tint-ink: #fff; } :root:not([data-theme="light"]) .c4 { --tint: #8fc0ea; --tint-ink: #08182a; }
 }
+.c0.ptile, .c0.pm-tile { box-shadow: inset 0 0 0 1px rgba(60,80,100,.18); }
+:root[data-theme="dark"] .c0.ptile, :root[data-theme="dark"] .c0.pm-tile { box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .c0.ptile, :root:not([data-theme="light"]) .c0.pm-tile { box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); } }
+/* likely answers: heavier and a little larger; unlikely: a different (serif) face, italic, lighter weight */
+.ptile.c3 .pt-ans, .ptile.c4 .pt-ans, .pm-tile.c3 .pm-ans, .pm-tile.c4 .pm-ans { font-weight: 900; font-size: 1.12em; }
+.ptile.c3 .pt-p, .ptile.c4 .pt-p { font-weight: 900; transform: scale(1.1); transform-origin: left bottom; display: inline-block; margin-right: .1em; }
+.ptile.c0 .pt-ans, .ptile.c1 .pt-ans, .ptile.c0 .pt-p, .ptile.c1 .pt-p, .ptile.c0 .pt-verdict, .ptile.c1 .pt-verdict, .pm-tile.c0 .pm-ans, .pm-tile.c1 .pm-ans,
+.lk-lo, .lk-lo b, .lk-lo .p-say-a, .lk-lo .p-say-p { font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-weight: 500; }
+.ptile.c0 .pt-verdict, .ptile.c1 .pt-verdict { text-transform: none; letter-spacing: 0; font-size: 12px; }
+.lk-hi, .lk-hi b, .lk-hi .p-say-a, .lk-hi .p-say-p { font-weight: 900; }
+.lk-hi .p-say-a { font-size: 25px; } .lk-hi .p-say-p { font-size: 34px; }
 .ptile .pt-chg, .pm-tile .pt-chg { background: var(--tint); color: var(--tint-ink); border-radius: 999px; padding: 1px 7px; font-size: 11.5px; font-weight: 700; white-space: nowrap; box-shadow: 0 0 0 1px rgba(0,0,0,.06); }
 .sz-l .pt-chg { font-size: 14px; padding: 2px 9px; }
 .pt-verdict { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; opacity: .75; margin-top: auto; }

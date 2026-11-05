@@ -114,7 +114,10 @@ const decided = m => (m.end && m.end < todayIso()) || certainty(m) >= DECIDED;
 const decidedWhy = m => m.end && m.end < todayIso() ? `past its end date (${dayLabel(m.end)}): waiting for the result` : `${pct(certainty(m))} sure already`;
 // tile colour: how sure the market is about the answer shown (c0 toss-up … c4 near certain); a long shot is just as sure
 // the other way, so a ladder step at 9% is coloured like 91%
-const sureClass = h => { const p = h.p ?? 0.5, s = Math.max(p, 1 - p); return s >= 0.9 ? 'c4' : s >= 0.8 ? 'c3' : s >= 0.7 ? 'c2' : s >= 0.6 ? 'c1' : 'c0'; };
+// shade by how likely the shown answer is: c4 (85%+) darkest … c0 (under 25%) lightest; one blue hue, read by lightness
+// alone, so it works for colour-blind readers; likely answers are also bold and larger, unlikely ones italic and lighter
+const sureClass = h => { const p = h.p ?? 0.5; return p >= 0.85 ? 'c4' : p >= 0.65 ? 'c3' : p >= 0.45 ? 'c2' : p >= 0.25 ? 'c1' : 'c0'; };
+const likeFont = h => { const p = h.p ?? 0.5; return p >= 0.65 ? ' lk-hi' : p < 0.45 ? ' lk-lo' : ''; };
 // move chip colours: teal = more likely, amber = less (q classes in index.html), never the parties' blue and red
 const heat = v => {
   if (v == null) return 'q0';
@@ -388,7 +391,7 @@ function mapHTML(live) {
         + `${sz === 'tiny' ? `<span class="pm-title">${iconOf(m.title, m.cat)}</span>` : `<span class="pm-title">${icon(m)}${esc(shortTitle(m.title))}</span>`}<span class="pm-ans">${sz === 'tiny' ? '' : esc(h.name) + ' '}<b>${pct(h.p)}</b></span>${sz === 'big' || sz === 'mid' ? `<span class="pm-foot">${chip(h[tfKey()])} ${endHTML(m)} ${money(mToday(m), 'USD')} today</span>` : ''}</button>`;
     }
   }
-  return `<div class="p-map" style="height:${H}px">${html}</div><p class="r-muted p-mapnote">Each rectangle’s area is the money on that question (bet today + a 30th of all money bet); blocks are topics; darker = the market is surer.${left ? ` ${left} question${left > 1 ? 's' : ''} without money figures (PredictIt) aren’t drawn.` : ''}</p>`;
+  return `<div class="p-map" style="height:${H}px">${html}</div><p class="r-muted p-mapnote">Each rectangle’s area is the money on that question (bet today + a 30th of all money bet); blocks are topics; darker and bold = likelier; lighter and italic = less likely.${left ? ` ${left} question${left > 1 ? 's' : ''} without money figures (PredictIt) aren’t drawn.` : ''}</p>`;
 }
 
 /* ---------- the Today strip: the news at a glance ---------- */
@@ -418,7 +421,7 @@ function tableHTML(ms) {
   return `<div class="r-tblwrap"><table class="r-tbl p-tbl"><thead><tr>${th}</tr></thead><tbody>${rows.map(m => {
     const h = shownOutcome(m), ch = h[tfKey()], vs = merged() ? membersOf(m) : [m];
     return `<tr class="r-row${decided(m) ? ' done' : ''}" data-id="${esc(m.id)}" tabindex="0"><td>${pos.get(m.id) ?? (decided(m) ? '✓' : '—')}</td><td class="p-tt">${watch.has(m.id) ? '★ ' : ''}${icon(m)}${esc(m.title)}</td><td>${vs.map(x => `<span class="pv pv-${x.venue}" title="${VNAME[x.venue]}">${VTAG[x.venue]}</span>`).join(' ')}${vs.length === 1 ? ' ' + VNAME[m.venue] : ''}</td>
-      <td class="p-tt"><span class="r-muted">${verdict(m, h)}:</span> ${esc(h.name)}</td><td><b>${pct(h.p)}</b></td><td><span class="cell-heat ${heat(ch)}">${arrow(ch)}${pts(ch)}</span></td><td>${money(mToday(m), 'USD')}</td><td>${money(mTotal(m), 'USD')}${playNote(m) ? ' <span class="r-muted">play</span>' : ''}</td><td>${endHTML(m) || '—'}</td><td>${esc(m.cat)}</td></tr>`;
+      <td class="p-tt"><span class="r-muted">${verdict(m, h)}:</span> ${esc(h.name)}</td><td class="${likeFont(h)}"><b>${pct(h.p)}</b></td><td><span class="cell-heat ${heat(ch)}">${arrow(ch)}${pts(ch)}</span></td><td>${money(mToday(m), 'USD')}</td><td>${money(mTotal(m), 'USD')}${playNote(m) ? ' <span class="r-muted">play</span>' : ''}</td><td>${endHTML(m) || '—'}</td><td>${esc(m.cat)}</td></tr>`;
   }).join('')}</tbody></table></div>`;
 }
 
@@ -488,7 +491,7 @@ function render() {
   else if (viewAs === 'map') main.innerHTML = note + intro + mapHTML(live) + decidedHTML(done);
   else main.innerHTML = note + intro + sectionsHTML(live) + decidedHTML(done);
   main.className = '';
-  $('#plegend').innerHTML = `<span class="p-key"><span class="p-sw c0"></span>toss-up <span class="p-sw c2"></span><span class="p-sw c4"></span> near certain</span> · move ${TFS.find(t => t[0] === tf)[2]}: <span class="p-key-chg q2">▲ more likely</span> <span class="p-key-chg q-2">▼ less</span> · ${esc(ORDERS.find(x => x[0] === order)[2])}${venue === 'predictit' && ['sure', 'money', 'close'].includes(order) ? ' (PredictIt publishes no money: its own order)' : ''}`;
+  $('#plegend').innerHTML = `<span class="p-key"><span class="p-sw c0"></span><i class="lk-lo">unlikely</i> <span class="p-sw c1"></span><span class="p-sw c2"></span><span class="p-sw c3"></span><span class="p-sw c4"></span> <b class="lk-hi">likely</b></span> · move ${TFS.find(t => t[0] === tf)[2]}: <span class="p-key-chg q2">▲ more likely</span> <span class="p-key-chg q-2">▼ less</span> · ${esc(ORDERS.find(x => x[0] === order)[2])}${venue === 'predictit' && ['sure', 'money', 'close'].includes(order) ? ' (PredictIt publishes no money: its own order)' : ''}`;
   const q = new URLSearchParams();
   if (venue !== 'all') q.set('v', venue);
   if (order !== 'sure') q.set('o', order);
@@ -559,7 +562,7 @@ function detailHTML(m) {
       <button class="btn p-watchbtn" data-watch="${esc(m.id)}" aria-pressed="${watch.has(m.id)}">${watch.has(m.id) ? '★ Watching' : '☆ Watch'}</button>
       <button class="btn p-fullbtn" aria-pressed="${full}" title="${full ? 'Back to the small view' : 'Full screen'}">${full ? '⤡ Smaller' : '⤢ Full view'}</button></div>
     <h2 class="p-q">${icon(m)}${esc(shortTitle(m.title))}</h2>${titleParts(m)[1] ? `<p class="p-qfull">${esc(m.title)}</p>` : ''}
-    <p class="p-say"><span class="p-say-v">${verdict(m, h)}:</span> <b class="p-say-a">${esc(h.name)}</b> <b class="p-say-p">${pct(h.p)}</b></p>
+    <p class="p-say${likeFont(h)}"><span class="p-say-v">${verdict(m, h)}:</span> <b class="p-say-a">${esc(h.name)}</b> <b class="p-say-p">${pct(h.p)}</b></p>
     <p class="p-moves">${moves}${m.end ? `<span class="p-mv">${endHTML(m, true)} <span class="r-muted">${dayLabel(m.end)}</span></span>` : ''}</p>
     ${m.stale ? '<p class="r-says">⚠ This venue didn’t answer in the latest update: these are its last known prices.</p>' : ''}
     ${chartHTML(m)}
