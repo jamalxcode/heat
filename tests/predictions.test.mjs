@@ -3,6 +3,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fromPolymarket, fromKalshi, fromPredictIt, fromManifold, fromBetfair, catOf, catFrom, headline, updateHist, histChange, interestOf, matchGroups, normName, backfill, build, DAY } from '../scripts/build-predictions.mjs';
 import { health } from '../scripts/health.mjs';
+import { nameScore, bestMatch } from '../app/names.mjs';
+import { districtOf } from '../scripts/build-predictions.mjs';
 import { PAGES } from '../scripts/market-page.mjs';
 
 const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-6, `${msg ?? ''} ${a} ≈ ${b}`);
@@ -213,6 +215,40 @@ test('matching: the same question on several venues is one group; different part
   assert.equal(g('ks:yes'), 'pm:yes');
   assert.equal(g('mf:ak'), undefined, 'Alaska ≠ Maine ≠ the whole Senate');
   assert.equal(g('pi:me'), undefined); assert.equal(g('pi:us'), undefined);
+});
+
+test('matching, looser: districts, party ↔ candidate, spellings, teams; numbers in full; spreads apart', () => {
+  const rec = (id, venue, title, outcomes, interest) => ({ id, venue, title, interest, outcomes: outcomes.map(([name, p]) => ({ name, p })) });
+  const ms = [
+    rec('ks:nc3', 'kalshi', 'NC-03 House winner? (NC-03)', [['Raymond Smith Jr.', 0.77], ['Greg Murphy', 0.24]], 900),
+    rec('mf:nc3', 'manifold', "Which party will win the 2026 U.S. House election in North Carolina's 3rd District?", [['Democratic Party — Raymond Smith Jr.', 0.73], ['Republican Party — Greg Murphy', 0.27]], 10),
+    rec('pm:az2', 'polymarket', 'AZ-02 House Election Winner', [['Eli Crane (R)', 0.72], ['Jonathan Nez (D)', 0.28]], 500),
+    rec('pi:nc1', 'predictit', "Which party will win the 2026 US House race in North Carolina's 1st District?", [['Democratic', 0.99], ['Republican', 0.01]], 0),
+    rec('ks:ak', 'kalshi', 'Alaska Senate winner?', [['Democratic party', 0.93], ['Republican party', 0.07]], 800),
+    rec('pm:ak', 'polymarket', 'Alaska Senate Election Winner', [['Mary Peltola (D)', 0.94], ['Sen. Dan Sullivan (R)', 0.06], ['Ann Diener', 0]], 700),
+    rec('pm:il', 'polymarket', 'Prime Minister of Israel after the next election?', [['Gadi Eizenkot', 0.57], ['Benjamin Netanyahu', 0.3], ['Avigdor Lieberman', 0.04]], 600),
+    rec('pi:il', 'predictit', 'Who will be the Prime Minister of Israel after the 2026 election?', [['Eisenkot', 0.54], ['Netanyahu', 0.32], ['Lieberman', 0.07]], 0),
+    rec('pm:nfl', 'polymarket', 'Pro Football: 2027 Champion', [['San Francisco 49ers', 0.14], ['Buffalo Bills', 0.13], ['Chicago Bears', 0.12]], 400),
+    rec('ks:nfl', 'kalshi', '2027 Pro Football Champion (2026-27)', [['San Francisco', 0.14], ['Buffalo', 0.13], ['Chicago', 0.12]], 300),
+    rec('ks:tx', 'kalshi', 'Texas Senate margin of victory', [['James Talarico, 0.5+ pts', 1], ['James Talarico, 1+ pts', 1]], 200),
+    rec('pm:tx', 'polymarket', 'Texas Senate Election Margin of Victory', [['Talarico 12%+', 0.95], ['Talarico 9-12%', 0.04]], 100),
+    rec('ks:nyk', 'kalshi', 'Chicago vs New York: Spread', [['New York wins by over 11.5 points', 1], ['Chicago wins by over 1.5 points', 0]], 90),
+    rec('mf:nyk', 'manifold', 'Chicago Bulls at New York Knicks, Nov 4', [['New York Knicks', 0.99], ['Chicago Bulls', 0.01]], 5),
+  ];
+  matchGroups(ms);
+  const g = id => ms.find(m => m.id === id).group;
+  assert.equal(g('mf:nc3'), 'ks:nc3', 'NC-03 and "North Carolina\'s 3rd District", candidates under their parties');
+  assert.equal(g('pm:az2'), undefined, 'AZ-02 is another district'); assert.equal(g('pi:nc1'), undefined, 'NC-01 too');
+  assert.equal(g('pm:ak'), 'ks:ak', 'a party-only answer matches its party\'s candidate');
+  assert.equal(g('pi:il'), 'pm:il', 'Eizenkot ≈ Eisenkot');
+  assert.equal(g('ks:nfl'), 'pm:nfl', 'San Francisco 49ers ≈ San Francisco');
+  assert.equal(g('pm:tx'), undefined, 'different margin buckets are different answers');
+  assert.equal(g('mf:nyk'), undefined, 'a spread isn\'t who wins');
+  assert.deepEqual(['NC-03 House winner?', "Which party will win the 2026 U.S. House election in North Carolina's 3rd District?", 'NY-17 House winner?', 'Senate control'].map(districtOf), ['nc03', 'nc03', 'ny17', null]);
+  assert.ok(nameScore('Democrats', 'Mary Peltola (D)') > 0 && nameScore('Democrats', 'Dan Sullivan (R)') === 0);
+  assert.ok(nameScore('Below 45', '45') === 0 && nameScore('Below 45', 'below 45') > 0);
+  assert.equal(bestMatch('Democratic party', [{ name: 'Sen. Dan Sullivan (R)' }, { name: 'Mary Peltola (D)' }]).name, 'Mary Peltola (D)');
+  assert.equal(bestMatch('Gadi Eizenkot', [{ name: 'Netanyahu' }, { name: 'Eisenkot' }]).name, 'Eisenkot');
 });
 
 test('backfill: missing days filled from Kalshi daily candles (mid of bid and ask), today left as the live price', async () => {

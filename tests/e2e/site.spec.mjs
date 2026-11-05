@@ -1091,7 +1091,13 @@ test.describe('predictions', () => {
 
   test('the tabs ask a question: close calls, biggest bets, venues disagree', async ({ page }) => {
     await page.locator('#porder button[data-o="close"]').click();
+    // mixed topics: the second politics question (mayor) counts ×0.65, so the Fed (economy) comes before it
+    await expect.poll(() => ids(page)).toEqual(['ks:SEN', 'pm:fed', 'pm:mayor', 'pm:thin', 'pi:8000']);
+    await filters(page);
+    await page.locator('#pmix').uncheck();                                                        // unmixed: the plain order
     await expect.poll(() => ids(page)).toEqual(['ks:SEN', 'pm:mayor', 'pm:fed', 'pm:thin', 'pi:8000']);
+    await expect(page.locator('#pfiltBtn .n')).toHaveText('1');
+    await page.locator('#pmix').check();
     await expect(page).toHaveURL(/o=close/);
     // surest bets: certainty × log10(interest): mayor 71% × 6.9, Fed (70% no) × 6.2, Senate (merged) 55% × 6.6, thin, PredictIt (no money) last
     await page.locator('#porder button[data-o="sure"]').click();

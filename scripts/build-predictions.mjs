@@ -18,6 +18,7 @@
 // A venue that fails keeps its last good markets, flagged stale, so one outage never empties a tab.
 // build() has no Node dependencies, so tests can run it with a fake fetch.
 import { pool } from './build-forex.mjs';
+import { nameKeys, nameScore } from '../app/names.mjs';
 
 export const DAY = 864e5;
 const FMT = 1;
@@ -466,6 +467,19 @@ const PARTY = [/\b(democrat|democratic|democrats|dem|dems)\b/i, /\b(republican|r
 const PLACES = ['alabama', 'alaska', 'arizona', 'arkansas', 'california', 'colorado', 'connecticut', 'delaware', 'florida', 'georgia', 'hawaii', 'idaho', 'illinois', 'indiana', 'iowa', 'kansas', 'kentucky', 'louisiana', 'maine', 'maryland', 'massachusetts', 'michigan', 'minnesota', 'mississippi', 'missouri', 'montana', 'nebraska', 'nevada', 'new hampshire', 'new jersey', 'new mexico', 'new york', 'north carolina', 'north dakota', 'ohio', 'oklahoma', 'oregon', 'pennsylvania', 'rhode island', 'south carolina', 'south dakota', 'tennessee', 'texas', 'utah', 'vermont', 'virginia', 'west virginia', 'washington', 'wisconsin', 'wyoming',
   'france', 'french', 'germany', 'german', 'israel', 'canada', 'canadian', 'japan', 'brazil', 'mexico', 'india', 'australia', 'uk', 'britain', 'british', 'italy', 'spain', 'poland', 'hungary', 'chile', 'colombia', 'peru', 'argentina', 'south korea', 'korea', 'netherlands', 'portugal', 'ukraine', 'russia', 'iran', 'venezuela', 'china', 'taiwan', 'romania', 'czech', 'philippines', 'new york city', 'nyc', 'los angeles', 'chicago'];
 const placesOf = t => { const s = ' ' + String(t).toLowerCase().replace(/[^a-z ]+/g, ' ') + ' '; const out = new Set(); for (const p of PLACES) if (s.includes(' ' + p + ' ')) out.add(p); for (const p of [...out]) for (const q of out) if (q !== p && q.includes(p)) out.delete(p); return out; };
+// US House districts: "NC-03", "North Carolina's 3rd District" and "NC 3" are all nc03; two different districts are never
+// the same question, and a district code counts as a word (otherwise "NC-03 House winner" and "AZ-02 House winner" match)
+const ABBR = { alabama: 'al', alaska: 'ak', arizona: 'az', arkansas: 'ar', california: 'ca', colorado: 'co', connecticut: 'ct', delaware: 'de', florida: 'fl', georgia: 'ga', hawaii: 'hi', idaho: 'id', illinois: 'il', indiana: 'in', iowa: 'ia', kansas: 'ks', kentucky: 'ky', louisiana: 'la', maine: 'me', maryland: 'md', massachusetts: 'ma', michigan: 'mi', minnesota: 'mn', mississippi: 'ms', missouri: 'mo', montana: 'mt', nebraska: 'ne', nevada: 'nv', 'new hampshire': 'nh', 'new jersey': 'nj', 'new mexico': 'nm', 'new york': 'ny', 'north carolina': 'nc', 'north dakota': 'nd', ohio: 'oh', oklahoma: 'ok', oregon: 'or', pennsylvania: 'pa', 'rhode island': 'ri', 'south carolina': 'sc', 'south dakota': 'sd', tennessee: 'tn', texas: 'tx', utah: 'ut', vermont: 'vt', virginia: 'va', washington: 'wa', 'west virginia': 'wv', wisconsin: 'wi', wyoming: 'wy' };
+const ABBRS = new Set(Object.values(ABBR));
+export function districtOf(t) {
+  const s = String(t);
+  let m = s.match(/\b([A-Z]{2})[- ]?(\d{1,2})\b/);
+  if (m && ABBRS.has(m[1].toLowerCase())) return m[1].toLowerCase() + m[2].padStart(2, '0');
+  m = s.toLowerCase().match(/\b([a-z]+(?: [a-z]+)?)[’']s (\d{1,2})(?:st|nd|rd|th) (?:congressional )?district\b/);
+  if (m) { const st = ABBR[m[1]] || ABBR[m[1].split(' ').pop()]; if (st) return st + m[2].padStart(2, '0'); }
+  if (/\bat[- ]large\b/i.test(s)) { const st = Object.keys(ABBR).find(k => s.toLowerCase().includes(k)); if (st) return ABBR[st] + '00'; }
+  return null;
+}
 const jaccard = (a, b) => { let n = 0; for (const x of a) if (b.has(x)) n++; return n / (a.size + b.size - n || 1); };
 function sameQuestion(a, b) {
   if (a.venue === b.venue) return 0;
@@ -474,18 +488,32 @@ function sameQuestion(a, b) {
   if (ya.size && yb.size && ![...ya].some(y => yb.has(y))) return 0;
   const pa = placesOf(a.title), pb = placesOf(b.title);
   if (pa.size && pb.size && ![...pa].some(p => pb.has(p))) return 0;
+  // a spread, a total or a margin is a different question from who wins: only matched with its own kind
+  const kind = t => (String(t).toLowerCase().match(/\b(spread|total|o\/u|over\/under|margin|exact score|handicap)\b/) || [''])[0];
+  if (kind(a.title) !== kind(b.title)) return 0;
+  const da0 = districtOf(a.title), db0 = districtOf(b.title);
+  if ((da0 || db0) && da0 !== db0) return 0;                       // a district on one side only, or two different ones
   // "which party wins the Senate" (the whole country) vs "… in Alaska": only one names a place and the outcomes are
   // just the parties, so nothing else tells them apart
-  const parties = m => m.outcomes.length > 1 && m.outcomes.every(o => /\b(dem|dems|democrat|democratic|democrats|rep|gop|republican|republicans)\b/i.test(o.name));
-  if (!pa.size !== !pb.size && parties(a) && parties(b)) return 0;
+  const parties = m => m.outcomes.length > 1 && m.outcomes.every(o => { const k = nameKeys(o.name); return k.party && !k.words.size; });   // party names only
+  if (!pa.size !== !pb.size && (parties(a) || parties(b))) return 0;
   const [da, ra] = PARTY.map(re => re.test(a.title)), [db, rb] = PARTY.map(re => re.test(b.title));
   if ((da && !ra && rb && !db) || (ra && !da && db && !rb)) return 0;
-  const sim = jaccard(words(a.title), words(b.title));
+  const wa = words(a.title), wb = words(b.title);
+  if (da0) { wa.add(da0); wb.add(db0); }
+  const sim = jaccard(wa, wb);
   if (yn(a) !== yn(b)) return 0;
   if (yn(a)) return sim >= 0.7 ? sim : 0;
-  const na = new Set(a.outcomes.slice(0, 6).map(o => normName(o.name))), nb = new Set(b.outcomes.slice(0, 6).map(o => normName(o.name)));
-  let shared = 0; for (const x of na) if (nb.has(x)) shared++;
-  return sim >= 0.35 && shared >= 2 && shared >= Math.min(na.size, nb.size) / 2 ? sim + shared / 10 : 0;
+  // outcomes in common: by words (surnames, teams, a letter's difference), by party for a party-only answer
+  // ("Democrats" ≈ "Mary Peltola (D)"), numbers in full; "Other" and the like don't count
+  const keep = o => !/^(other|another|none|no one|field|any other)\b/i.test(o.name);
+  const ka = a.outcomes.filter(keep).slice(0, 6).map(o => nameKeys(o.name)), kb = b.outcomes.filter(keep).slice(0, 6).map(o => nameKeys(o.name));
+  const shared = ka.filter(x => kb.some(y => nameScore(x, y) > 0)).length;
+  // the same district, or the same place with well-matched outcomes, needs fewer title words in common: venues word
+  // these very differently ("NC-03 House winner?" / "Which party will win … North Carolina's 3rd District?")
+  const samePlace = (da0 && da0 === db0) || (pa.size && [...pa].some(p => pb.has(p)));
+  const need = da0 && da0 === db0 ? 0.1 : samePlace ? 0.25 : 0.35;
+  return sim >= need && shared >= 2 && shared >= Math.min(ka.length, kb.length) / 2 ? sim + shared / 10 : 0;
 }
 export function matchGroups(markets) {
   const byInterest = [...markets].sort((a, b) => (b.interest || 0) - (a.interest || 0));

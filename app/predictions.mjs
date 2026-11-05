@@ -12,6 +12,7 @@
 // the price pipeline.
 import { $, $$, esc, M, S, store } from './core.mjs';
 import { renderHealth } from './render.mjs';
+import { bestMatch } from './names.mjs';
 
 const DAY = 864e5, REFRESH = 10 * 60e3, ALL_MAX = 200;
 const DECIDED = 0.97;                  // a question whose likeliest outcome is at least this sure counts as decided
@@ -44,6 +45,7 @@ let tf = pref('hm.predTf', TFS.map(t => t[0]), '1d');
 let viewAs = pref('hm.predView2', ['tiles', 'map', 'table'], 'tiles');
 let groupBy = pref('hm.predGroup2', ['none', 'cat', 'story'], 'none');
 let order = (o => ORDERS.some(x => x[0] === o) ? o : null)(Q.get('o')) || pref('hm.predOrder', ORDERS.map(x => x[0]), 'money');
+let mix = store.get('hm.predMix') !== false;                         // a mixed front page: a few from each topic (on by default)
 let play = store.get('hm.predPlay') === true;                         // Manifold's play money in "All" (off by default)
 const hidden = new Set(Array.isArray(store.get('hm.predHide')) ? store.get('hm.predHide') : ['games', 'short']);   // topics switched off
 if (!store.get('hm.predShort1')) { hidden.add('short'); store.set('hm.predShort1', true); store.set('hm.predHide', [...hidden]); }   // new filter: off once for everyone
@@ -66,7 +68,6 @@ const dayLabel = iso => iso ? new Date(iso + 'T12:00:00Z').toLocaleDateString([]
 const dayOf = d => new Date(d * DAY).toLocaleDateString([], { day: 'numeric', month: 'short', timeZone: 'UTC' });
 const headOf = m => m.outcomes.find(o => o.name === m.head) || m.outcomes[0];
 const tfKey = () => TFS.find(t => t[0] === tf)[1];
-const normName = n => { let s = String(n).toLowerCase(); const inner = s.match(/\(([^)]{4,})\)/); if (inner && /^(dems?|democrats?|gop|republicans?|rep|ind|independent)\b/.test(s)) s = inner[1]; s = s.replace(/\([^)]{0,3}\)/g, ' ').replace(/[^a-z0-9 ]+/g, ' ').trim(); return s.split(/\s+/).pop() || ''; };   // as the build matches
 
 // The common yardstick (scripts/build-predictions.mjs interestOf), in dollars on every venue: money bet today (last 24 h)
 // and in total; interest = bet today + a 30th of bet in total. PredictIt publishes no money figures: interest 0.
@@ -259,12 +260,9 @@ function endHTML(m, big = false) {
 const membersOf = m => m.group ? groups.get(m.group) || [m] : [m];
 const priceOn = (x, name, yn) => {
   if (yn) { const o = x.outcomes[0]; return isYesNo(x) ? o : null; }
-  // a number in the outcome ("Below 45", "45", "52+") must match in full: "Below 45" isn't "exactly 45"; a person is
-  // matched by surname ("Scott Colom (D)" ≈ "Colom")
-  const full = n => String(n).toLowerCase().replace(/\([^)]{0,3}\)/g, ' ').replace(/[^a-z0-9+<> ]+/g, ' ').replace(/\s+/g, ' ').trim();
-  if (/\d/.test(name)) return x.outcomes.find(o => full(o.name) === full(name)) || null;
-  const k = normName(name);
-  return x.outcomes.find(o => normName(o.name) === k) || null;
+  // as the build matches (names.mjs): numbers in full ("Below 45" isn't "45"), people by name ("Scott Colom (D)" ≈
+  // "Colom", "Eizenkot" ≈ "Eisenkot"), a party-only answer by party ("Democratic party" ≈ "Mary Peltola (D)")
+  return bestMatch(name, x.outcomes);
 };
 function comparison(m) {
   const ms = membersOf(m);
@@ -295,6 +293,7 @@ const WEIGHT = {
   disagree: m => comparison(m)?.spread ?? 0,
 };
 // PredictIt publishes no money, so its own tab keeps its own order unless a non-money order is picked
+const MIXED = ['money', 'sure', 'close', 'movers'], MIX = 0.65;
 const weight = m => venue === 'predictit' && ['sure', 'money', 'close'].includes(order) ? -(m.ord ?? 999) : WEIGHT[order](m);
 
 /* ---------- which questions ---------- */
@@ -310,6 +309,12 @@ function shown() {
   else ms = ms.filter(m => !hidden.has(topicOf(m)));
   if (order === 'disagree') ms = ms.filter(m => (comparison(m)?.spread ?? 0) >= DIFFER);
   ms = [...ms].sort((a, b) => weight(b) - weight(a) || mInterest(b) - mInterest(a));
+  // mixed: each further question from the same topic counts a little less (×0.65 for the 2nd, ×0.42 for the 3rd…), so
+  // the top of the page has a few from each topic instead of a wall of politics; the leader of each topic keeps its place
+  if (mix && !query && MIXED.includes(order) && !(venue === 'predictit' && ['sure', 'money', 'close'].includes(order))) {
+    const seen = {}, adj = new Map(ms.map(m => { if (decided(m)) return [m.id, weight(m)]; const k = topicOf(m); seen[k] = (seen[k] ?? -1) + 1; return [m.id, weight(m) * MIX ** seen[k]]; }));   // decided ones fold away below: they don't count
+    ms.sort((a, b) => adj.get(b.id) - adj.get(a.id) || mInterest(b) - mInterest(a));
+  }
   const live = ms.filter(m => !decided(m)), done = ms.filter(decided);
   pos.clear();
   live.forEach((m, i) => { pos.set(m.id, i + 1); });
@@ -471,9 +476,10 @@ function topicChips() {
   const b = base(), n = k => b.filter(m => topicOf(m) === k).length;
   const keys = [...CATS, 'games', 'short'].filter(k => n(k)), NAME = { games: ['Single games', 'single games and matches'], short: ['Short-term prices', 'price bets ending within 3 days (BTC at 5pm, above ___ tomorrow…)'] };
   return keys.map(k => `<button class="chip" data-topic="${k}" aria-pressed="${!hidden.has(k)}" title="${hidden.has(k) ? 'Show' : 'Hide'} ${NAME[k]?.[1] || k}">${NAME[k]?.[0] || esc(k)} <span class="n">${n(k)}</span></button>`).join('')
+    + `<label class="check p-play" title="Each further question from the same topic counts a little less, so the top of the page has a few from each topic"><input type="checkbox" id="pmix"${mix ? ' checked' : ''}> Mix topics</label>`
     + (merged() ? `<label class="check p-play" title="Manifold is play money: its odds aren't backed by real bets"><input type="checkbox" id="pplay"${play ? ' checked' : ''}> Play money</label>` : '');
 }
-const filterCount = () => [...hidden].filter(k => k !== 'games' && k !== 'short').length + (hidden.has('games') ? 0 : 1) + (hidden.has('short') ? 0 : 1) + (play ? 1 : 0) + (tf !== '1d' ? 1 : 0) + (groupBy !== 'none' ? 1 : 0) + (viewAs !== 'tiles' ? 1 : 0);
+const filterCount = () => [...hidden].filter(k => k !== 'games' && k !== 'short').length + (hidden.has('games') ? 0 : 1) + (hidden.has('short') ? 0 : 1) + (play ? 1 : 0) + (mix ? 0 : 1) + (tf !== '1d' ? 1 : 0) + (groupBy !== 'none' ? 1 : 0) + (viewAs !== 'tiles' ? 1 : 0);
 function watchHTML() {
   const ms = P.markets.filter(m => watch.has(m.id));
   if (!ms.length) return '';
@@ -709,7 +715,10 @@ export function start() {
     if (hidden.has(k)) hidden.delete(k); else hidden.add(k);
     store.set('hm.predHide', [...hidden]); render();
   });
-  on('#ptopics', 'change', e => { if (e.target.id === 'pplay') { play = e.target.checked; store.set('hm.predPlay', play); render(); } });
+  on('#ptopics', 'change', e => {
+    if (e.target.id === 'pplay') { play = e.target.checked; store.set('hm.predPlay', play); render(); }
+    if (e.target.id === 'pmix') { mix = e.target.checked; store.set('hm.predMix', mix); render(); }
+  });
   on('#pfiltBtn', 'click', e => { const open = $('#pfilters').hidden; $('#pfilters').hidden = !open; e.currentTarget.setAttribute('aria-expanded', open); });
   let qt = 0;
   on('#psearch', 'input', e => { clearTimeout(qt); qt = setTimeout(() => { query = e.target.value.trim(); render(); }, 150); });
