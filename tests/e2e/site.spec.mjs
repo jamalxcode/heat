@@ -1060,7 +1060,10 @@ test.describe('predictions', () => {
     await expect(top).toHaveClass(/sz-l/);
     await expect(top).toHaveClass(/c2/);                                                            // 71% sure: the middle shade
     await expect(top.locator('.pt-rank')).toHaveText('#1');
-    await expect(top.locator('.pt-title')).toHaveText('NYC mayor winner?');
+    await expect(top.locator('.pt-title')).toHaveText('🇺🇸NYC mayor winner?');                    // a flag for US politics, then the headline
+    await expect(top.locator('.pt-full')).toHaveCount(0);                                         // short already: no second line
+    await expect(top.locator('.p-end')).toHaveText(/yrs\+ left$/);                                // the time-left ring
+    await expect(top.locator('.p-end')).toHaveClass(/e-far/);
     await expect(top.locator('.pt-verdict')).toHaveText('Leaning');
     await expect(top.locator('.pt-ans')).toHaveText('Alice');
     await expect(top.locator('.pt-p')).toHaveText('71%');
@@ -1082,7 +1085,7 @@ test.describe('predictions', () => {
     expect(await page.locator('.p-news').evaluateAll(els => els.map(e => e.dataset.id))).toEqual(['pm:fed', 'pm:mayor', 'ks:SEN', 'ks:SEN']);
     await page.locator('.p-news').first().click();
     await expect(page.locator('#detail')).toHaveClass(/pinned/);
-    await expect(page.locator('#detail .p-q')).toHaveText('Fed cut in December?');
+    await expect(page.locator('#detail .p-q')).toHaveText('🏦Fed cut in December?');
   });
 
   test('the tabs ask a question: close calls, biggest bets, venues disagree', async ({ page }) => {
@@ -1146,7 +1149,7 @@ test.describe('predictions', () => {
     expect((await ids(page, '.p-map .pm-tile')).sort()).toEqual(['ks:GAME', 'ks:SEN', 'pm:fed', 'pm:mayor']);
     await expect(page.locator('.p-mapnote')).toContainText('1 question without money figures');
     await page.locator('.pm-tile[data-id="pm:mayor"]').click();
-    await expect(page.locator('#detail .p-q')).toHaveText('NYC mayor winner?');
+    await expect(page.locator('#detail .p-q')).toHaveText('🇺🇸NYC mayor winner?');
     await page.keyboard.press('Escape');
     await page.locator('#pview button[data-v="tiles"]').click();
     await page.locator('#pgroup').selectOption('story');

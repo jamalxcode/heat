@@ -149,6 +149,97 @@ export function storyOf(title) {
   return null;
 }
 
+/* ---------- a picture for each question: a flag for a country's politics, a coin for crypto, and so on ---------- */
+// first match wins; flags before topics, so "Prime Minister of Israel" is 🇮🇱 and not 🗳️
+const FLAGS = [
+  ['🇬🇧', /\b(uk|u\.k\.|britain|british|england|scotland|starmer|labour|tory|tories|reform uk|farage|westminster)\b/],
+  ['🇨🇦', /\b(canada|canadian|carney|poilievre|trudeau|ontario|quebec)\b/],
+  ['🇫🇷', /\b(france|french|macron|le pen|bardella|m[ée]lenchon)\b/],
+  ['🇩🇪', /\b(germany|german|merz|bundestag|afd)\b/],
+  ['🇮🇱', /\b(israel|israeli|netanyahu|knesset|gaza|hamas)\b/],
+  ['🇮🇷', /\b(iran|iranian|khamenei|pahlavi|tehran|hormuz)\b/],
+  ['🇺🇦', /\b(ukraine|ukrainian|zelensky|kyiv|crimea)\b/],
+  ['🇷🇺', /\b(russia|russian|putin|kremlin)\b/],
+  ['🇹🇼', /\b(taiwan|taipei|kaohsiung)\b/],
+  ['🇸🇪', /\b(sweden|swedish)\b/],
+  ['🇪🇸', /\b(spain|spanish|s[aá]nchez)\b/],
+  ['🇳🇱', /\b(netherlands|dutch)\b/],
+  ['🇮🇹', /\b(italy|italian|meloni)\b/],
+  ['🇨🇳', /\b(china|chinese|xi jinping|beijing)\b/],
+  ['🇻🇪', /\b(venezuela|maduro|machado)\b/],
+  ['🇯🇵', /\b(japan|japanese|takaichi)\b/],
+  ['🇰🇷', /\b(south korea|korean)\b/],
+  ['🇰🇵', /\b(north korea|kim jong)\b/],
+  ['🇮🇳', /\b(india|indian|modi)\b/],
+  ['🇧🇷', /\b(brazil|brazilian|lula|bolsonaro)\b/],
+  ['🇦🇷', /\b(argentina|milei)\b/],
+  ['🇲🇽', /\b(mexico|mexican|sheinbaum)\b/],
+  ['🇦🇺', /\b(australia|australian|albanese)\b/],
+  ['🇵🇱', /\b(poland|polish)\b/],
+  ['🇭🇺', /\b(hungary|orb[aá]n)\b/],
+  ['🇹🇷', /\b(turkey|erdo[gğ]an)\b/],
+  ['🇻🇦', /\b(pope|vatican)\b/],
+];
+const US = /\b(us|u\.s\.|usa|america|american|senate|senator|house|congress|governor|gubernatorial|mayor|mayoral|nyc|los angeles|trump|vance|newsom|harris|biden|democrats?|democratic|republicans?|gop|midterms?|supreme court|scotus|alito|white house|electoral|presidential|blue (wave|tsunami)|red wave|[a-z]{2}-\d{1,2}|h\.r\.?\s?\d+)\b/;
+const ICONS = [
+  ['🪙', /\b(bitcoin|btc|crypto|ethereum|eth|solana|xrp|doge(coin)?|stablecoin|memecoin|coinbase|token)\b/],
+  ['🏦', /\b(fed|fomc|interest rates?|rate cuts?|rate hikes?|powell)\b/], ['📈', /\b(s&p|nasdaq|dow|stocks?|recession|gdp|inflation|cpi|jobs|unemployment|tariffs?|layoffs)\b/],
+  ['🛢️', /\b(oil|gas prices?|opec)\b/], ['🤖', /\b(ai|openai|chatgpt|gpt|anthropic|claude|gemini|agi|grok)\b/], ['🚀', /\b(spacex|starship|nasa|rocket|moon|mars)\b/], ['👽', /\b(aliens?|ufos?|uap)\b/],
+  ['🏈', /\b(nfl|super bowl|pro football|college football|heisman|cfp)\b/], ['🏀', /\b(nba|wnba|ncaa basketball|march madness)\b/], ['⚾', /\b(mlb|world series)\b/], ['🏒', /\b(nhl|stanley cup)\b/],
+  ['🎾', /\b(atp|wta|wimbledon|us open|french open|australian open|masters|grand slam)\b/], ['🏎️', /\b(f1|formula 1|grand prix|nascar)\b/], ['🥊', /\b(ufc|boxing|fight)\b/], ['⛳', /\b(pga|golf|masters tournament)\b/],
+  ['🎮', /\b(lol|league of legends|worlds|esports|cs2|dota|valorant)\b/], ['⚽', /\b(uefa|champions league|premier league|la liga|serie a|bundesliga|fifa|world cup|laliga|fc|cf|sk|real madrid|liverpool|arsenal|manchester|barcelona|bayern|psg|chelsea|juventus|milan|inter|dortmund|napoli|porto|ajax|psv|celtic|betis|sevilla|atl[eé]tico|tottenham|leipzig)\b/],
+  ['📱', /\b(tweets?|truth social|x posts?)\b/], ['🎬', /\b(oscars?|box office|movie|film|netflix)\b/], ['🎵', /\b(grammys?|album|song|billboard|spotify|taylor swift)\b/], ['🏆', /\b(award|person of the year|nobel)\b/],
+  ['🌀', /\b(hurricane|storm|typhoon)\b/], ['🌡️', /\b(temperature|heat|warmest|climate)\b/],
+];
+const CAT_ICON = { Politics: '🗳️', World: '🌍', Economy: '📈', Business: '💼', Crypto: '🪙', 'Tech & science': '🔬', Sports: '🏆', Culture: '🎭', Climate: '🌡️', Other: '🔮' };
+export function iconOf(title, cat) {
+  const t = ' ' + String(title).toLowerCase() + ' ';
+  if (cat === 'Politics' || cat === 'World') {
+    const f = FLAGS.find(([, re]) => re.test(t));
+    if (f) return f[0];
+    if (US.test(t) || STATES.some(s => t.includes(' ' + s + ' '))) return '🇺🇸';
+  }
+  if (cat === 'Sports' && /\bvs\.?\b/.test(t) && !ICONS.slice(8, 18).some(([, re]) => re.test(t))) return '🏟️';
+  const i = ICONS.find(([, re]) => re.test(t));
+  return i ? i[0] : CAT_ICON[cat] || '🔮';
+}
+const icon = m => `<span class="p-ico" aria-hidden="true">${iconOf(m.title, m.cat)}</span>`;
+
+/* ---------- a short headline, the full question under it ---------- */
+const MAXHEAD = 52;                    // a headline longer than this is cut (the full question shows under it)
+const capFirst = s => s ? s[0].toUpperCase() + s.slice(1) : s;
+export function shortTitle(title) {
+  let s = String(title).replace(/\s*-\s*More Markets$/i, '').replace(/\s*\((Build Your Map|[A-Z]{2}-\d+|H\.R\.\s?\d+|Directional|Person|Party)\)/gi, '').replace(/\u200b/g, '').replace(/\s+/g, ' ').trim();
+  const q = /\?$/.test(s);
+  s = s.replace(/\?$/, '');
+  let r;
+  if ((r = s.match(/^What (?:price )?will (.+?) hit (?:in |by |on )?(.+)$/i))) s = `${r[1].replace(/\s*\((\w+)\)$/, '')} peak ${r[2]}`;
+  else if ((r = s.match(/^(.+?) price on (.+?)( at .+)?$/i))) s = `${r[1]} price on ${r[2]}`;
+  else if ((r = s.match(/^How many (.+?) will (.+?) (hold|win|have|get)( after| in| by)? (the )?(.+)$/i))) s = `${r[2]}’ ${r[1]}${r[4] ? r[4] : ' in'} ${r[6]}`.replace(/s’ /, 's’ ').replace(/([^s])’ /, '$1’s ');
+  else if ((r = s.match(/^How many (.+)$/i))) s = `Number of ${r[1]}`;
+  else if ((r = s.match(/^Who will win (the )?(.+)$/i))) s = `${r[2]}: winner`;
+  else if ((r = s.match(/^Which party will win (the )?(.+)$/i))) s = `${r[2]}: which party`;
+  else if (s.length > MAXHEAD && (r = s.match(/^Will (the )?(.+)$/i))) s = capFirst(r[2]) + (q ? '?' : '');
+  else if (q) s += '?';
+  s = s.replace(/\s*\.\.\.\?$/, ' …?').replace(/\s+\.\.\.$/, '…');
+  if (s.length > MAXHEAD) { const cut = s.slice(0, MAXHEAD - 2); s = cut.slice(0, Math.max(cut.lastIndexOf(' '), 28)).replace(/[,:;\s]+$/, '') + '…'; }
+  return capFirst(s);
+}
+// the shortened headline and, when it differs, the full question
+const titleParts = m => { const s = shortTitle(m.title), full = String(m.title).replace(/\u200b/g, ''); const k = x => x.toLowerCase().replace(/[^a-z0-9]+/g, ''); return [s, k(s) === k(full) ? '' : full]; };
+
+/* ---------- time left: a ring that fills up as the end date nears ---------- */
+// days to go on a log scale over a year, so a week and a month look different while next year still shows a sliver
+const daysLeft = m => m.end ? Math.round((Date.parse(m.end + 'T23:59:59Z') - Date.now()) / DAY) : null;
+const leftLabel = d => d == null ? '' : d < 0 ? 'ended' : d === 0 ? 'today' : d === 1 ? '1 day' : d < 14 ? `${d} days` : d < 60 ? `${Math.round(d / 7)} wks` : d < 365 ? `${Math.round(d / 30.4)} mo` : d < 730 ? '1 yr+' : `${Math.floor(d / 365)} yrs+`;
+const leftClass = d => d < 0 ? 'e-over' : d <= 1 ? 'e-now' : d <= 7 ? 'e-week' : d <= 31 ? 'e-month' : 'e-far';
+function endHTML(m, big = false) {
+  const d = daysLeft(m);
+  if (d == null) return '';
+  const u = d < 0 ? 1 : Math.max(0.04, 1 - Math.log(1 + d) / Math.log(366)), r = 6, c = 2 * Math.PI * r;
+  return `<span class="p-end ${leftClass(d)}${big ? ' big' : ''}" title="${d < 0 ? `Ended ${dayLabel(m.end)}` : `Ends ${dayLabel(m.end)}`}"><svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="${r}" fill="none" stroke="currentColor" stroke-opacity=".25" stroke-width="2.6"/><circle cx="8" cy="8" r="${r}" fill="none" stroke="currentColor" stroke-width="2.6" stroke-dasharray="${(u * c).toFixed(2)} ${c.toFixed(2)}" transform="rotate(-90 8 8)" stroke-linecap="round"/></svg>${d < 0 ? 'ended' : d <= 1 ? `ends ${leftLabel(d)}` : leftLabel(d) + ' left'}</span>`;
+}
+
 /* ---------- the same question on several venues (matched by the build: m.group) ---------- */
 const membersOf = m => m.group ? groups.get(m.group) || [m] : [m];
 const priceOn = (x, name, yn) => {
@@ -239,15 +330,15 @@ function tileHTML(m, size, done = false) {
   const h = shownOutcome(m), ch = h[tfKey()], cmp = merged() ? comparison(m) : null;
   const badges = (cmp ? cmp.rows.map(r => r.x) : [m]).map(x => `<span class="pv pv-${x.venue}" title="${VNAME[x.venue]}">${VTAG[x.venue]}</span>`).join('');
   const label = `${m.title}: ${verdict(m, h)}, ${h.name}, ${pct(h.p)}. Move ${TFS.find(t => t[0] === tf)[2]} ${pts(ch)}. ${(cmp ? cmp.rows.map(r => VNAME[r.x.venue]) : [VNAME[m.venue]]).join(', ')}`;
-  const t$ = mToday(m), T$ = mTotal(m), place = pos.get(m.id);
+  const t$ = mToday(m), T$ = mTotal(m), place = pos.get(m.id), tp = titleParts(m);
   return `<button class="ptile sz-${size} ${sureClass(h)}${m.id === sel ? ' sel' : ''}${m.stale ? ' stale' : ''}${thin(m) ? ' thin' : ''}${done ? ' done' : ''}" data-id="${esc(m.id)}" data-coin="1" aria-haspopup="dialog" aria-label="${esc(label)}">
     <span class="pt-top"><span class="pt-id">${badges}${place && !done ? `<span class="pt-rank">#${place}</span>` : ''}${watch.has(m.id) ? '<span class="pt-star" title="On your watchlist">★</span>' : ''}</span>${chip(ch)}</span>
-    <span class="pt-title">${esc(m.title)}</span>
+    <span class="pt-title">${icon(m)}${esc(tp[0])}</span>${tp[1] ? `<span class="pt-full">${esc(tp[1])}</span>` : ''}
     <span class="pt-verdict">${verdict(m, h)}</span>
     <span class="pt-ans">${esc(h.name)}</span>
     <span class="pt-nums"><b class="pt-p">${pct(h.p)}</b>${spark(m, size === 'l' ? 120 : 64, size === 'l' ? 30 : 18)}</span>
     ${cmp ? `<span class="pt-cmp${cmp.spread >= DIFFER ? ' differ' : ''}" title="The same answer on each venue${cmp.spread >= DIFFER ? `: they differ by ${Math.round(cmp.spread * 100)} points` : ''}">${cmp.spread >= DIFFER ? '⚡ ' : ''}${cmp.rows.map(r => `${VTAG[r.x.venue]} ${pct(r.p)}`).join(' · ')}</span>` : ''}
-    <span class="pt-foot">${done ? esc(decidedWhy(m)) : `${t$ != null ? `<b>${money(t$, 'USD')}</b> today · ` : ''}${T$ != null ? `${money(T$, 'USD')} total${playNote(m)}` : 'no money figures'}${m.end ? ` · ends ${dayLabel(m.end)}` : ''}${thin(m) ? ' · thin market' : ''}`}${m.stale ? ' · ⚠ not refreshed' : ''}</span>
+    <span class="pt-foot">${done ? esc(decidedWhy(m)) : `${endHTML(m, size === 'l')}${t$ != null ? `<b>${money(t$, 'USD')}</b> today · ` : ''}${T$ != null ? `${money(T$, 'USD')} total${playNote(m)}` : 'no money figures'}${thin(m) ? ' · thin market' : ''}`}${m.stale ? ' · ⚠ not refreshed' : ''}</span>
   </button>`;
 }
 function grid(ms) {
@@ -293,7 +384,7 @@ function mapHTML(live) {
     for (const r of squarify(b.ms.map(m => ({ m, v: mInterest(m) })), b.x + 1, b.y + 1 + head, b.w - 2, b.h - 2 - head)) {
       const m = r.m, h = shownOutcome(m), area = r.w * r.h, sz = area > 26000 ? 'big' : area > 9000 ? 'mid' : area > 2500 ? 'small' : 'tiny';
       html += `<button class="pm-tile ${sureClass(h)} pm-${sz}${m.id === sel ? ' sel' : ''}" data-id="${esc(m.id)}" data-coin="1" style="left:${r.x + 1}px;top:${r.y + 1}px;width:${Math.max(0, r.w - 2)}px;height:${Math.max(0, r.h - 2)}px" title="${esc(`${m.title}: ${verdict(m, h)} ${h.name} ${pct(h.p)} · ${money(mInterest(m), 'USD')} interest`)}" aria-label="${esc(`${m.title}: ${verdict(m, h)}, ${h.name}, ${pct(h.p)}`)}">`
-        + `${sz === 'tiny' ? '' : `<span class="pm-title">${esc(m.title)}</span>`}<span class="pm-ans">${sz === 'tiny' ? '' : esc(h.name) + ' '}<b>${pct(h.p)}</b></span>${sz === 'big' || sz === 'mid' ? `<span class="pm-foot">${chip(h[tfKey()])} ${money(mToday(m), 'USD')} today</span>` : ''}</button>`;
+        + `${sz === 'tiny' ? `<span class="pm-title">${iconOf(m.title, m.cat)}</span>` : `<span class="pm-title">${icon(m)}${esc(shortTitle(m.title))}</span>`}<span class="pm-ans">${sz === 'tiny' ? '' : esc(h.name) + ' '}<b>${pct(h.p)}</b></span>${sz === 'big' || sz === 'mid' ? `<span class="pm-foot">${chip(h[tfKey()])} ${endHTML(m)} ${money(mToday(m), 'USD')} today</span>` : ''}</button>`;
     }
   }
   return `<div class="p-map" style="height:${H}px">${html}</div><p class="r-muted p-mapnote">Each rectangle’s area is the money on that question (bet today + a 30th of all money bet); blocks are topics; darker = the market is surer.${left ? ` ${left} question${left > 1 ? 's' : ''} without money figures (PredictIt) aren’t drawn.` : ''}</p>`;
@@ -315,7 +406,7 @@ function todayHTML(live) {
     if (dis) { const c = comparison(dis); cards.push(['Venues disagree', dis, `⚡ ${c.rows.map(r => `${VTAG[r.x.venue]} ${pct(r.p)}`).join(' · ')}`]); }
   }
   if (!cards.length) return '';
-  return `<section class="p-today" aria-label="Today at a glance">${cards.map(([k, m, line]) => `<button class="p-news" data-id="${esc(m.id)}" data-coin="1"><span class="p-news-k">${k}</span><span class="p-news-t">${esc(m.title)}</span><span class="p-news-l">${line}</span></button>`).join('')}</section>`;
+  return `<section class="p-today" aria-label="Today at a glance">${cards.map(([k, m, line]) => `<button class="p-news" data-id="${esc(m.id)}" data-coin="1"><span class="p-news-k">${k}</span><span class="p-news-t">${icon(m)}${esc(shortTitle(m.title))}</span><span class="p-news-l">${line}</span></button>`).join('')}</section>`;
 }
 
 /* ---------- table ---------- */
@@ -325,8 +416,8 @@ function tableHTML(ms) {
   const th = COLS.map(([k, l]) => `<th scope="col" data-sort="${k}" aria-sort="${sortBy.key === k ? (sortBy.dir > 0 ? 'ascending' : 'descending') : 'none'}">${l}${sortBy.key === k ? (sortBy.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('');
   return `<div class="r-tblwrap"><table class="r-tbl p-tbl"><thead><tr>${th}</tr></thead><tbody>${rows.map(m => {
     const h = shownOutcome(m), ch = h[tfKey()], vs = merged() ? membersOf(m) : [m];
-    return `<tr class="r-row${decided(m) ? ' done' : ''}" data-id="${esc(m.id)}" tabindex="0"><td>${pos.get(m.id) ?? (decided(m) ? '✓' : '—')}</td><td class="p-tt">${watch.has(m.id) ? '★ ' : ''}${esc(m.title)}</td><td>${vs.map(x => `<span class="pv pv-${x.venue}" title="${VNAME[x.venue]}">${VTAG[x.venue]}</span>`).join(' ')}${vs.length === 1 ? ' ' + VNAME[m.venue] : ''}</td>
-      <td class="p-tt"><span class="r-muted">${verdict(m, h)}:</span> ${esc(h.name)}</td><td><b>${pct(h.p)}</b></td><td><span class="cell-heat ${heat(ch)}">${arrow(ch)}${pts(ch)}</span></td><td>${money(mToday(m), 'USD')}</td><td>${money(mTotal(m), 'USD')}${playNote(m) ? ' <span class="r-muted">play</span>' : ''}</td><td>${dayLabel(m.end)}</td><td>${esc(m.cat)}</td></tr>`;
+    return `<tr class="r-row${decided(m) ? ' done' : ''}" data-id="${esc(m.id)}" tabindex="0"><td>${pos.get(m.id) ?? (decided(m) ? '✓' : '—')}</td><td class="p-tt">${watch.has(m.id) ? '★ ' : ''}${icon(m)}${esc(m.title)}</td><td>${vs.map(x => `<span class="pv pv-${x.venue}" title="${VNAME[x.venue]}">${VTAG[x.venue]}</span>`).join(' ')}${vs.length === 1 ? ' ' + VNAME[m.venue] : ''}</td>
+      <td class="p-tt"><span class="r-muted">${verdict(m, h)}:</span> ${esc(h.name)}</td><td><b>${pct(h.p)}</b></td><td><span class="cell-heat ${heat(ch)}">${arrow(ch)}${pts(ch)}</span></td><td>${money(mToday(m), 'USD')}</td><td>${money(mTotal(m), 'USD')}${playNote(m) ? ' <span class="r-muted">play</span>' : ''}</td><td>${endHTML(m) || '—'}</td><td>${esc(m.cat)}</td></tr>`;
   }).join('')}</tbody></table></div>`;
 }
 
@@ -466,9 +557,9 @@ function detailHTML(m) {
     <div class="p-pophead"><span class="p-popven">${membersOf(m).filter(x => merged() || x === m).map(x => `<span class="pv pv-${x.venue}" title="${VNAME[x.venue]}">${VTAG[x.venue]}</span>`).join('')}</span>
       <button class="btn p-watchbtn" data-watch="${esc(m.id)}" aria-pressed="${watch.has(m.id)}">${watch.has(m.id) ? '★ Watching' : '☆ Watch'}</button>
       <button class="btn p-fullbtn" aria-pressed="${full}" title="${full ? 'Back to the small view' : 'Full screen'}">${full ? '⤡ Smaller' : '⤢ Full view'}</button></div>
-    <h2 class="p-q">${esc(m.title)}</h2>
+    <h2 class="p-q">${icon(m)}${esc(shortTitle(m.title))}</h2>${titleParts(m)[1] ? `<p class="p-qfull">${esc(m.title)}</p>` : ''}
     <p class="p-say"><span class="p-say-v">${verdict(m, h)}:</span> <b class="p-say-a">${esc(h.name)}</b> <b class="p-say-p">${pct(h.p)}</b></p>
-    <p class="p-moves">${moves}</p>
+    <p class="p-moves">${moves}${m.end ? `<span class="p-mv">${endHTML(m, true)} <span class="r-muted">${dayLabel(m.end)}</span></span>` : ''}</p>
     ${m.stale ? '<p class="r-says">⚠ This venue didn’t answer in the latest update: these are its last known prices.</p>' : ''}
     ${chartHTML(m)}
     ${jumps.length ? `<p class="p-jumps"><b>Biggest moves:</b> ${jumps.map(j => `${dayOf(j.day)} <span class="cell-heat ${heat(j.chg)}">${arrow(j.chg)}${pts(j.chg)}</span>`).join(' · ')}</p>` : ''}
