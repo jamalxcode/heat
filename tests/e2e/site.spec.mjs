@@ -1211,6 +1211,10 @@ test.describe('predictions', () => {
     await expect(page.locator('#ptrack tbody tr').nth(4)).toContainText('70–90%');
     await expect(page.locator('#ptrack tbody tr').nth(4)).toContainText('20');
     await expect(page.locator('#ptrack tbody tr').nth(4)).toContainText('75%');
+    // on a phone the whole table fits: the "Happened" column isn't pushed off-screen
+    await page.setViewportSize({ width: 375, height: 800 });
+    const box = await page.locator('#ptrack table').boundingBox();
+    expect(box.x + box.width).toBeLessThanOrEqual(375);
   });
 
   test('since your last visit: the biggest moves since the saved visit, and a chip on the tile', async ({ page }) => {
@@ -1241,9 +1245,12 @@ test.describe('predictions', () => {
     await expect(page.locator('#pfiltBtn .n')).toHaveText('3');                                   // play money, games shown, politics hidden
     await page.locator('#ptopics button[data-topic="Politics"]').click();
     await page.locator('#pview button[data-v="map"]').click();
-    // area = the square root of the money with Mix topics on, so even the small ones get a rectangle (the map doesn't stack stories)
-    expect((await ids(page, '.p-map .pm-tile')).sort()).toEqual(['ks:GAME', 'ks:SEN', 'mf:x', 'pm:by', 'pm:eth', 'pm:fed', 'pm:mayor', 'pm:seats', 'pm:thin']);
-    await expect(page.locator('.p-mapnote')).toContainText('1 question without money figures');
+    // area = the square root of the money with Mix topics on, so even the small ones get a rectangle; one block per story
+    // (the Senate seats question is in the Senate block, listed in its popup)
+    expect((await ids(page, '.p-map .pm-tile')).sort()).toEqual(['ks:GAME', 'ks:SEN', 'mf:x', 'pm:by', 'pm:eth', 'pm:fed', 'pm:mayor', 'pm:thin']);
+    await expect(page.locator('.p-mapnote')).toContainText('1 without money figures');
+    expect(await page.locator('.pm-tile[data-id="ks:SEN"]').getAttribute('aria-label')).toContain('1 related question');
+    await expect(page).toHaveURL(/view=map/);
     await page.locator('.pm-tile[data-id="pm:mayor"]').click();
     await expect(page.locator('#detail .p-q')).toHaveText('🇺🇸NYC mayor winner?');
     await page.keyboard.press('Escape');

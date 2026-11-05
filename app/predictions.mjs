@@ -43,7 +43,8 @@ let P = null, loadedAt = 0, sel = null, query = '', groups = new Map(), full = f
 const pos = new Map();                 // each question's place in the current order (the #number on its tile)
 let venue = (v => ['all', ...VENUES.map(x => x[0])].includes(v) ? v : null)(Q.get('v')) || pref('hm.predVenue', ['all', ...VENUES.map(x => x[0])], 'all');
 let tf = pref('hm.predTf', TFS.map(t => t[0]), '1d');
-let viewAs = pref('hm.predView2', ['tiles', 'map', 'table'], 'tiles');
+const VIEWS = ['tiles', 'map', 'table'];
+let viewAs = (v => VIEWS.includes(v) ? v : null)(Q.get('view')) || pref('hm.predView2', VIEWS, 'tiles');   // a shared link's view wins
 let groupBy = pref('hm.predGroup2', ['none', 'cat', 'story'], 'none');
 let order = (o => ORDERS.some(x => x[0] === o) ? o : null)(Q.get('o')) || pref('hm.predOrder', ORDERS.map(x => x[0]), 'money');
 let mix = store.get('hm.predMix') !== false;                         // a mixed front page: a few from each topic (on by default)
@@ -454,7 +455,8 @@ function trackHTML() {
   });
   return `<details class="p-decided p-track" id="ptrack"${open ? ' open' : ''}>${head}
     <p class="r-muted">Every answer of a settled question, by what it was priced at a week before: how often it happened. A well-priced market's answers at 80% happen about 80% of the time.</p>
-    <table class="r-tbl p-ttbl"><thead><tr><th>Priced a week before</th><th>Answers</th><th>Happened</th><th></th></tr></thead><tbody>${bands.map(b => `<tr><td>${Math.round(b.lo * 100)}–${Math.round(b.hi * 100)}%</td><td>${b.n}</td><td>${b.rate == null ? '—' : `<b>${Math.round(b.rate * 100)}%</b> <span class="r-muted">(avg price ${Math.round(b.avg * 100)}%)</span>`}</td><td class="p-pbar">${b.rate == null ? '' : `<span style="width:${Math.round(b.rate * 100)}%"></span>`}</td></tr>`).join('')}</tbody></table>
+    <table class="r-tbl p-ttbl"><thead><tr><th>Priced a week before</th><th>Happened</th><th aria-label="Happened, with the average price marked"></th><th>Answers</th></tr></thead><tbody>${bands.map(b => `<tr><td>${Math.round(b.lo * 100)}–${Math.round(b.hi * 100)}%</td><td>${b.rate == null ? '—' : `<b>${Math.round(b.rate * 100)}%</b>`}</td><td class="p-pbar">${b.rate == null ? '' : `<span style="width:${Math.round(b.rate * 100)}%"></span><i style="left:${Math.round(b.avg * 100)}%" title="Average price ${Math.round(b.avg * 100)}%"></i>`}</td><td>${b.n}</td></tr>`).join('')}</tbody></table>
+    <p class="r-muted p-tkey">Bar: how often it happened · tick: the average price. A tick at the bar’s end means the prices were right.</p>
     <p class="r-src">From each venue’s own 1-week price change when the question settled (97%+ for the answer). Real money only. Small bands are noisy.</p></details>`;
 }
 function decidedHTML(done) {
@@ -484,26 +486,48 @@ export function squarify(items, x, y, w, h) {
   }
   return out;
 }
+// a few words for a small rectangle: the story ("Iran · 6") or the start of the short headline
+function fewWords(m, h, n) {
+  if (n > 1) return `${storyOf(m.title)} · ${n}`;
+  return shortTitle(fullTitle(m, h)).replace(/^(will|who|what|which|when|how|is|are|does|do|the)\s+/i, '').replace(/^(the|a)\s+/i, '').split(/\s+/).slice(0, 3).join(' ').replace(/[?:,.…]+$/, '');
+}
+const MAP_PHONE = 18;                  // rectangles drawn on a phone; the rest are a "more" block that opens the grid
 function mapHTML(live) {
   const ms = live.filter(m => mInterest(m) > 0), left = live.length - ms.length;
   if (!ms.length) return '<p class="p-empty">No money figures to draw a map from.</p>';
-  const W = Math.max(320, $('#grid').clientWidth || 1000), H = Math.round(Math.max(420, Math.min(900, W * (innerWidth <= 640 ? 1.6 : 0.62))));
+  const phone = innerWidth <= 640;
+  const W = Math.max(320, $('#grid').clientWidth || 1000), H = Math.round(Math.max(420, Math.min(900, W * (phone ? 1.25 : 0.62))));
   // with Mix topics on, area is the square root of the money, so politics doesn't swallow the map and smaller topics are
   // readable; off, area is the money itself
   const area = m => mix ? Math.sqrt(mInterest(m)) : mInterest(m);
-  const byCat = CATS.map(c => ({ c, ms: ms.filter(m => m.cat === c) })).filter(x => x.ms.length).map(x => ({ ...x, v: x.ms.reduce((s, m) => s + area(m), 0) }));
+  // one rectangle per story (the ten Iran questions are one block, sized by all of them; the popup lists the rest)
+  const { out, also } = stack([...ms].sort((a, b) => mInterest(b) - mInterest(a)));
+  let items = out.map(m => ({ m, also: also.get(m.id) || [] })).map(x => ({ ...x, v: area(x.m) + x.also.reduce((t, y) => t + area(y), 0) }));
+  let cut = [];
+  if (phone && items.length > MAP_PHONE) { items.sort((a, b) => b.v - a.v); cut = items.slice(MAP_PHONE); items = items.slice(0, MAP_PHONE); }
+  const cutN = cut.reduce((t, x) => t + 1 + x.also.length, 0);
+  const byCat = CATS.map(c => ({ c, xs: items.filter(x => x.m.cat === c) })).filter(x => x.xs.length).map(x => ({ ...x, v: x.xs.reduce((t, y) => t + y.v, 0) }));
   let html = '';
   for (const b of squarify(byCat, 0, 0, W, H)) {
     const head = b.h > 40 && b.w > 70 ? 16 : 0;
     html += `<div class="pm-block" style="left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px">${head ? `<span class="pm-cat">${esc(b.c)}</span>` : ''}</div>`;
-    for (const r of squarify(b.ms.map(m => ({ m, v: area(m) })), b.x + 1, b.y + 1 + head, b.w - 2, b.h - 2 - head)) {
-      const m = r.m, h = shownOutcome(m), area = r.w * r.h, sz = area > 26000 ? 'big' : area > 9000 ? 'mid' : area > 2500 ? 'small' : 'tiny';
-      html += `<button class="pm-tile ${sureClass(h)} pm-${sz}${m.id === sel ? ' sel' : ''}" data-id="${esc(m.id)}" data-coin="1" style="left:${r.x + 1}px;top:${r.y + 1}px;width:${Math.max(0, r.w - 2)}px;height:${Math.max(0, r.h - 2)}px" title="${esc(`${m.title}: ${verdict(m, h)} ${h.name} ${pct(h.p)} · ${money(mInterest(m), 'USD')} interest`)}" aria-label="${esc(`${m.title}: ${verdict(m, h)}, ${h.name}, ${pct(h.p)}`)}">`
-        // small rectangles: the icon and the chance only (a cut-off "Mojtab…" helps nobody); the rest on hover and click
-        + `${sz === 'tiny' || sz === 'small' ? `<span class="pm-title">${iconOf(m.title, m.cat)}</span>` : `<span class="pm-title">${icon(m)}${esc(shortTitle(fullTitle(m, h)))}</span>`}<span class="pm-ans">${sz === 'tiny' || sz === 'small' ? '' : esc(answer(m, h)) + ' '}<b>${pct(h.p)}</b></span>${sz === 'big' || sz === 'mid' ? `<span class="pm-foot">${chip(h[tfKey()])} ${endHTML(m)} ${money(mToday(m), 'USD')} today</span>` : ''}</button>`;
+    for (const r of squarify(b.xs, b.x + 1, b.y + 1 + head, b.w - 2, b.h - 2 - head)) {
+      const m = r.m, h = shownOutcome(m), a = r.w * r.h, n = 1 + r.also.length;
+      // by shape as well as area: a narrow sliver has room for the chance only, never a cut-off "9…"
+      const sz = r.w < 66 || r.h < 36 || a < 2500 ? 'tiny' : a > 26000 && r.w > 150 ? 'big' : a > 9000 && r.w > 110 ? 'mid' : 'small';
+      const one = sz === 'small' && r.h < 64;
+      const label = sz === 'big' || sz === 'mid'
+        ? `<span class="pm-title">${icon(m)}${esc(shortTitle(fullTitle(m, h)))}</span>`
+        : sz === 'small' ? `<span class="pm-title pm-words${one ? ' pm-one' : ''}">${esc(fewWords(m, h, n))}</span>`
+        : r.h >= 54 && r.w >= 40 ? `<span class="pm-title pm-ticon" aria-hidden="true">${iconOf(m.title, m.cat)}</span>` : '';
+      html += `<button class="pm-tile ${sureClass(h)} pm-${sz}${m.id === sel ? ' sel' : ''}" data-id="${esc(m.id)}" data-coin="1" style="left:${r.x + 1}px;top:${r.y + 1}px;width:${Math.max(0, r.w - 2)}px;height:${Math.max(0, r.h - 2)}px" title="${esc(`${fullTitle(m, h)}: ${verdict(m, h)} ${h.name} ${pct(h.p)} · ${money(mInterest(m), 'USD')} interest${n > 1 ? ` · ${n - 1} related in the popup` : ''}`)}" aria-label="${esc(`${fullTitle(m, h)}: ${verdict(m, h)}, ${h.name}, ${pct(h.p)}${n > 1 ? `; ${n - 1} related questions` : ''}`)}">`
+        + label + `<span class="pm-ans">${sz === 'big' || sz === 'mid' ? esc(answer(m, h)) + ' ' : ''}<b>${pct(h.p)}</b></span>`
+        + (sz === 'big' || sz === 'mid' ? `<span class="pm-foot">${chip(h[tfKey()])} ${endHTML(m)} ${money(mToday(m), 'USD')} today${n > 1 ? ` · <span class="pm-also">+${n - 1} related</span>` : ''}</span>` : '')
+        + '</button>';
     }
   }
-  return `<div class="p-map" style="height:${H}px">${html}</div><p class="r-muted p-mapnote">Each rectangle’s area is the money on that question (bet today + a 30th of all money bet${mix ? '; with Mix topics on, its square root, so smaller topics stay readable' : ''}); blocks are topics; darker and bold = likelier; lighter and italic = less likely.${left ? ` ${left} question${left > 1 ? 's' : ''} without money figures (PredictIt) aren’t drawn.` : ''}</p>`;
+  const more = cutN ? `<p class="p-morewrap"><button class="btn p-more" id="pmapmore">${cutN} more question${cutN > 1 ? 's' : ''} <span class="r-muted">· see them all in the grid</span></button></p>` : '';
+  return `<div class="p-map" style="height:${H}px">${html}</div>${more}<p class="r-muted p-mapnote">Size = money · darker = likelier · one block per story${left ? ` · ${left} without money figures (PredictIt) not drawn` : ''}</p>`;
 }
 
 /* ---------- just decided: results of the last days, with what the market said a week before ---------- */
@@ -513,7 +537,11 @@ function recentHTML(done) {
   const rows = done.filter(m => !isPlay(m)).map(m => {
     const h = shownOutcome(m), d = daysLeft(m), was = h.d7 != null ? h.p - h.d7 : null;
     return { m, h, was, recent: (d != null && d < 0 && d >= -10) || (was != null && was < 0.9) };
-  }).filter(r => r.recent).sort((a, b) => mInterest(b.m) - mInterest(a.m)).slice(0, 10);
+  }).filter(r => r.recent).sort((a, b) => mInterest(b.m) - mInterest(a.m));
+  // mixed: each further result from the same topic counts for less, so one election night doesn't fill the row
+  const seenCat = new Map();
+  const score = new Map(rows.map(r => { const k = r.m.cat, i = seenCat.get(k) || 0; seenCat.set(k, i + 1); return [r, mInterest(r.m) * MIX ** i]; }));
+  rows.sort((a, b) => score.get(b) - score.get(a)).splice(10);
   if (!rows.length) return '';
   return `<section class="p-recent" aria-label="Just decided"><h3 class="p-recent-h">Just decided <span class="r-muted">${rows.length} · results of the last days, and what the market said a week before</span></h3><div class="p-row">${rows.map(({ m, h, was }) => {
     // an upset only where the answer is a name or a yes/no: on a margin or seat ladder the step shown changes, so "a week
@@ -649,16 +677,20 @@ function render() {
   $('#pfiltBtn').innerHTML = `⚙ Filters${n ? ` <span class="n">${n}</span>` : ''}`;
   const note = merged() ? VENUES.map(v => P.venues?.[v[0]]?.state === 'stale' ? venueNote(v[0]) : '').join('') : venueNote(venue);
   const all = [...live, ...done];
-  const intro = !query && viewAs !== 'table' ? recentHTML(done) + sinceHTML(live) + todayHTML(live) + watchHTML() : '';
+  // on a phone each strip is a sideways swipe: only Just decided and Since your last visit sit above the heatmap, Today below it
+  const phone = innerWidth <= 640, strips = !query && viewAs !== 'table';
+  const intro = strips ? recentHTML(done) + sinceHTML(live) + (phone ? '' : todayHTML(live)) + watchHTML() : '';
+  const after = strips && phone ? todayHTML(live) : '';
   if (!all.length) main.innerHTML = note + intro + (query ? `<p class="p-empty">No question matches “${esc(query)}”.</p>` : order === 'disagree' ? '<p class="p-empty">No question is priced 5 or more points apart on two venues right now.</p>' : '<p class="p-empty">No open questions in the topics shown.</p>');
   else if (viewAs === 'table') main.innerHTML = note + tableHTML(all);
-  else if (viewAs === 'map') main.innerHTML = note + intro + mapHTML(live) + decidedHTML(done) + trackHTML();
-  else main.innerHTML = note + intro + sectionsHTML(live) + decidedHTML(done) + trackHTML();
+  else if (viewAs === 'map') main.innerHTML = note + intro + mapHTML(live) + after + decidedHTML(done) + trackHTML();
+  else main.innerHTML = note + intro + sectionsHTML(live) + after + decidedHTML(done) + trackHTML();
   main.className = '';
   $('#plegend').innerHTML = `<span class="p-key"><span class="p-sw c0"></span><i class="lk-lo">unlikely</i> <span class="p-sw c1"></span><span class="p-sw c2"></span><span class="p-sw c3"></span><span class="p-sw c4"></span> <b class="lk-hi">likely</b></span> · move ${TFS.find(t => t[0] === tf)[2]}: <span class="p-key-chg q2">▲ more likely</span> <span class="p-key-chg q-2">▼ less</span> · ${esc(ORDERS.find(x => x[0] === order)[2])}${venue === 'predictit' && ['sure', 'money', 'close'].includes(order) ? ' (PredictIt publishes no money: its own order)' : ''}`;
   const q = new URLSearchParams();
   if (venue !== 'all') q.set('v', venue);
   if (order !== 'money') q.set('o', order);
+  if (viewAs !== 'tiles') q.set('view', viewAs);
   if (sel) q.set('m', sel);
   const url = location.pathname + (q.toString() ? '?' + q : '');
   if (url !== location.pathname + location.search) history.replaceState(null, '', url);
@@ -867,6 +899,7 @@ export function start() {
     const th = e.target.closest('th[data-sort]');
     if (th) { const k = th.dataset.sort; sortBy = { key: k, dir: sortBy.key === k ? -sortBy.dir : ['rank', 'title', 'venue', 'head', 'end', 'cat'].includes(k) ? 1 : -1 }; render(); return; }
     if (e.target.closest('#pmore')) { showN += SHOW_STEP; render(); return; }
+    if (e.target.closest('#pmapmore')) { viewAs = 'tiles'; store.set('hm.predView2', viewAs); render(); scrollTo({ top: $('#grid').getBoundingClientRect().top + scrollY - 60 }); return; }
     const t = e.target.closest('[data-id]');
     if (t && P) openPopup(t.dataset.id);
   });

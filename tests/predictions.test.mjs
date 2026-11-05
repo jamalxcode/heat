@@ -288,17 +288,29 @@ test('backfill: Polymarket price history, trying its other request forms when on
 test('track record: a settled question logs every answer\'s week-before price and whether it happened, once', () => {
   const rec = (id, title, outcomes, extra = {}) => ({ id, venue: 'polymarket', title, cur: 'USD', exclusive: true, outcomes: outcomes.map(([name, p, d7]) => ({ name, p, d7 })), ...extra });
   const ms = [
-    rec('pm:won', 'Who wins?', [['Ann', 0.98, 0.6], ['Bob', 0.02, -0.58], ['Cy', 0.01, null]]),
+    rec('pm:won', 'Who wins?', [['Ann', 0.98, 0.6], ['Bob', 0.02, -0.58]]),
     rec('pm:no', 'Will it happen?', [['Yes', 0.02, -0.3]]),
     rec('pm:open', 'Still open?', [['Yes', 0.6, 0.1]]),
     rec('mf:play', 'Play money?', [['Yes', 0.99, 0.5]], { cur: 'MANA', venue: 'manifold' }),
   ];
   const log = settle(ms, [], Date.UTC(2026, 10, 5));
   assert.deepEqual(log.map(r => r.id), ['pm:won', 'pm:no'], 'open and play-money questions are left out');
-  assert.deepEqual(log[0].pairs, [[0.38, 1], [0.6, 0]], 'Ann was 38% a week before and won; Bob 60% and lost; Cy has no week change');
-  assert.equal(log[0].w, 'Ann');
+  assert.deepEqual(log[0].pairs, [[0.38, 1], [0.6, 0]], 'Ann was 38% a week before and won; Bob 60% and lost');
+  assert.equal(log[0].w, 'Ann'); assert.equal(log[0].full, 1);
   assert.deepEqual(log[1].pairs, [[0.32, 0]]); assert.equal(log[1].w, 'No');
   assert.equal(settle(ms, log).length, 2, 'logged once');
+});
+
+test('track record: a question with answers missing is not logged (it would count mostly winners)', () => {
+  const rec = (id, outcomes, extra = {}) => ({ id, venue: 'kalshi', title: id, cur: 'USD', exclusive: true, outcomes: outcomes.map(([name, p, d7]) => ({ name, p, d7 })), ...extra });
+  const ms = [
+    rec('ks:onlywinner', [['Ann', 0.98, 0.5], ['Bob', 0.01, null], ['Cy', 0.01, null]]),
+    rec('ks:thin', [['Ann', 0.98, 0.5], ['Bob', 0.02, -0.1]]),          // a week before: 48% + 12% = 60% of the chance
+    rec('ks:ladder', [['Above 5', 0.99, 0.1], ['Above 6', 0.02, -0.2]], { exclusive: false, more: 3 }),
+    rec('ks:ladderall', [['Above 5', 0.99, 0.1], ['Above 6', 0.02, -0.2]], { exclusive: false, more: 0 }),
+  ];
+  assert.deepEqual(settle(ms, [], Date.UTC(2026, 10, 5)).map(r => r.id), ['ks:ladderall']);
+  assert.deepEqual(settle([], [{ id: 'old', pairs: [[0.5, 1]] }, { id: 'new', pairs: [[0.5, 1]], full: 1 }]).map(r => r.id), ['new'], 'old one-sided entries are dropped');
 });
 
 test('single games are left out of the build; season-long sports stay', () => {

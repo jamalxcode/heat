@@ -548,28 +548,36 @@ export function matchGroups(markets) {
 }
 
 /* ---------- track record: what the market said a week before each question settled ---------- */
-// When a question's answer reaches 97% (or a yes/no falls to 3%), it's logged once: for every outcome with a known
-// 1-week change, its chance a week before (now − the week's change) and whether it happened (97%+ = yes, 3% or less =
-// no; anything between is left out). Over many questions this says how good the prices are: of answers priced 80–90% a
-// week out, how many happened. Real money only; kept across updates (the last RESULTS_MAX).
-export const SETTLED = 0.97, RESULTS_MAX = 3000;
+// When a question's answer reaches 97% (or a yes/no falls to 3%), it's logged once: for every outcome, its chance a
+// week before (now − the week's change) and whether it happened (97%+ = yes, 3% or less = no). Over many questions
+// this says how good the prices are: of answers priced 80–90% a week out, how many happened. Real money only; kept
+// across updates (the last RESULTS_MAX).
+// A question counts only when its answers are all there. Logging just the ones with a known week-before price would
+// mostly log the winner (the leader is the one with history), and the table would say every band "happens" too often.
+//   yes/no: the Yes side (one pair; No is its mirror)
+//   one-winner lists: every listed answer priced and decided, and those answers held 85%+ of the chance a week before
+//   ladders and other many-winner lists: every answer listed (none cut) and each priced and decided
+// Entries from before this rule (no `full`) are dropped.
+export const SETTLED = 0.97, RESULTS_MAX = 3000, COVER = 0.85;
 export function settle(markets, prev = [], now = Date.now()) {
-  const out = Array.isArray(prev) ? [...prev] : [], seen = new Set(out.map(r => r.id)), day = Math.floor(now / DAY);
+  const out = Array.isArray(prev) ? prev.filter(r => r && r.full) : [], seen = new Set(out.map(r => r.id)), day = Math.floor(now / DAY);
   for (const m of markets) {
     if (seen.has(m.id) || m.stale || m.cur === 'MANA') continue;
     const yn = m.outcomes.length === 1 && /^yes$/i.test(m.outcomes[0].name);
     const done = m.outcomes.some(o => (o.p ?? 0) >= SETTLED) || (yn && (m.outcomes[0].p ?? 1) <= 1 - SETTLED);
     if (!done) continue;
     const pairs = [];
+    let complete = true;
     for (const o of m.outcomes) {
-      if (o.p == null || o.d7 == null) continue;
-      const won = o.p >= SETTLED ? 1 : o.p <= 1 - SETTLED ? 0 : null;
-      if (won == null) continue;
+      const won = o.p == null ? null : o.p >= SETTLED ? 1 : o.p <= 1 - SETTLED ? 0 : null;
+      if (won == null || o.d7 == null) { complete = false; break; }
       pairs.push([r4(Math.min(1, Math.max(0, o.p - o.d7))), won]);
     }
-    if (!pairs.length) continue;
+    if (!complete || !pairs.length) continue;
+    if (!yn && m.exclusive && pairs.reduce((a, p) => a + p[0], 0) < COVER) continue;
+    if (!yn && !m.exclusive && (m.more || 0) > 0) continue;
     const w = yn ? (m.outcomes[0].p >= SETTLED ? 'Yes' : 'No') : (m.outcomes.find(o => o.p >= SETTLED)?.name ?? null);
-    out.push({ id: m.id, t: m.title, v: m.venue, d: day, w, pairs });
+    out.push({ id: m.id, t: m.title, v: m.venue, d: day, w, pairs, full: 1 });
     seen.add(m.id);
   }
   return out.slice(-RESULTS_MAX);

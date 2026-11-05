@@ -331,7 +331,6 @@ button.sc-chip:hover, button.sc-chip[aria-expanded="true"] { box-shadow: inset 0
 .sz-w .pt-head > .p-ico { font-size: 42px; }
 .sz-l .pt-head { gap: 12px; } .sz-l .pt-head > .p-ico { font-size: 60px; }
 .pm-big .p-ico { font-size: 30px; display: block; margin-bottom: 2px; } .pm-mid .p-ico { font-size: 22px; }
-.pm-tiny .pm-title { font-size: 18px; }
 .p-news-t .p-ico { font-size: 1.6em; }
 .p-q .p-ico { font-size: 1.8em; }
 @media (max-width: 640px) { .pt-head > .p-ico, .sz-w .pt-head > .p-ico { font-size: 28px; } .sz-l .pt-head > .p-ico { font-size: 36px; } }
@@ -392,7 +391,8 @@ td.p-pbar b { position: relative; z-index: 1; padding-left: 4px; }
 .ptile.thin:hover, .ptile.thin:focus-visible { opacity: 1; }
 .ptile.done { opacity: .8; }
 .p-decided { margin-top: 16px; }
-.p-track table { max-width: 620px; } .p-track td.p-pbar { width: 35%; } .p-track .r-muted { font-size: 12.5px; }
+.p-track table { max-width: 620px; min-width: 0; } .p-track td.p-pbar i { position: absolute; top: 2px; bottom: 2px; width: 2px; margin-left: -1px; background: var(--ink); z-index: 1; } .p-tkey { margin: 4px 0 0; }
+@media (max-width: 640px) { .p-track td.p-pbar { min-width: 50px; } .p-track th, .p-track td { padding-left: 5px; padding-right: 5px; } } .p-track td.p-pbar { width: 35%; } .p-track .r-muted { font-size: 12.5px; }
 .p-decided > summary { cursor: pointer; font-size: 13px; color: var(--ink-2); margin-bottom: 8px; }
 .p-decided .grid.pgrid { grid-auto-rows: minmax(118px, auto); }
 .p-topics { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
@@ -499,8 +499,12 @@ tr.r-row.done { opacity: .65; }
 .pm-ans { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pm-ans b { font-variant-numeric: tabular-nums; }
 .pm-big .pm-title { font-size: 14px; -webkit-line-clamp: 3; } .pm-big .pm-ans { font-size: 18px; } .pm-big .pm-ans b { font-size: 26px; }
-.pm-mid .pm-title { font-size: 12px; } .pm-mid .pm-ans { font-size: 14px; } .pm-mid .pm-ans b { font-size: 18px; }
-.pm-tiny { padding: 2px 3px; justify-content: center; align-items: center; } .pm-tiny .pm-ans { font-size: 10px; }
+.pm-mid .pm-title { font-size: 12.5px; } .pm-mid .pm-ans { font-size: 14px; } .pm-mid .pm-ans b { font-size: 18px; }
+.pm-tiny { padding: 2px 3px; justify-content: center; } .pm-tiny .pm-ans { font-size: 10.5px; text-overflow: clip; }
+/* small rectangles: a few words of the question (or its story) instead of a cut-off headline or a wall of flags */
+.pm-small .pm-words { font-size: 11px; -webkit-line-clamp: 2; letter-spacing: -.01em; } .pm-small .pm-ans { font-size: 13px; text-overflow: clip; } .pm-words.pm-one { -webkit-line-clamp: 1; }
+.pm-also { font-weight: 600; opacity: .85; }
+.pm-ticon { font-size: 22px; line-height: 1.1; opacity: 1; }
 .pm-foot { margin-top: auto; font-size: 11px; display: flex; gap: 6px; align-items: center; white-space: nowrap; }
 .p-mapnote { margin: 6px 0 0; font-size: 12px; }
 /* popup: the answer first */
