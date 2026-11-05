@@ -231,10 +231,10 @@ export function makePredictionsFixture(now = Date.now()) {
   const DAY = 864e5, today = Math.floor(now / DAY);
   const m = (id, venue, title, cat, outcomes, extra = {}) => ({ id, venue, title, cat, url: 'https://example.invalid/' + id, end: '2099-12-31', head: outcomes[0].name, exclusive: true, outcomes, more: 0, cur: 'USD', ...extra });
   const markets = [
-    m('pm:mayor', 'polymarket', 'NYC mayor winner?', 'Politics', [{ name: 'Alice', p: 0.71, d1: 0.05, d7: 0.12, d30: -0.03, sp: 0.01 }, { name: 'Bob', p: 0.27, d1: -0.04, d7: null, d30: null }], { vol24: 5e6, vol: 9e7, liq: 2e6 }),
+    m('pm:mayor', 'polymarket', 'NYC mayor winner?', 'Politics', [{ name: 'Alice', p: 0.71, d1: 0.05, d7: 0.12, d30: -0.03, sp: 0.01 }, { name: 'Bob', p: 0.27, d1: -0.04, d7: null, d30: null }, { name: 'Carol', p: 0.02, d1: 0, d7: null, d30: null }], { vol24: 5e6, vol: 9e7, liq: 2e6 }),
     m('pm:fed', 'polymarket', 'Fed cut in December?', 'Economy', [{ name: 'Yes', p: 0.3, d1: -0.08, d7: 0.01, d30: 0.2 }], { vol24: 1e6, vol: 2e7 }),
     m('ks:SEN', 'kalshi', 'Senate control after the midterms?', 'Politics', [{ name: 'Democrats', p: 0.55, d1: 0.02, d7: null, d30: null }, { name: 'Republicans', p: 0.45, d1: -0.02, d7: null, d30: null }], { vol24: 2e6, vol: 5e7, oi: 1e6, group: 'ks:SEN' }),
-    m('pi:SEN', 'predictit', 'Which party will control the Senate after the midterms?', 'Politics', [{ name: 'Democrats', p: 0.61, d1: 0, d7: null, d30: null }, { name: 'Republicans', p: 0.4, d1: 0, d7: null, d30: null }], { vol24: null, vol: null, group: 'ks:SEN', ord: 2 }),
+    m('pi:SEN', 'predictit', 'Which party will control the Senate after the midterms?', 'Politics', [{ name: 'Democrats', p: 0.65, d1: 0, d7: null, d30: null }, { name: 'Republicans', p: 0.36, d1: 0, d7: null, d30: null }], { vol24: null, vol: null, group: 'ks:SEN', ord: 2 }),
     m('pi:8000', 'predictit', 'Who will win the 2028 presidential election?', 'Politics', [{ name: 'Vance', p: 0.31, d1: 0.02, d7: null, d30: null }], { vol24: null, vol: null, ord: 1 }),
     m('pm:thin', 'polymarket', 'Will a tiny thing happen?', 'Other', [{ name: 'Yes', p: 0.4, d1: 0, d7: null, d30: null }], { vol24: 100, vol: 600 }),
     m('ks:DONE', 'kalshi', 'Blue wave in 2026?', 'Politics', [{ name: 'Yes', p: 0.99, d1: 0.3, d7: null, d30: null }], { vol24: 3e6, vol: 1e7 }),
@@ -242,6 +242,9 @@ export function makePredictionsFixture(now = Date.now()) {
     // a second Senate-control question (a story card's extra line) and a short-term price bet with a blank in its title
     m('pm:seats', 'polymarket', 'How many Senate seats will Democrats hold after the Midterms?', 'Politics', [{ name: 'Below 50', p: 0.62, d1: 0, d7: null, d30: null }, { name: '50 or more', p: 0.38, d1: 0, d7: null, d30: null }], { vol24: 2, vol: 60 }),
     m('pm:btc', 'polymarket', 'Bitcoin above ___ on November 5?', 'Crypto', [{ name: '↑ 80,000', p: 0.6, d1: 0, d7: null, d30: null }, { name: '↑ 84,000', p: 0.1, d1: 0, d7: null, d30: null }], { exclusive: false, vol24: 60, vol: 600, end: new Date(now + DAY).toISOString().slice(0, 10) }),
+    // decided yesterday, an upset (24% a week before); a ladder whose "by...?" title takes the step shown
+    m('ks:WON', 'kalshi', 'NC-05 House winner?', 'Politics', [{ name: 'Chuck Hubbard', p: 0.98, d1: 0.5, d7: 0.74, d30: null }, { name: 'Virginia Foxx', p: 0.02, d1: -0.5, d7: -0.74, d30: null }], { vol24: 9e5, vol: 3e6, end: new Date(now - DAY).toISOString().slice(0, 10) }),
+    m('pm:by', 'polymarket', 'Netanyahu out by...?', 'World', [{ name: 'June 30, 2027', p: 0.43, d1: 0, d7: null, d30: null }, { name: 'December 31, 2026', p: 0.2, d1: 0, d7: null, d30: null }], { exclusive: false, vol24: 10, vol: 300 }),
     m('mf:x', 'manifold', 'Will Bitcoin hit $200k in 2026?', 'Crypto', [{ name: 'Yes', p: 0.12, d1: 0.01, d7: null, d30: null }], { vol24: 5000, vol: 9e4, cur: 'MANA', traders: 40 }),
   ];
   for (const x of markets) { x.usd24 = x.vol24 == null ? null : x.cur === 'MANA' ? x.vol24 / 100 : x.vol24; x.usdTotal = x.vol == null ? null : x.cur === 'MANA' ? x.vol / 100 : x.vol; x.interest = Math.round((x.usd24 || 0) + (x.usdTotal || 0) / 30); }

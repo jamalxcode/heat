@@ -18,7 +18,8 @@ const DAY = 864e5, REFRESH = 10 * 60e3, ALL_MAX = 200;
 const DECIDED = 0.97;                  // a question whose likeliest outcome is at least this sure counts as decided
 const THIN = 1000;                     // less interest than this (in dollars, real money): a thin market, faded
 const DIFFER = 0.05;                   // venues disagreeing by at least this much are flagged ⚡
-const MOVER_MIN = 1e4;                 // big movers need at least this much interest, or a tiny market's jump leads
+const MOVER_MIN = 1e4;
+const PI_SLACK = 0.03;                 // PredictIt must differ by DIFFER + this (8 points) to count as disagreeing (fees)                 // big movers need at least this much interest, or a tiny market's jump leads
 const VENUES = [
   ['polymarket', 'Polymarket', 'PM'], ['kalshi', 'Kalshi', 'K'], ['predictit', 'PredictIt', 'PI'],
   ['manifold', 'Manifold', 'MF'], ['betfair', 'Betfair', 'BF'],
@@ -100,9 +101,10 @@ function verdict(m, h = shownOutcome(m)) {
 }
 // "Bitcoin above ___ on November 5?" reads "Bitcoin above 80,000 on November 5?" with the step shown, answered yes;
 // yes/no answers say it in words ("No, it won't"), so "Clarity Act signed?" → "No" isn't a double negative to work out
-const blank = m => /_{2,}/.test(m.title) && !isYesNo(m);
+const blank = m => !isYesNo(m) && (/_{2,}/.test(m.title) || (isLadder(m) && /(\.\.\.|…)\s*\??\s*$/.test(m.title)));
 const cleanStep = n => String(n).replace(/^[↑↓≥≤><\s]+/, '').trim();
-const fullTitle = (m, h = shownOutcome(m)) => (blank(m) ? m.title.replace(/_{2,}/, cleanStep(h.name)) : m.title).replace(/\u200b/g, '');
+// "Netanyahu out by...?" with the step "June 30, 2027" → "Netanyahu out by June 30, 2027?"
+const fullTitle = (m, h = shownOutcome(m)) => (blank(m) ? m.title.replace(/_{2,}/, cleanStep(h.name)).replace(/\s*(\.\.\.|…)\s*(\??)\s*$/, (x, d, q) => ' ' + cleanStep(h.name) + (q || '?')) : m.title).replace(/\u200b/g, '');
 const answer = (m, h = shownOutcome(m)) => h.yn ? (h.no ? 'No, it won’t' : 'Yes, it will') : blank(m) ? 'Yes' : h.name;
 // how sure the market already is (for "decided")
 function certainty(m) {
@@ -272,8 +274,13 @@ function comparison(m) {
     const p = o?.p == null ? null : h.no ? 1 - o.p : o.p;
     return { x, p };
   });
-  const ps = rows.filter(r => r.p != null).map(r => r.p);
-  return { rows, spread: ps.length > 1 ? Math.max(...ps) - Math.min(...ps) : 0 };
+  // PredictIt's fees and $850 limit pull its favourites down a few points, so it counts as disagreeing only 8+ points
+  // from the others (its price still shows); the rest disagree at 5
+  const core = rows.filter(r => r.p != null && r.x.venue !== 'predictit').map(r => r.p), pi = rows.find(r => r.p != null && r.x.venue === 'predictit')?.p;
+  const coreSpread = core.length > 1 ? Math.max(...core) - Math.min(...core) : 0;
+  const piDev = pi != null && core.length ? Math.max(...core.map(p => Math.abs(p - pi))) - (PI_SLACK) : 0;
+  const all = rows.filter(r => r.p != null).map(r => r.p);
+  return { rows, spread: Math.max(coreSpread, piDev, 0), gap: all.length > 1 ? Math.max(...all) - Math.min(...all) : 0 };   // spread decides ⚡; gap is what's shown
 }
 const merged = () => venue === 'all';
 const combined = (m, f) => { const ms = membersOf(m).filter(x => play || !isPlay(x) || x === m); const v = ms.map(f).filter(x => x != null); return v.length ? v.reduce((a, b) => a + b, 0) : null; };
@@ -345,6 +352,13 @@ function spark(m, w = 64, ht = 18) {
 }
 
 /* ---------- tiles ---------- */
+// a race (who wins, several names) on a big or wide tile: the top three as bars, so "Front-runner 23%" shows whether
+// it's a two-horse race or a crowded field
+function raceHTML(m, h) {
+  if (h.yn || isLadder(m) || !m.exclusive || m.outcomes.length < 3) return '';
+  const top = [...m.outcomes].filter(o => o.p != null).sort((a, b) => b.p - a.p).slice(0, 3), max = top[0]?.p || 1;
+  return `<span class="pt-race" aria-label="Top three: ${esc(top.map(o => `${o.name} ${pct(o.p)}`).join(', '))}">${top.map((o, i) => `<span class="pt-run${i ? '' : ' lead'}"><span class="pt-run-n">${esc(o.name)}</span><span class="pt-run-b"><i style="width:${Math.max(3, Math.round(o.p / max * 100))}%"></i></span><b>${pct(o.p)}</b></span>`).join('')}</span>`;
+}
 const chip = v => `<span class="pt-chg ${heat(v)}" title="Move ${TFS.find(t => t[0] === tf)[2]}">${arrow(v)}${pts(v)}</span>`;
 function tileHTML(m, size, done = false, also = []) {
   const h = shownOutcome(m), ch = h[tfKey()], cmp = merged() ? comparison(m) : null;
@@ -357,9 +371,10 @@ function tileHTML(m, size, done = false, also = []) {
     <span class="pt-verdict">${verdict(m, h)}</span>
     <span class="pt-ans">${esc(answer(m, h))}</span>
     <span class="pt-nums"><b class="pt-p">${pct(h.p)}</b>${spark(m, size === 'l' ? 120 : 64, size === 'l' ? 30 : 18)}</span>
-    ${cmp ? `<span class="pt-cmp${cmp.spread >= DIFFER ? ' differ' : ''}" title="The same answer on each venue${cmp.spread >= DIFFER ? `: they differ by ${Math.round(cmp.spread * 100)} points` : ''}">${cmp.spread >= DIFFER ? '⚡ ' : ''}${cmp.rows.map(r => `${VTAG[r.x.venue]} ${pct(r.p)}`).join(' · ')}</span>` : ''}
+    ${size !== 's' && !done ? raceHTML(m, h) : ''}
+    ${cmp ? `<span class="pt-cmp${cmp.spread >= DIFFER ? ' differ' : ''}" title="The same answer on each venue${cmp.spread >= DIFFER ? `: they differ by ${Math.round(cmp.gap * 100)} points` : ''}">${cmp.spread >= DIFFER ? '⚡ ' : ''}${cmp.rows.map(r => `${VTAG[r.x.venue]} ${pct(r.p)}`).join(' · ')}</span>` : ''}
     ${also.length ? alsoHTML(m, also, size) : ''}
-    <span class="pt-foot">${done ? esc(decidedWhy(m)) : `${endHTML(m, size === 'l')}${t$ != null ? `<b>${money(t$, 'USD')}</b> today · ` : ''}${T$ != null ? `${money(T$, 'USD')} total${playNote(m)}` : 'no money figures'}${thin(m) ? ' · thin market' : ''}`}${m.stale ? ' · ⚠ not refreshed' : ''}</span>
+    <span class="pt-foot">${done ? esc(decidedWhy(m)) : `${endHTML(m, size === 'l')}${t$ != null ? `<b>${money(t$, 'USD')}</b> today · ` : ''}${T$ != null ? `${money(T$, 'USD')} total${playNote(m)}` : ''}${thin(m) ? ' · thin market' : ''}`}${m.stale ? ' · ⚠ not refreshed' : ''}</span>
   </button>`;
 }
 // one card per story: the first question of a story (in the tab's order) leads, the others ride along as short lines
@@ -378,14 +393,17 @@ function alsoHTML(m, also, size) {
   const n = size === 's' ? 1 : 3, rest = also.length - n;
   return `<span class="pt-also" aria-label="Related: ${esc(also.map(x => fullTitle(x)).join('; '))}"><span class="pt-also-k">${esc(storyOf(m.title))} · ${also.length + 1} questions</span>${also.slice(0, n).map(x => { const h = shownOutcome(x); return `<span class="pt-more" data-id="${esc(x.id)}" title="${esc(fullTitle(x, h))}"><span class="pt-more-t">${esc(shortTitle(fullTitle(x, h)))}</span> <b class="${sureClass(h)}">${esc(answer(x, h))} ${pct(h.p)}</b></span>`; }).join('')}${rest > 0 ? `<span class="pt-more-n">+${rest} more in the popup</span>` : ''}</span>`;
 }
-function grid(ms) {
+let showN = 24;                        // tiles shown before "Show more" (the plain list only; reset when the list changes)
+const SHOW_STEP = 24;
+function grid(ms, top = false) {
   let also = new Map();
   if (groupBy !== 'story') {
     ({ out: ms, also } = stack(ms));
     if (groupBy === 'none') { pos.clear(); ms.forEach((m, i) => pos.set(m.id, i + 1)); }
   }
-  const sz = sizes(ms);
-  return `<div class="grid pgrid">${ms.map(m => tileHTML(m, sz.get(m.id), false, also.get(m.id) || [])).join('')}</div>`;
+  const sz = sizes(ms), cut = top && !query && ms.length > showN + 6 ? showN : ms.length, left = ms.length - cut;
+  return `<div class="grid pgrid">${ms.slice(0, cut).map(m => tileHTML(m, sz.get(m.id), false, also.get(m.id) || [])).join('')}</div>`
+    + (left ? `<p class="p-morewrap"><button class="btn p-more" id="pmore">Show ${Math.min(SHOW_STEP, left)} more <span class="r-muted">· ${left} left</span></button></p>` : '');
 }
 function decidedHTML(done) {
   if (!done.length) return '';
@@ -430,6 +448,21 @@ function mapHTML(live) {
     }
   }
   return `<div class="p-map" style="height:${H}px">${html}</div><p class="r-muted p-mapnote">Each rectangle’s area is the money on that question (bet today + a 30th of all money bet); blocks are topics; darker and bold = likelier; lighter and italic = less likely.${left ? ` ${left} question${left > 1 ? 's' : ''} without money figures (PredictIt) aren’t drawn.` : ''}</p>`;
+}
+
+/* ---------- just decided: results of the last days, with what the market said a week before ---------- */
+// a question counts as just decided when it ended in the last 10 days, or became 97%+ sure this week (a week ago its
+// answer was under 90%); the week-ago chance shows how much of a surprise it was
+function recentHTML(done) {
+  const rows = done.filter(m => !isPlay(m)).map(m => {
+    const h = shownOutcome(m), d = daysLeft(m), was = h.d7 != null ? h.p - h.d7 : null;
+    return { m, h, was, recent: (d != null && d < 0 && d >= -10) || (was != null && was < 0.9) };
+  }).filter(r => r.recent).sort((a, b) => mInterest(b.m) - mInterest(a.m)).slice(0, 10);
+  if (!rows.length) return '';
+  return `<section class="p-recent" aria-label="Just decided"><h3 class="p-recent-h">Just decided <span class="r-muted">${rows.length} · results of the last days, and what the market said a week before</span></h3><div class="p-row">${rows.map(({ m, h, was }) => {
+    const called = (h.p ?? 0) >= DECIDED, upset = was != null && was < 0.5;
+    return `<button class="p-news p-res${upset ? ' upset' : ''}" data-id="${esc(m.id)}" data-coin="1"><span class="p-news-k">${called ? '✓ Decided' : '⏳ Awaiting the result'}${upset ? ' · upset' : ''}</span><span class="p-news-t">${icon(m)}${esc(shortTitle(fullTitle(m, h)))}</span><span class="p-news-l"><b>${esc(answer(m, h))}</b> ${pct(h.p)}${was != null ? ` · a week ago <b>${pct(was)}</b>` : ''}</span></button>`;
+  }).join('')}</div></section>`;
 }
 
 /* ---------- the Today strip: the news at a glance ---------- */
@@ -501,7 +534,7 @@ function sectionsHTML(live) {
     solo.sort((a, b) => weight(b) - weight(a));
     return `<div class="r-groups">${gs.map(({ s, g, sum }) => `<section class="r-group p-story"><h3>${esc(s)} <span class="r-muted">${g.length} questions · ${money(sum, 'USD')} interest</span></h3>${grid(g)}</section>`).join('')}${solo.length ? `<section class="r-group"><h3>Other questions <span class="r-muted">${solo.length}</span></h3>${grid(solo)}</section>` : ''}</div>`;
   }
-  return grid(live);
+  return grid(live, true);
 }
 function render() {
   if (!P) return;
@@ -524,7 +557,7 @@ function render() {
   $('#pfiltBtn').innerHTML = `⚙ Filters${n ? ` <span class="n">${n}</span>` : ''}`;
   const note = merged() ? VENUES.map(v => P.venues?.[v[0]]?.state === 'stale' ? venueNote(v[0]) : '').join('') : venueNote(venue);
   const all = [...live, ...done];
-  const intro = !query && viewAs !== 'table' ? todayHTML(live) + watchHTML() : '';
+  const intro = !query && viewAs !== 'table' ? recentHTML(done) + todayHTML(live) + watchHTML() : '';
   if (!all.length) main.innerHTML = note + intro + (query ? `<p class="p-empty">No question matches “${esc(query)}”.</p>` : order === 'disagree' ? '<p class="p-empty">No question is priced 5 or more points apart on two venues right now.</p>' : '<p class="p-empty">No open questions in the topics shown.</p>');
   else if (viewAs === 'table') main.innerHTML = note + tableHTML(all);
   else if (viewAs === 'map') main.innerHTML = note + intro + mapHTML(live) + decidedHTML(done);
@@ -564,7 +597,7 @@ function compareHTML(m) {
   const cmp = comparison(m);
   if (!cmp) return '';
   const h = shownOutcome(m);
-  return `<h3>${esc(h.name)} on each venue${cmp.spread >= DIFFER ? ` <span class="p-differ">⚡ ${Math.round(cmp.spread * 100)} points apart</span>` : ''}</h3>
+  return `<h3>${esc(h.name)} on each venue${cmp.spread >= DIFFER ? ` <span class="p-differ">⚡ ${Math.round(cmp.gap * 100)} points apart</span>` : ''}</h3>
     <table class="r-tbl p-otbl p-cmp"><thead><tr><th>Venue</th><th>Chance</th><th>Bet today</th><th>Bet in total</th></tr></thead><tbody>${cmp.rows.map(({ x, p }) =>
       `<tr><td class="p-tt"><span class="pv pv-${x.venue}" aria-hidden="true">${VTAG[x.venue]}</span> <a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${VNAME[x.venue]} ↗</a></td><td><b>${pct(p)}</b></td><td>${money(today$(x), 'USD')}</td><td>${money(total$(x), 'USD')}${playNote(x) ? ' <span class="r-muted">play</span>' : ''}</td></tr>`).join('')}</tbody></table>
     <p class="r-muted">Matched by wording and outcomes: a best guess. Each venue’s rules for when a question resolves can differ.</p>`;
@@ -653,7 +686,7 @@ function renderFresh() {
   const tm = new Date(P.generated).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   const late = Date.now() - P.generated > REFRESH * 2.5;
   const vs = VENUES.filter(([k]) => P.venues?.[k]?.state !== 'off').map(([k, l]) => { const s = P.venues?.[k]?.state; return `${l} ${s === 'ok' ? '✓' : s === 'stale' ? '⚠' : '✕'}`; }).join(' · ');
-  const html = `<span>🕒 <b>Last refreshed ${tm}</b> (${ago}) · <b>not real-time</b>, every 10 min · ${vs}${late ? ' · <b>⚠ this update is running late</b>' : ''}</span>`;
+  const html = `<span>🕒 <b><span class="fr-lbl">Last refreshed </span>${tm}</b> <span class="fr-ago">(${ago})</span><span class="fr-more"> · <b>not real-time</b>, every 10 min · ${vs}</span>${late ? ' · <b>⚠ late</b>' : ''}</span>`;
   $('#fresh').classList.toggle('late', late);
   if ($('#fresh').innerHTML !== html) $('#fresh').innerHTML = html;
 }
@@ -677,12 +710,12 @@ async function load() {
 }
 
 const HELP = `<div class="leg-more p-help" id="phelp" hidden>
-  <p><b>A tile</b> says what the market thinks: the question, a verdict (almost certain, likely, leaning, toss-up, unlikely, long shot; “front-runner” for the leader of a crowded field), the answer and its chance, the trend over the last weeks, and the money bet. A chance is the price of a contract that pays 1 if it happens: 62% means traders pay 62¢ for a dollar if it does. For yes/no questions the likelier side is shown (2% yes is “No 98%”); on a ladder (“above 50 seats”, “by 31 October”) the step nearest 50%.</p>
-  <p><b>Colour is how likely the answer shown is</b>: dark and bold for likely, light and italic for unlikely (one blue hue, so it reads the same with colour blindness). <b>The chip is the move</b> today, this week or this month, in points (40% → 52% is ▲ +12 pts): teal when the answer became more likely, amber when less. No blue or red, so nothing reads as a party.</p>
-  <p><b>The tabs</b> ask a question: <b>Biggest bets</b> (the first tab), <b>Surest bets</b> (the most certain open questions with the most money), <b>Close calls</b> (near 50/50, lots of money), <b>Big movers</b>, <b>Ending soon</b>, and in “All”, <b>Venues disagree</b>. <b>Today</b> picks out the biggest swing, the most money, the closest big call and the widest disagreement.</p>
-  <p><b>Money</b> is in US dollars on every venue: bet today (24 hours) and in total; interest = bet today + a 30th of the total. It’s approximate: Kalshi counts contracts (turned into dollars at their price) and each venue counts trades its own way. Manifold is play money, left out of “All” unless ticked in Filters. PredictIt publishes no money figures. A faded tile is a <b>thin market</b> (under $1K), where one small trade can move the price.</p>
-  <p><b>Views</b> (in Filters): tiles; a <b>money map</b> where each question’s area is the money on it, in blocks by topic; or a table. Tiles can be grouped by topic or by <b>story</b> (all the Alaska Senate questions together, all of 2028, Senate control…). Questions at least ${Math.round(DECIDED * 100)}% sure or past their end date fold into a row at the bottom.</p>
-  <p><b>Click a question</b> for the answer first, a 35-day chart with its biggest moves, each venue’s price, every outcome, related questions and the fine print; ☆ Watch keeps it at the top of the page (saved in this browser), ⤢ makes it full screen. The same question on several venues is one tile in “All” (⚡ when they differ by ${Math.round(DIFFER * 100)}+ points), matched by wording: a best guess. Not real-time, refreshed every 10 minutes, and not advice.</p></div>`;
+  <p><b>A tile</b> says what the market thinks: an icon for the topic, a short headline (the full question under it when shortened), the answer and its chance, the trend over the last weeks, the time left (the ring fills as the end nears; amber in the last week, red on the last day) and the money bet. A chance is the price of a contract that pays 1 if it happens: 62% means traders pay 62¢ for a dollar if it does. For yes/no questions the likelier side is shown in words (“No, it won’t · 98%”); on a ladder (“above 50 seats”, “by 31 October”) the step nearest 50%, written into the question (“Netanyahu out by June 30, 2027?”). Big tiles of a race show the top three as bars.</p>
+  <p><b>Colour and type say how likely the answer is</b>: <span class="p-sw c0"></span><span class="p-sw c1"></span><span class="p-sw c2"></span><span class="p-sw c3"></span><span class="p-sw c4"></span> light and italic for unlikely, dark and bold for likely (one blue hue, so it reads the same with colour blindness). <b>The chip is the move</b> today, this week or this month, in points (40% → 52% is ▲ +12 pts): teal ▲ when the answer became more likely, amber ▼ when less.</p>
+  <p><b>Story cards</b>: related questions (all of Iran, every 2028 race, Senate control and its seat counts…) share one card; the others are short lines under the first, each opening its own question. <b>Mix topics</b> (Filters, on by default) lets each further question from the same topic count a little less, so the top of the page has a few from each topic.</p>
+  <p><b>The tabs</b> ask a question: <b>Biggest bets</b>, <b>Surest bets</b>, <b>Close calls</b> (near 50/50, lots of money), <b>Big movers</b>, <b>Ending soon</b>, and in “All”, <b>Venues disagree</b>. <b>Just decided</b> lists results of the last days with the chance a week before (an <b>upset</b> was under 50%); <b>Today</b> picks out the biggest swing, the most money, the closest big call and the widest disagreement.</p>
+  <p><b>Money</b> is in US dollars on every venue: bet today (24 hours) and in total; interest = bet today + a 30th of the total. It’s approximate: Kalshi counts contracts (turned into dollars at their price) and each venue counts trades its own way. Manifold is play money, left out of “All” unless ticked in Filters. PredictIt publishes no money figures. A faded tile is a <b>thin market</b> (under $1K), where one small trade can move the price. Short-term price bets and single games are off to start with (Filters).</p>
+  <p><b>The same question on several venues</b> is one tile in “All”, with each venue’s chance (⚡ when they differ by ${Math.round(DIFFER * 100)}+ points; PredictIt, whose fees pull its favourites down, by ${Math.round((DIFFER + PI_SLACK) * 100)}+), matched by wording and names: a best guess. <b>Click a question</b> for the answer first, a 35-day chart with its biggest moves, each venue’s price, every outcome, related questions and the fine print; ☆ Watch keeps it at the top (saved in this browser). Not real-time, refreshed every 10 minutes, and not advice.</p></div>`;
 
 export function start() {
   document.body.classList.add('rates-page', 'pred-page');
@@ -703,8 +736,8 @@ export function start() {
   $('#detail').setAttribute('aria-label', 'Question details');
   const linked = Q.get('m');
   const on = (s, ev, f) => $(s).addEventListener(ev, f);
-  on('#pvenue', 'click', e => { const b = e.target.closest('button[data-v]'); if (!b) return; venue = b.dataset.v; store.set('hm.predVenue', venue); render(); });
-  on('#porder', 'click', e => { const b = e.target.closest('button[data-o]'); if (!b) return; order = b.dataset.o; store.set('hm.predOrder', order); render(); });
+  on('#pvenue', 'click', e => { const b = e.target.closest('button[data-v]'); if (!b) return; venue = b.dataset.v; showN = SHOW_STEP; store.set('hm.predVenue', venue); render(); });
+  on('#porder', 'click', e => { const b = e.target.closest('button[data-o]'); if (!b) return; order = b.dataset.o; showN = SHOW_STEP; store.set('hm.predOrder', order); render(); });
   on('#ptf', 'click', e => { const b = e.target.closest('button[data-v]'); if (!b) return; tf = b.dataset.v; store.set('hm.predTf', tf); render(); });
   on('#pview', 'click', e => { const b = e.target.closest('button[data-v]'); if (!b) return; viewAs = b.dataset.v; store.set('hm.predView2', viewAs); render(); });
   on('#pgroup', 'change', e => { groupBy = e.target.value; store.set('hm.predGroup2', groupBy); render(); });
@@ -713,6 +746,7 @@ export function start() {
     if (!b) return;
     const k = b.dataset.topic;
     if (hidden.has(k)) hidden.delete(k); else hidden.add(k);
+    showN = SHOW_STEP;
     store.set('hm.predHide', [...hidden]); render();
   });
   on('#ptopics', 'change', e => {
@@ -727,6 +761,7 @@ export function start() {
   on('#grid', 'click', e => {
     const th = e.target.closest('th[data-sort]');
     if (th) { const k = th.dataset.sort; sortBy = { key: k, dir: sortBy.key === k ? -sortBy.dir : ['rank', 'title', 'venue', 'head', 'end', 'cat'].includes(k) ? 1 : -1 }; render(); return; }
+    if (e.target.closest('#pmore')) { showN += SHOW_STEP; render(); return; }
     const t = e.target.closest('[data-id]');
     if (t && P) openPopup(t.dataset.id);
   });

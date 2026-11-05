@@ -1055,7 +1055,7 @@ test.describe('predictions', () => {
     await expect(page.locator('#pvenue button')).toHaveText([/^All/, /Polymarket/, /Kalshi/, /PredictIt/, /Manifold/]);
     await expect(page.locator('#porder button')).toHaveText(['Biggest bets', 'Surest bets', 'Close calls', 'Big movers', 'Ending soon', 'Venues disagree']);
     await expect(page.locator('#porder button[aria-pressed="true"]')).toHaveText('Biggest bets');   // the first tab mixes likely and unlikely
-    await expect.poll(() => ids(page)).toEqual(['pm:mayor', 'ks:SEN', 'pm:fed', 'pm:thin', 'pi:8000']);
+    await expect.poll(() => ids(page)).toEqual(['pm:mayor', 'ks:SEN', 'pm:fed', 'pm:thin', 'pm:by', 'pi:8000']);
     const top = page.locator('#grid > .grid .ptile').first();
     await expect(top).toHaveClass(/sz-l/);
     await expect(top).toHaveClass(/c3/);                                                            // 71%: the second-darkest shade, bold
@@ -1082,9 +1082,9 @@ test.describe('predictions', () => {
   });
 
   test('Today picks out the news; each card opens its question', async ({ page }) => {
-    await expect(page.locator('.p-news .p-news-k')).toHaveText(['Biggest swing today', 'Most money today', 'Closest big call', 'Venues disagree']);
-    expect(await page.locator('.p-news').evaluateAll(els => els.map(e => e.dataset.id))).toEqual(['pm:fed', 'pm:mayor', 'ks:SEN', 'ks:SEN']);
-    await page.locator('.p-news').first().click();
+    await expect(page.locator('.p-today .p-news-k')).toHaveText(['Biggest swing today', 'Most money today', 'Closest big call', 'Venues disagree']);
+    expect(await page.locator('.p-today .p-news').evaluateAll(els => els.map(e => e.dataset.id))).toEqual(['pm:fed', 'pm:mayor', 'ks:SEN', 'ks:SEN']);
+    await page.locator('.p-today .p-news').first().click();
     await expect(page.locator('#detail')).toHaveClass(/pinned/);
     await expect(page.locator('#detail .p-q')).toHaveText('🏦Fed cut in December?');
   });
@@ -1092,21 +1092,21 @@ test.describe('predictions', () => {
   test('the tabs ask a question: close calls, biggest bets, venues disagree', async ({ page }) => {
     await page.locator('#porder button[data-o="close"]').click();
     // mixed topics: the second politics question (mayor) counts ×0.65, so the Fed (economy) comes before it
-    await expect.poll(() => ids(page)).toEqual(['ks:SEN', 'pm:fed', 'pm:mayor', 'pm:thin', 'pi:8000']);
+    await expect.poll(() => ids(page)).toEqual(['ks:SEN', 'pm:fed', 'pm:mayor', 'pm:thin', 'pm:by', 'pi:8000']);
     await filters(page);
     await page.locator('#pmix').uncheck();                                                        // unmixed: the plain order
-    await expect.poll(() => ids(page)).toEqual(['ks:SEN', 'pm:mayor', 'pm:fed', 'pm:thin', 'pi:8000']);
+    await expect.poll(() => ids(page)).toEqual(['ks:SEN', 'pm:mayor', 'pm:fed', 'pm:thin', 'pm:by', 'pi:8000']);
     await expect(page.locator('#pfiltBtn .n')).toHaveText('1');
     await page.locator('#pmix').check();
     await expect(page).toHaveURL(/o=close/);
     // surest bets: certainty × log10(interest): mayor 71% × 6.9, Fed (70% no) × 6.2, Senate (merged) 55% × 6.6, thin, PredictIt (no money) last
     await page.locator('#porder button[data-o="sure"]').click();
-    await expect.poll(() => ids(page)).toEqual(['pm:mayor', 'pm:fed', 'ks:SEN', 'pm:thin', 'pi:8000']);
+    await expect.poll(() => ids(page)).toEqual(['pm:mayor', 'pm:fed', 'ks:SEN', 'pm:thin', 'pm:by', 'pi:8000']);
     await page.locator('#porder button[data-o="disagree"]').click();
     await expect.poll(() => ids(page)).toEqual(['ks:SEN']);
     const sen = page.locator('.ptile[data-id="ks:SEN"]');
     await expect(sen.locator('.pv')).toHaveText(['K', 'PI']);
-    await expect(sen.locator('.pt-cmp')).toHaveText('⚡ K 55% · PI 61%');
+    await expect(sen.locator('.pt-cmp')).toHaveText('⚡ K 55% · PI 65%');
     await page.locator('#pvenue button[data-v="predictit"]').click();                             // a venue's own tab: no merging, its own order
     await expect(page.locator('#porder button[data-o="disagree"]')).toHaveCount(0);
     await expect.poll(() => ids(page)).toEqual(['pi:8000', 'pi:SEN']);
@@ -1116,7 +1116,7 @@ test.describe('predictions', () => {
     await page.locator('.ptile[data-id="ks:SEN"]').click();
     await expect(page.locator('#detail .p-say')).toHaveText(/Toss-up:\s*Democrats\s*55%/);
     await expect(page.locator('#detail .p-cmp tbody tr')).toHaveCount(2);
-    await expect(page.locator('#detail .p-differ')).toContainText('6 points apart');
+    await expect(page.locator('#detail .p-differ')).toContainText('10 points apart');
     await page.keyboard.press('Escape');
     await page.locator('.ptile[data-id="pm:mayor"]').click();
     await expect(page.locator('#detail .p-say')).toHaveText(/Leaning:\s*Alice\s*71%/);
@@ -1160,9 +1160,26 @@ test.describe('predictions', () => {
     await expect(btc.locator('.pt-p')).toHaveText('60%');
   });
 
+  test('just decided, race bars, "by …?" filled, PredictIt needs 8 points to disagree', async ({ page }) => {
+    // NC-05 ended yesterday at 98%; a week before, the winner was at 24%: an upset
+    const res = page.locator('.p-recent .p-res');
+    await expect(res).toHaveCount(1);
+    await expect(res.locator('.p-news-k')).toHaveText('✓ Decided · upset');
+    await expect(res.locator('.p-news-l')).toHaveText('Chuck Hubbard 98% · a week ago 24%');
+    // a race on the big tile: the top three as bars
+    await expect(page.locator('.ptile[data-id="pm:mayor"] .pt-run')).toHaveText([/Alice\s*71%/, /Bob\s*27%/, /Carol\s*2%/]);
+    await expect(page.locator('.ptile[data-id="pm:fed"] .pt-race')).toHaveCount(0);                // yes/no: no race
+    // "Netanyahu out by...?" takes the step shown
+    await expect(page.locator('.ptile[data-id="pm:by"] .pt-title')).toHaveText('Netanyahu out by June 30, 2027?');
+    await expect(page.locator('.ptile[data-id="pm:by"] .pt-ans')).toHaveText('Yes');
+    // PredictIt 10 points off Kalshi: flagged; the shown gap is the real one
+    await expect(page.locator('.ptile[data-id="ks:SEN"] .pt-cmp')).toHaveClass(/differ/);
+    await expect(page.locator('.ptile[data-id="pm:by"] .pt-foot')).not.toContainText('no money');
+  });
+
   test('Filters: decided row, topics, play money, single games; money map, stories and table views', async ({ page }) => {
     await expect(page.locator('#pfilters')).toBeHidden();
-    await expect(page.locator('#pdone .ptile')).toHaveCount(1);
+    await expect(page.locator('#pdone .ptile')).toHaveCount(2);
     await expect(page.locator('#pdone .ptile[data-id="ks:DONE"] .pt-foot')).toContainText('99% sure already');
     await expect(page.locator('.ptile[data-id="mf:x"]')).toHaveCount(0);
     await expect(page.locator('.ptile[data-id="ks:GAME"]')).toHaveCount(0);
