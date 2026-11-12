@@ -32,7 +32,7 @@ No lint script. `package-lock.json` is gitignored.
 - Built JSON files (`data.json`, `forex.json`, ... and generated market dirs) are gitignored and exist only in the deployed site.
 - In-browser fallback: if `data.json` is missing or older than 45 min, the page runs `scripts/build-data.mjs` itself (at most once per 10 min per browser).
 - `tests/`: unit tests (`signals`, `scoring`, per-market, `deploy.test.mjs`); `tests/e2e/` Playwright spec, fixtures and local server.
-- `docs/rebuild-prompts.md`: the prompts that built the project.
+- `docs/rebuild-prompts.md`: the prompts that built the project. `docs/DECISIONS.md`: why things work as they do (e.g. how often prediction markets are fetched).
 
 ## Deployment
 
