@@ -43,5 +43,5 @@ Why the project works the way it does. Add new decisions at the end, and keep ea
 - If the whole build fails or times out, the last `predictions.json` is republished.
 - The previous file comes in through `PREV_URL`, which also carries the daily history and Kalshi's event list between runs.
 
-### Open point
-`scripts/check-fresh.mjs` (the hourly freshness check) does not check `predictions.json`, so a prediction build that stays stale doesn't send an email. Worth adding if the predictions page needs the same alerting as the other markets.
+### 8. Predictions are in the hourly freshness check
+**Decision:** `scripts/check-fresh.mjs` fails (and GitHub emails) when `predictions.json` hasn't been built for an hour, or when a venue has been stale for more than a day, or has an empty tab (`down`). A venue that isn't set up (`off`, Betfair without its secrets) never alerts. Before this, a prediction build that stayed stale went unnoticed, because the build republishes the last file and the job still "succeeds".

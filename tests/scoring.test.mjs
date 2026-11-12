@@ -61,14 +61,19 @@ test('buildScorecard: records costs, and scores point-in-time only the coins tha
 test('freshness check: each limit catches stale data and passes fresh data', () => {
   const now = Date.now(), H = 3600e3;
   const fresh = { generated: now - 5 * 60e3, hist: { a: { t: now - H } }, rateDate: new Date(now - 864e5).toISOString().slice(0, 10),
-    metalsDate: new Date(now - 864e5).toISOString().slice(0, 10), sources: { at: now - 20 * 60e3 }, countries: [{ date: new Date(now - 864e5).toISOString().slice(0, 10) }], pump: [{ id: 'us', date: new Date(now - 864e5).toISOString().slice(0, 10) }] };
+    metalsDate: new Date(now - 864e5).toISOString().slice(0, 10), sources: { at: now - 20 * 60e3 }, countries: [{ date: new Date(now - 864e5).toISOString().slice(0, 10) }], pump: [{ id: 'us', date: new Date(now - 864e5).toISOString().slice(0, 10) }],
+    venues: { polymarket: { state: 'ok', at: now - 5 * 60e3 }, betfair: { state: 'off', at: null } } };
   const stale = { generated: now - 5 * H, hist: { a: { t: now - 10 * H } }, rateDate: new Date(now - 9 * 864e5).toISOString().slice(0, 10),
-    metalsDate: new Date(now - 9 * 864e5).toISOString().slice(0, 10), sources: { at: now - 5 * 864e5 }, countries: [{ date: new Date(now - 9 * 864e5).toISOString().slice(0, 10), failedSince: now - 2 * 864e5 }], pump: [{ id: 'us', date: new Date(now - 20 * 864e5).toISOString().slice(0, 10) }] };
+    metalsDate: new Date(now - 9 * 864e5).toISOString().slice(0, 10), sources: { at: now - 5 * 864e5 }, countries: [{ date: new Date(now - 9 * 864e5).toISOString().slice(0, 10), failedSince: now - 2 * 864e5 }], pump: [{ id: 'us', date: new Date(now - 20 * 864e5).toISOString().slice(0, 10) }],
+    venues: { polymarket: { state: 'ok', at: now }, kalshi: { state: 'stale', at: now - 2 * 864e5 } } };
   for (const [file, age, limit, what] of CHECKS) {
     if (what.includes('scorecard')) continue;              // generated a day apart: covered by the 'generated' rule
     assert.ok(age(fresh) <= limit, `${file}: fresh data passes "${what}"`);
     assert.ok(age(stale) > limit, `${file}: stale data fails "${what}"`);
   }
+  const venueAge = CHECKS.find(c => c[3].includes('prediction market venue'))[1];
+  assert.equal(venueAge({ venues: { betfair: { state: 'off', at: null } } }), 0, 'a venue that is not set up never alerts');
+  assert.equal(venueAge({ venues: { manifold: { state: 'down', at: null } } }), Infinity, 'a venue with an empty tab alerts');
 });
 
 test('point-in-time: a coin that left the top 100 still counts on the days it was in the list; moves compared within the list', () => {

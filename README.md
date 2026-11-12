@@ -245,7 +245,7 @@ GitHub Actions: daily 00:20 UTC (via cron-job.org)
 | `.github/workflows/update-data.yml` | Builds `data.json` and deploys the site to GitHub Pages every 10 minutes and on every push to `main` |
 | `.github/workflows/score-signals.yml` | Daily scoring (plus Sunday tuning). It commits the results, which also keeps the schedules from being paused for inactivity. |
 | `.github/workflows/test.yml` | Runs the unit tests on every push to any branch |
-| `.github/workflows/freshness.yml`, `scripts/check-fresh.mjs` | **Hourly freshness check** of the live site: fails (and GitHub emails you) if `data.json`, `forex.json`, `metals.json`, `energy.json`, `etfs.json`, `rates.json` or a scorecard stops updating, even when every other job "succeeds" |
+| `.github/workflows/freshness.yml`, `scripts/check-fresh.mjs` | **Hourly freshness check** of the live site: fails (and GitHub emails you) if `data.json`, `forex.json`, `metals.json`, `energy.json`, `etfs.json`, `rates.json`, `predictions.json` (or a prediction venue keeps failing for a day) or a scorecard stops updating, even when every other job "succeeds" |
 | `data/universe-history.json` | Each day's top-100 list, for the point-in-time scorecard |
 | `.github/workflows/e2e.yml` | **Browser tests** (Playwright, headless Chrome) on every push to any branch: no outside API calls, filters, both stop states, the popup (fits a 13-inch screen, opens only on a resting mouse, closes when moving away, stays put when moving onto it, pins and closes), the phone bottom sheet, and the Scorecard view |
 | `tests/e2e/` | The browser tests, deterministic test data (`fixtures.mjs`) and a local server (`serve.mjs`, also `npm run dev`) |
