@@ -2,7 +2,17 @@
 
 **Live: https://heat.sala.company**
 
-A crypto heatmap of the top 100 coins by market cap, with stablecoins, tokenized gold and wrapped/staked copies left out, and a [forex heatmap](https://heat.sala.company/forex/) of 48 currencies against the US dollar. Every tile combines the price move with technical indicators, and a daily scorecard checks whether the 🚀 / 😢 calls actually predicted anything.
+Market heatmaps in one place:
+
+- **[Crypto](https://heat.sala.company/)**: the top 100 coins by market cap, with stablecoins, tokenized gold and wrapped/staked copies left out
+- **[Forex](https://heat.sala.company/forex/)**: 48 currencies against the US dollar, with a US Dollar Index bar
+- **[Metals](https://heat.sala.company/metals/)**: gold, silver, platinum and palladium, with tokenized gold and Bitcoin beside them
+- **[Energy](https://heat.sala.company/energy/)**: oil, diesel, gasoline and gas futures, plus weekly pump prices
+- **[ETFs](https://heat.sala.company/etfs/)**: 112 US stock ETFs, grouped by market, sector, theme and country
+- **[Rates](https://heat.sala.company/rates/)**: official government bond yield curves for 14 markets and a monthly Europe row
+- **[Predictions](https://heat.sala.company/predictions/)**: the most traded questions on Polymarket, Kalshi, PredictIt, Manifold and Betfair
+
+On the price pages every tile combines the move with technical indicators, and a daily scorecard checks whether the 🚀 / 😢 calls actually predicted anything.
 
 > ⚠️ **Work in progress. Use at your own risk.** Data can be late, wrong or missing, and nothing here is financial advice. Prices are **not real-time**: they refresh every 10 minutes.
 
@@ -135,7 +145,7 @@ Statistics cap moves at ±30% a day (wider for 3 and 7 days), so a bad price pri
 
 ## Forex: heat.sala.company/forex/
 
-The same heatmap for **48 currencies against the US dollar**. The **🪙 Crypto | 💱 Forex | 🥇 Metals | 🛢️ Energy | 📊 ETFs | 📈 Rates** switch at the start of the controls row moves between the pages.
+The same heatmap for **48 currencies against the US dollar**. The **🪙 Crypto | 💱 Forex | 🥇 Metals | 🛢️ Energy | 📊 ETFs | 📈 Rates | 🎯 Predictions** switch at the start of the controls row moves between the pages.
 
 - **It's the same page.** `/forex/` (and `/metals/`, `/energy/`, `/etfs/`, `/rates/`) is made from `index.html` at deploy (`scripts/market-page.mjs`), with only the search tags, the About/FAQ text and the source credits swapped in (`seo/forex-*.html`, `seo/metals-*.html`, `seo/energy-*.html`, `seo/etfs-*.html`, `seo/rates-*.html`). The page picks its market from its address, and everything market-specific sits in one `MARKETS` settings block at the top of the page script. So any change to tiles, popups, filters, the scorecard or the engine shows on every page.
 - **Rates:** official **ECB euro reference rates** (via the Frankfurter API) for 29 currencies, set once per business day around 14:15 Frankfurt time, with history back to 1999. Currencies the ECB doesn't publish (the ruble, the Gulf and other Arab currencies, the rial, the Syrian pound) come from the public-domain **exchange-api** feed and get the **?** mark. ECB rates get **✓**. Weekends have no rates, so charts and indicators use business days.
@@ -220,7 +230,7 @@ GitHub Actions: daily 00:20 UTC (via cron-job.org)
 | File | What it is |
 |---|---|
 | `index.html` | The page: HTML, CSS, and its search and link-preview tags |
-| `app/` | The page script, as ES modules: `markets.mjs` (everything market-specific, one adapter per market), `core.mjs` (helpers and state), `data.mjs` (indicators per tile), `render.mjs` (tiles, legend, table), `scorecard.mjs`, `interact.mjs` (popup, hover, clicks, switches) and `main.mjs` (loading and refresh; it starts the page) |
+| `app/` | The page script, as ES modules: `markets.mjs` (everything market-specific, one adapter per market), `core.mjs` (helpers and state), `data.mjs` (indicators per tile), `render.mjs` (tiles, legend, table), `scorecard.mjs`, `interact.mjs` (popup, hover, clicks, switches), `main.mjs` (loading and refresh; it starts the page), `dxy.mjs` (forex dollar index bar), `fuel.mjs` (energy pump-price rows), `rates.mjs`, `predictions.mjs` and `names.mjs` (outcome-name matching shared with the predictions build) |
 | `og-image.png`, `og-image-forex.png`, `og-image-metals.png`, `og-image-energy.png`, `og-image-etfs.png`, `og-image-rates.png`, `robots.txt` | The link-preview images (crypto, forex, metals, energy, ETFs and rates) and the robots file, published with the site (the deploy job also writes `sitemap.xml`) |
 | `scripts/build-forex.mjs` | Builds `forex.json`: the currency list, both rate sources, business-day closes. Reuses the last file and refetches hourly |
 | `scripts/score-forex.mjs` | Daily forex scorecard and weekly tuning |
@@ -230,6 +240,9 @@ GitHub Actions: daily 00:20 UTC (via cron-job.org)
 | `scripts/build-rates.mjs`, `app/rates.mjs` | Builds `rates.json` (official yield curves, refetched every 3 hours) and draws the rates page |
 | `scripts/build-predictions.mjs`, `app/predictions.mjs`, `scripts/question-pages.mjs` | Builds `predictions.json` every 10 minutes (Polymarket, Kalshi, PredictIt, Manifold, Betfair; Kalshi's full list hourly), draws the predictions page, and writes the static question pages. Fetch cadence and why: [`docs/DECISIONS.md`](docs/DECISIONS.md) |
 | `scripts/health.mjs` | Builds `health.json`, the sources health line in every page's footer |
+| `scripts/build-fuel.mjs` | Builds `fuel.json`: weekly pump prices (US, UK, EU) and US refined-product spot prices, refetched every 6 hours |
+| `scripts/pulse.mjs` | Builds `pulse.json` (under 1 KB: BTC, ETH, gold, Brent) for go.sala.company's live strip, from the files the deploy just made |
+| `docs/DECISIONS.md`, `docs/rebuild-prompts.md`, `CLAUDE.md` | Why things work as they do; the prompts that built the project; guidance for Claude Code |
 | `scripts/backfill-universe.mjs`, `data/backfill-cache.json` | One-off: rebuilds the daily top-100 lists before recording began, gently (10 CoinGecko requests a minute, capped, resumable) |
 | `scripts/tradingview.mjs` | TradingView chart links: candidate symbols per asset, checked in the deploy job and cached in `tv.json`; the page imports it to pick the link |
 | `scripts/market-page.mjs`, `seo/` | Makes `/forex/`, `/metals/`, `/energy/`, `/etfs/` and `/rates/` from `index.html`, swapping in each market's search tags, About/FAQ and source credits |
@@ -258,10 +271,11 @@ GitHub Actions: daily 00:20 UTC (via cron-job.org)
 
 ## Running it yourself
 
-- **Making changes:** work on a branch. The unit and browser tests run on every push to any branch; merge into `main` only when both pass. Only `main` deploys.
+- **Making changes:** work on a branch (a Claude session uses its own `claude/...` branch). The unit and browser tests run on every push to any branch; merge into `main` only when both pass. Only `main` deploys. Pull `main` before merging: the scorer commits to it every day.
+- **Keep the docs in step:** a change that alters behaviour also updates this README, adds a decision to `docs/DECISIONS.md` when the reason is worth keeping, and adds a prompt to `docs/rebuild-prompts.md` for a new feature.
 
-- **Design decisions:** [`docs/DECISIONS.md`](docs/DECISIONS.md) explains why things work as they do.
-- **Rebuild from scratch:** [`docs/rebuild-prompts.md`](docs/rebuild-prompts.md) has the 12 prompts, in order, that built this project with Claude.
+- **Design decisions:** [`docs/DECISIONS.md`](docs/DECISIONS.md) explains why things work as they do: prediction-market fetching and tiles, the reasons behind the rest of the site (data built in Actions, fallbacks, timers, the shared signal engine, the honest scorecard, colour, deploy safety) and how the repo is worked on.
+- **Rebuild from scratch:** [`docs/rebuild-prompts.md`](docs/rebuild-prompts.md) has the 26 prompts, in order, that built this project with Claude, up to 12 Nov 2026.
 - **Manual runs:** go to **Actions → Update heatmap data → Run workflow**, or **Actions → Score signals → Run workflow**. Tick *"Run the tuner now"* to tune immediately.
 - **Locally:** `node scripts/build-data.mjs data.json`, then serve the folder (for example `npx serve .`). Scoring: `node scripts/score.mjs --tune` (needs the live `data.json`, via `SITE_URL`). Tests: `npm test` (unit) and `npm run test:e2e` (browser). Preview with test data: `npm run dev`.
 - **Timers:** GitHub's own schedules proved unreliable (about 1 run in 15, and no daily runs), so **cron-job.org** starts the workflows through GitHub's API: the data update every 10 minutes, the scorer daily and the freshness check hourly, using a fine-grained token limited to this repo (Actions: read and write). The token expires in September 2027 and must then be renewed in all three cron-job.org jobs. GitHub's schedules stay on as a backup, and the page's in-browser fallback covers any gaps.
@@ -273,6 +287,7 @@ GitHub Actions: daily 00:20 UTC (via cron-job.org)
 - **Link previews** (Open Graph and X): `og-image.png`, a 1200×630 screenshot of the heatmap. To refresh it, take a new 1200×630 screenshot of the page and replace the file.
 - **Structured data** (JSON-LD): a `WebApplication` and an `FAQPage`. The FAQ questions are also shown as plain text in the **About this crypto heatmap** section at the bottom of the page, because Google wants FAQ markup to match visible text.
 - **`robots.txt`** (in the repo) and **`sitemap.xml`** (written by the deploy job with today's date) are published with the site.
+- **Analytics:** the shared GoatCounter snippet at the end of `index.html` (endpoint `salacompany.goatcounter.com`, not loaded on localhost), the same as the other sala.company sites. Market pages inherit it.
 - To get it indexed faster, add the site in **Google Search Console** and submit `https://heat.sala.company/sitemap.xml`. The domain is already verified for GitHub, but Search Console needs its own verification (a TXT record at GoDaddy).
 
 ## Hosting setup

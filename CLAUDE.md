@@ -32,7 +32,7 @@ No lint script. `package-lock.json` is gitignored.
 - Built JSON files (`data.json`, `forex.json`, ... and generated market dirs) are gitignored and exist only in the deployed site.
 - In-browser fallback: if `data.json` is missing or older than 45 min, the page runs `scripts/build-data.mjs` itself (at most once per 10 min per browser).
 - `tests/`: unit tests (`signals`, `scoring`, per-market, `deploy.test.mjs`); `tests/e2e/` Playwright spec, fixtures and local server.
-- `docs/rebuild-prompts.md`: the prompts that built the project. `docs/DECISIONS.md`: why things work as they do (e.g. how often prediction markets are fetched).
+- `docs/rebuild-prompts.md`: the prompts that built the project, in order (one per feature). `docs/DECISIONS.md`: why things work as they do (prediction-market fetching and tiles, the site-wide rules such as fallbacks, timers, the shared engine, the honest scorecard, colour and deploy safety, and how the repo is worked on). Read it before changing behaviour.
 
 ## Deployment
 
@@ -41,7 +41,7 @@ No lint script. `package-lock.json` is gitignored.
 - `score-signals.yml`: daily 00:20 UTC scoring (Sunday tuning), commits results to `main` (also keeps schedules from being paused). Expect bot commits; pull before pushing.
 - `test.yml` and `e2e.yml` run on push to every branch and PRs. `freshness.yml`: hourly live-data check. `backfill-universe.yml`: manual one-off.
 - Secrets: `COINGECKO_API_KEY`; optional `BETFAIR_APP_KEY`/`BETFAIR_USERNAME`/`BETFAIR_PASSWORD`.
-- README workflow: work on a branch, merge to `main` only when unit and browser tests pass.
+- README workflow: work on a branch (Claude sessions use their `claude/...` branch), merge to `main` only when unit and browser tests pass. Pull `main` first (the scorer's daily bot commits).
 
 ## Conventions and gotchas
 
@@ -51,3 +51,5 @@ No lint script. `package-lock.json` is gitignored.
 - Fonts are self-hosted (`fonts/inter-latin.woff2`); no calls to Google.
 - Browser tests must make no outside API calls (fixtures only). Phone layout (bottom sheet, sideways-scrolling tabs) and 13-inch popup fit are tested; check both when changing UI.
 - Keep FAQ JSON-LD in sync with the visible About text. Line endings are LF (`.gitattributes`).
+- Docs move with the code: a behaviour change updates `README.md`, adds a decision to `docs/DECISIONS.md` (append, numbered) when the reason is worth keeping, and adds a prompt to `docs/rebuild-prompts.md` for a new feature.
+- Plain words in page text, code and docs (see decision 27 in `docs/DECISIONS.md`).
