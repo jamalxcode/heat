@@ -650,7 +650,7 @@ export function buildScorecard(coins, current, { prev = null, tuneNow = false, n
   let newParams = null;
   if (tuneNow || !tuning.lastRun) {
     const res = tune(coins, params, { momPcts });
-    // Guard: the tuner learns on today's list, which flatters signals (coins are in it because they rose). New signal
+    // Guard: the tuner learns on today's list, which makes signals look better (coins are in it because they rose). New signal
     // settings are adopted only if they also do at least as well on the fair days, and not at all while there are
     // fewer than PIT_MIN_DAYS of those. (Forex has no such bias: its list of currencies never changes.)
     let fair = null;

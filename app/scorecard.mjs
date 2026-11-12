@@ -108,7 +108,7 @@ export function renderScorecard() {
   const Hs = sc.horizons || [1];
   if (!Hs.includes(S.scoreH)) S.scoreH = 1;
   const h = S.scoreH, hw = H_WORD[h];
-  // Fair (point-in-time) figures lead whenever the scorer made them: today's list flatters the signals, because coins
+  // Fair (point-in-time) figures lead whenever the scorer made them: today's list makes the signals look better, because coins
   // are in it because they rose. (Forex has no fair/long split: its list of currencies never changes.)
   const hasFair = !!sc.pit?.windows;
   if (!hasFair || !['fair', 'long'].includes(S.scoreSet)) S.scoreSet = hasFair ? 'fair' : 'long';
@@ -125,7 +125,7 @@ export function renderScorecard() {
   const detail = tooEarly || !A.rockets.n ? '' : `Over ${hasFair ? `the last ${nDays} fair days` : `${nDays.toLocaleString()} days of history`}, ${M.noun} with more 🚀 than 😢 went up ${pc(A.rockets.upRate)} of the time the next day, against ${pc(A.all.upRate)} for all ${M.noun}, and moved ${spc(A.rockets.avgExc)} a day compared with the market.`;
   const fairWhy = hasFair ? `<b>Fair</b> means each day is judged only on the ${M.noun} that were in that day's top 100, including ones that have since dropped out.` : `The list of ${M.noun} never changes, so the whole history is a fair test.`;
   const answerHTML = `<div class="sc-card sc-answer"><h2>Do the signals work?</h2><p class="sc-answer-line">${answer} ${detail}</p><p class="sc-muted">${fairWhy}${A.ic.t >= 2 ? '' : ' Until a signal proves itself, read the 🚀/😢 as a summary of the chart, not a prediction.'}</p></div>`;
-  const longNote = hasFair && !fair ? `<p class="sc-warn-note">⚠ These figures use <b>today's</b> top 100 over the whole history: longer, but flattering, because ${M.noun} are in today's list partly because they rose. The <b>Fair test</b> is the honest one.</p>` : '';
+  const longNote = hasFair && !fair ? `<p class="sc-warn-note">⚠ These figures use <b>today's</b> top 100 over the whole history: longer, but too kind to the signals, because ${M.noun} are in today's list partly because they rose. The <b>Fair test</b> is the honest one.</p>` : '';
   const moved = y.coins.filter(c => c.score !== 0);
   const tile = (title, big, lines) => `<div class="sc-tile"><div class="sc-t">${title}</div><div class="sc-big">${big}</div>${lines.map(l => `<div class="sc-l">${l}</div>`).join('')}</div>`;
   const segBtns = (id, attr, cur, opts) => `<div class="seg" id="${id}">${opts.map(([v, l]) => `<button data-${attr}="${v}" aria-pressed="${String(cur) === String(v)}">${l}</button>`).join('')}</div>`;
@@ -151,15 +151,15 @@ export function renderScorecard() {
   const pitW = pit?.windows?.all?.[h];
   // which days are rebuilt (scripts/backfill-universe.mjs) and which recorded each night
   const pitSrc = !pit ? '' : pit.backfill
-    ? `lists up to ${pit.backfill.to} rebuilt from CoinGecko market caps (coins that have since collapsed out of today’s top ${pit.backfill.limit} may be missing, so a small flattering bias remains), recorded each night after that`
+    ? `lists up to ${pit.backfill.to} rebuilt from CoinGecko market caps (coins that have since collapsed out of today’s top ${pit.backfill.limit} may be missing, so a small bias in the signals’ favour remains), recorded each night after that`
     : `recording since ${pit.from ?? 'today'}`;
-  const pitHTML = !pit ? '' : `<p class="sc-muted"><b>Point-in-time check:</b> ${pit.days} day${pit.days === 1 ? '' : 's'} scored using only the ${M.noun} that were in the list on each day${pit.left ? `, including ${pit.left} that have since left the top 100` : ''} (${pitSrc}). ${pit.days >= 60 && pitW ? `Verdict on those days: <b>${icVerdict(pitW.ic)}</b> (t = ${pitW.ic.t?.toFixed(1) ?? '—'}).` : 'A verdict needs about 60 days; until then the figures above use today’s list, which flatters the 🚀 (coins are in it because they rose).'}</p>`;
+  const pitHTML = !pit ? '' : `<p class="sc-muted"><b>Point-in-time check:</b> ${pit.days} day${pit.days === 1 ? '' : 's'} scored using only the ${M.noun} that were in the list on each day${pit.left ? `, including ${pit.left} that have since left the top 100` : ''} (${pitSrc}). ${pit.days >= 60 && pitW ? `Verdict on those days: <b>${icVerdict(pitW.ic)}</b> (t = ${pitW.ic.t?.toFixed(1) ?? '—'}).` : 'A verdict needs about 60 days; until then the figures above use today’s list, which makes the 🚀 look better (coins are in it because they rose).'}</p>`;
   const t = sc.tuning || {}, last = t.last;
   const foldsHTML = last?.folds ? `<ul>${last.folds.map(f => `<li>${f.from} → ${f.to}: current ${f.before?.toFixed(3) ?? '—'} vs candidate ${f.after?.toFixed(3) ?? '—'} ${f.won ? '✅' : '❌'}</li>`).join('')}</ul>` : '';
   const tuneHTML = !t.lastRun || !last ? '<p class="sc-muted">The tuner hasn\'t run yet. It runs every Sunday.</p>' : `
     <p><b>Last run ${new Date(t.lastRun).toLocaleDateString()}</b>: ${last.adopted ? '✅ <b>adopted new settings</b>: they beat the current ones on periods they weren\'t tuned on.' : 'kept the current settings. The alternative didn\'t clearly beat them on periods it wasn\'t tuned on.'}
       ${last.folds ? `Won <b>${last.wins} of ${last.folds.length}</b> check periods · average score (rank correlation over 1/3/7 days): current <b>${last.testIC.before?.toFixed(3) ?? '—'}</b> vs candidate <b>${last.testIC.after?.toFixed(3) ?? '—'}</b>.` : `Check-period score: current <b>${last.testIC.before?.toFixed(3) ?? '—'}</b> vs candidate <b>${last.testIC.after?.toFixed(3) ?? '—'}</b>.`}</p>
-    ${last.fair ? `<p><b>Fair-days check</b>: ${last.fair.ok ? '✅' : '⏸ new signal settings not adopted:'} ${esc(last.fair.why)}${last.fair.current != null ? ` (current ${last.fair.current.toFixed(3)} vs candidate ${last.fair.proposed.toFixed(3)})` : ''}. <span class="sc-muted">The tuner learns on today's list, which flatters the signals, so a change must also hold on the fair days.</span></p>` : ''}
+    ${last.fair ? `<p><b>Fair-days check</b>: ${last.fair.ok ? '✅' : '⏸ new signal settings not adopted:'} ${esc(last.fair.why)}${last.fair.current != null ? ` (current ${last.fair.current.toFixed(3)} vs candidate ${last.fair.proposed.toFixed(3)})` : ''}. <span class="sc-muted">The tuner learns on today's list, which makes the signals look better, so a change must also hold on the fair days.</span></p>` : ''}
     ${last.holdout ? `<p><b>Untouched check</b> (${last.holdout.from} → ${last.holdout.to}, never used for tuning): current settings scored <b>${last.holdout.current?.toFixed(3) ?? '—'}</b>, the alternative <b>${last.holdout.proposed?.toFixed(3) ?? '—'}</b> <span class="sc-muted">(same score as above; around 0 means no link)</span>.</p>` : ''}
     ${last.stop ? `<p><b>Stop distance</b>: tested ${last.stop.table.map(s => `${s.m}× (exits ${s.avg >= 0 ? 'saved' : 'cost'} ${pc(Math.abs(s.avg), 2)} over 3 days)`).join(', ')}. ${last.stop.adopt ? `✅ <b>Switched from ${last.stop.from}× to ${last.stop.to}×</b>: it did better in ${last.stop.wins} of 3 check periods.` : `Kept <b>${last.stop.from}×</b>: no other distance did clearly better.`}</p>` : ''}
     ${foldsHTML ? `<details><summary>Check periods</summary>${foldsHTML}</details>` : ''}

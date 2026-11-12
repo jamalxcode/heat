@@ -438,7 +438,7 @@ export function summarize(c, days, now, prevLong = null) {
     d.push(k - ds[0]); y10.push(r4(a)); ys.push(b == null ? null : r4(b));
   }
   const ten = interp(pts, 10), sh = shortOf(c, pts), slope = ten != null && sh != null ? r4(ten - sh) : null;
-  // the weekly history (up to ten years) and where today's slope sits in it: the share of weeks it was flatter
+  // the weekly history (up to ten years) and where today's slope sits in it: the share of weeks it was less steep
   const hist = new Map();
   if (prevLong?.d) { const d0 = Math.floor(prevLong.t0 / DAY); prevLong.d.forEach((o, i) => hist.set(d0 + o, [d0 + o, prevLong.y10[i], prevLong.ys[i]])); }
   for (const k of all) { const p = days.get(k), a = interp(p, 10), b = shortOf(c, p); if (a != null) hist.set(k, [k, r4(a), b == null ? null : r4(b)]); }

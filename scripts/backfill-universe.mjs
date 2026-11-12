@@ -5,7 +5,7 @@
 // them), download each one's daily market cap for `days` days, and for each past day keep the top 100 by that day's
 // market cap, stablecoins and wrapped/gold tokens left out as everywhere else. Days already recorded are kept.
 // Limit: a coin that has since fallen out of today's top `limit` is missing from the rebuilt lists, so a small
-// flattering bias remains; the Scorecard says these days are reconstructed.
+// bias in the signals' favour remains; the Scorecard says these days are reconstructed.
 // Careful with CoinGecko's free plan (30 requests a minute, ~10,000 a month, shared with the 10-minute updates):
 //   - one request every GAP_MS (10 a minute), a hard cap on requests, a stop at the first "too many requests" or at
 //     two errors in a row, and progress saved after every coin (data/backfill-cache.json), so a rerun resumes

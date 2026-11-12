@@ -58,7 +58,7 @@ await pool(universe, 5, async c => { const h = await history(c, true); if (h) co
 const verified = coins.filter(c => c.verified).length;
 
 // 4. Point-in-time lists: record today's top 100, so the scorecard can also judge each day using only the coins that
-// were in the list on that day (scoring today's list alone flatters the signals: coins are there because they rose).
+// were in the list on that day (scoring today's list alone makes the signals look better: coins are there because they rose).
 // Every coin in a recorded list is scored, not only today's: a coin that later fell out of the top 100 must still
 // count on the days it was in it, or the losers quietly disappear from the check.
 const isoToday = new Date(today * DAY).toISOString().slice(0, 10);
