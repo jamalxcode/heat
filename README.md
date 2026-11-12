@@ -228,6 +228,7 @@ GitHub Actions: daily 00:20 UTC (via cron-job.org)
 | `scripts/build-energy.mjs` | Builds `energy.json` in the deploy job: six front-month energy futures from Yahoo Finance (full history hourly, the latest days every build) |
 | `scripts/build-etfs.mjs` | Builds `etfs.json` in the deploy job: 112 US stock ETFs from Yahoo Finance (latest prices every build in 6 bulk requests, full history with volume hourly) |
 | `scripts/build-rates.mjs`, `app/rates.mjs` | Builds `rates.json` (official yield curves, refetched every 3 hours) and draws the rates page |
+| `scripts/build-predictions.mjs`, `app/predictions.mjs`, `scripts/question-pages.mjs` | Builds `predictions.json` every 10 minutes (Polymarket, Kalshi, PredictIt, Manifold, Betfair; Kalshi's full list hourly), draws the predictions page, and writes the static question pages. Fetch cadence and why: [`docs/DECISIONS.md`](docs/DECISIONS.md) |
 | `scripts/health.mjs` | Builds `health.json`, the sources health line in every page's footer |
 | `scripts/backfill-universe.mjs`, `data/backfill-cache.json` | One-off: rebuilds the daily top-100 lists before recording began, gently (10 CoinGecko requests a minute, capped, resumable) |
 | `scripts/tradingview.mjs` | TradingView chart links: candidate symbols per asset, checked in the deploy job and cached in `tv.json`; the page imports it to pick the link |
@@ -259,6 +260,7 @@ GitHub Actions: daily 00:20 UTC (via cron-job.org)
 
 - **Making changes:** work on a branch. The unit and browser tests run on every push to any branch; merge into `main` only when both pass. Only `main` deploys.
 
+- **Design decisions:** [`docs/DECISIONS.md`](docs/DECISIONS.md) explains why things work as they do.
 - **Rebuild from scratch:** [`docs/rebuild-prompts.md`](docs/rebuild-prompts.md) has the 12 prompts, in order, that built this project with Claude.
 - **Manual runs:** go to **Actions → Update heatmap data → Run workflow**, or **Actions → Score signals → Run workflow**. Tick *"Run the tuner now"* to tune immediately.
 - **Locally:** `node scripts/build-data.mjs data.json`, then serve the folder (for example `npx serve .`). Scoring: `node scripts/score.mjs --tune` (needs the live `data.json`, via `SITE_URL`). Tests: `npm test` (unit) and `npm run test:e2e` (browser). Preview with test data: `npm run dev`.
