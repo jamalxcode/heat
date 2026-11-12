@@ -1071,7 +1071,9 @@ test.describe('predictions', () => {
     await expect(top.locator('.pt-spark')).toHaveCount(1);                                         // the trend from its history
     await expect(top.locator('.pt-chg')).toHaveText('▲ +5 pts');
     await expect(top.locator('.pt-chg')).toHaveClass(/q2/);                                        // teal chip: more likely
-    await expect(top.locator('.pt-foot')).toContainText('$5M today · $90M total');
+    await expect(top.locator('.pt-top .pt-vol')).toHaveText('$5M today');                         // money bet today, up front beside the rank
+    await expect(top.locator('.pt-foot')).toContainText('$90M total');
+    await expect(top.locator('.pt-foot')).not.toContainText('today');
     const fed = page.locator('.ptile[data-id="pm:fed"]');
     await expect(fed.locator('.pt-ans')).toHaveText('No, it won’t');                               // 30% yes shown as its likelier side, in words
     await expect(fed.locator('.pt-p')).toHaveText('70%');

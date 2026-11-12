@@ -45,3 +45,16 @@ Why the project works the way it does. Add new decisions at the end, and keep ea
 
 ### 8. Predictions are in the hourly freshness check
 **Decision:** `scripts/check-fresh.mjs` fails (and GitHub emails) when `predictions.json` hasn't been built for an hour, or when a venue has been stale for more than a day, or has an empty tab (`down`). A venue that isn't set up (`off`, Betfair without its secrets) never alerts. Before this, a prediction build that stayed stale went unnoticed, because the build republishes the last file and the job still "succeeds".
+
+## Prediction tiles: less empty space
+
+*12 Nov 2026, from a screenshot of the live page on a laptop: big tiles were mostly empty.*
+
+### 9. Content stacks under the title
+**Decision:** a tile's answer and chance sit right under its question, and only the footer (time left, total bet) is pushed to the bottom. Before, the answer was pinned to the bottom, so a tile stretched to match a taller neighbour showed a big hole between the question and the answer.
+
+### 10. A 2×2 tile has to have something to fill it
+**Decision:** the top few questions get a 2×2 tile only when they have a top-three race or related questions to show. A lone yes/no in that place gets a wide (2×1) tile instead (`sizes()` in `app/predictions.mjs`).
+
+### 11. Money bet today goes in the header
+**Decision:** the amount bet in the last 24 hours is a chip beside the rank ("#4 · $4.7M today"; just "$4.7M" on small tiles, with "today" in the tooltip). It's the first thing read after the rank, and the footer keeps only the time left and the total. Big tiles use smaller type (36px chance, 21px question, 40px icon instead of 54, 27 and 60).
