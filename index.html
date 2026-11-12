@@ -319,6 +319,9 @@ button.sc-chip:hover, button.sc-chip[aria-expanded="true"] { box-shadow: inset 0
 .pt-top { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
 .pt-id { display: inline-flex; align-items: center; gap: 5px; min-width: 0; overflow: hidden; } .pt-top .pt-chg { flex: none; }
 .pt-rank { font-size: 10.5px; font-weight: 700; opacity: .8; font-variant-numeric: tabular-nums; }
+/* money bet today, up front: the first thing read after the rank */
+.pt-vol { font-size: 11.5px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; padding: 0 6px; border-radius: 999px; background: color-mix(in srgb, var(--tint-ink) 14%, transparent); }
+.sz-s .pt-vol-w { display: none; }   /* small tiles: just the amount, the tooltip says it's today's */
 .pt-chg { font-weight: 800; font-size: 13px; font-variant-numeric: tabular-nums; }
 /* a tile reads top to bottom: the question, the answer, then its chance and the money bet; text grows with the tile */
 .pt-title { font-size: 16px; font-weight: 750; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
@@ -328,8 +331,8 @@ button.sc-chip:hover, button.sc-chip[aria-expanded="true"] { box-shadow: inset 0
 .pt-head { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
 .pt-head > .p-ico { font-size: 34px; margin: 0; flex: none; line-height: 1.05; }
 .pt-htxt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.sz-w .pt-head > .p-ico { font-size: 42px; }
-.sz-l .pt-head { gap: 12px; } .sz-l .pt-head > .p-ico { font-size: 60px; }
+.sz-w .pt-head > .p-ico { font-size: 34px; }
+.sz-l .pt-head { gap: 10px; } .sz-l .pt-head > .p-ico { font-size: 40px; }
 .pm-big .p-ico { font-size: 30px; display: block; margin-bottom: 2px; } .pm-mid .p-ico { font-size: 22px; }
 .p-news-t .p-ico { font-size: 1.6em; }
 .p-q .p-ico { font-size: 1.8em; }
@@ -344,18 +347,18 @@ button.sc-chip:hover, button.sc-chip[aria-expanded="true"] { box-shadow: inset 0
 :root[data-theme="dark"] .ptile .p-end.e-week, :root[data-theme="dark"] .ptile .p-end.e-now { background: #1b1b1a; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .p-end.e-week { color: #f0a640; } :root:not([data-theme="light"]) .p-end.e-now { color: #ff7a66; } :root:not([data-theme="light"]) .ptile .p-end.e-week, :root:not([data-theme="light"]) .ptile .p-end.e-now { background: #1b1b1a; } }
 .p-qfull { margin: 0 0 6px; font-size: 13px; color: var(--muted); }
-.pt-ans { margin-top: auto; font-size: 15px; font-weight: 800; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pt-ans { font-size: 15px; font-weight: 800; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pt-nums { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; min-width: 0; }
 .pt-p { font-size: 22px; font-weight: 800; line-height: 1.05; font-variant-numeric: tabular-nums; }
 .pt-amt { font-size: 11.5px; font-weight: 600; opacity: .9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
 .sz-w .pt-title { font-size: 19px; } .sz-w .pt-full { font-size: 12px; }
 .sz-w .pt-ans { font-size: 18px; } .sz-w .pt-p { font-size: 28px; } .sz-w .pt-amt { font-size: 13px; }
-.sz-l { padding: 14px 16px; gap: 6px; }
-.sz-l .pt-title { font-size: 27px; -webkit-line-clamp: 3; font-weight: 800; } .sz-l .pt-full { font-size: 14px; }
-.sz-l .pt-ans { font-size: 30px; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.sz-l .pt-p { font-size: 54px; } .sz-l .pt-amt { font-size: 18px; } .sz-l .pt-foot { font-size: 12.5px; }
-.sz-l .pt-chg { font-size: 16px; } .sz-l .pt-rank { font-size: 13px; }
-.pt-foot { font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: color-mix(in srgb, var(--tint-ink) 80%, transparent); }
+.sz-l { padding: 10px 12px; gap: 4px; }
+.sz-l .pt-title { font-size: 21px; -webkit-line-clamp: 3; font-weight: 800; } .sz-l .pt-full { font-size: 14px; }
+.sz-l .pt-ans { font-size: 21px; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.sz-l .pt-p { font-size: 36px; } .sz-l .pt-amt { font-size: 18px; } .sz-l .pt-foot { font-size: 12.5px; }
+.sz-l .pt-chg { font-size: 14px; } .sz-l .pt-rank { font-size: 12px; } .sz-l .pt-vol { font-size: 13px; }
+.pt-foot { margin-top: auto; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: color-mix(in srgb, var(--tint-ink) 80%, transparent); }
 .p-note { margin: 0 0 10px; padding: 9px 12px; border-radius: 10px; background: var(--neutral); font-size: 13px; color: var(--ink-2); }
 .p-empty { color: var(--muted); font-size: 13px; }
 .p-help p { margin: 0 0 6px; }
@@ -429,11 +432,11 @@ tr.r-row.done { opacity: .65; }
 .lk-hi .p-say-a { font-size: 25px; } .lk-hi .p-say-p { font-size: 34px; }
 .ptile .pt-chg, .pm-tile .pt-chg { background: var(--tint); color: var(--tint-ink); border-radius: 999px; padding: 1px 7px; font-size: 11.5px; font-weight: 700; white-space: nowrap; box-shadow: 0 0 0 1px rgba(0,0,0,.06); }
 .sz-l .pt-chg { font-size: 14px; padding: 2px 9px; }
-.pt-verdict { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; opacity: .85; margin-top: auto; }
+.pt-verdict { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; opacity: .85; margin-top: 2px; }
 .pt-verdict + .pt-ans { margin-top: 0; }
 /* small tiles: the verdict word goes (colour, type and the % already say it) and the answer gets its room */
 .sz-s .pt-verdict { display: none; }
-.sz-s .pt-ans { font-size: 18px; margin-top: auto; }
+.sz-s .pt-ans { font-size: 18px; }
 /* a story card: related questions as short lines under the lead question */
 .pt-also { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; padding-top: 5px; border-top: 1px solid color-mix(in srgb, var(--tint-ink) 22%, transparent); min-width: 0; }
 .pt-also-k { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; opacity: .82; }
@@ -445,7 +448,7 @@ tr.r-row.done { opacity: .65; }
 .pt-more b, .pt-more b[class] { background: none; color: inherit; }
 .pt-more-n { font-size: 11.5px; opacity: .82; }
 .sz-l .pt-more { font-size: 14px; } .sz-l .pt-also-k { font-size: 11.5px; }
-.sz-l .pt-verdict { font-size: 13px; }
+.sz-l .pt-verdict { font-size: 11.5px; }
 .pt-spark { flex: none; opacity: .85; align-self: center; }
 .pt-star { color: #d39a00; font-size: 12px; }
 .p-orders { display: flex; flex-wrap: wrap; margin: 2px 0 6px; }

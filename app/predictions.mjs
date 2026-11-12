@@ -364,10 +364,13 @@ function shown() {
   live.forEach((m, i) => { pos.set(m.id, i + 1); });
   return { live: merged() && !query ? live.slice(0, ALL_MAX) : live, done };
 }
-// tile size from the place in the order: the top 4 or so big (2×2), the next tenth wide (2×1), the rest small
-function sizes(ms) {
+// tile size from the place in the order: the top 4 or so big (2×2), the next tenth wide (2×1), the rest small.
+// A big tile needs something to fill it (a top-three race or related questions); a lone yes/no goes wide instead,
+// so the top of the page isn't a 2×2 box holding one line
+const rich = (m, also) => (also.get(m.id) || []).length > 0 || raceHTML(m, shownOutcome(m)) !== '';
+function sizes(ms, also = new Map()) {
   const n = ms.length, out = new Map();
-  ms.forEach((m, i) => out.set(m.id, weight(m) <= 0 || thin(m) ? 's' : i < Math.min(4, Math.max(1, Math.round(n * 0.03))) ? 'l' : i < Math.max(2, Math.round(n * 0.1)) ? 'w' : 's'));
+  ms.forEach((m, i) => out.set(m.id, weight(m) <= 0 || thin(m) ? 's' : i < Math.min(4, Math.max(1, Math.round(n * 0.03))) ? (rich(m, also) ? 'l' : 'w') : i < Math.max(2, Math.round(n * 0.1)) ? 'w' : 's'));
   return out;
 }
 
@@ -403,15 +406,15 @@ function tileHTML(m, size, done = false, also = []) {
   const label = `${m.title}: ${verdict(m, h)}, ${h.name}, ${pct(h.p)}. Move ${TFS.find(t => t[0] === tf)[2]} ${pts(ch)}. ${(cmp ? cmp.rows.map(r => VNAME[r.x.venue]) : [VNAME[m.venue]]).join(', ')}`;
   const t$ = mToday(m), T$ = mTotal(m), place = pos.get(m.id), tp = titleParts(m);
   return `<button class="ptile sz-${size} ${sureClass(h)}${m.id === sel ? ' sel' : ''}${m.stale ? ' stale' : ''}${thin(m) ? ' thin' : ''}${done ? ' done' : ''}" data-id="${esc(m.id)}" data-coin="1" aria-haspopup="dialog" aria-label="${esc(label)}">
-    <span class="pt-top"><span class="pt-id">${badges}${place && !done ? `<span class="pt-rank">#${place}</span>` : ''}${watch.has(m.id) ? '<span class="pt-star" title="On your watchlist">★</span>' : ''}</span>${chip(ch)}</span>
+    <span class="pt-top"><span class="pt-id">${badges}${place && !done ? `<span class="pt-rank">#${place}</span>` : ''}${t$ != null && !done ? `<span class="pt-vol" title="${money(t$, 'USD')} bet in the last 24 hours">${money(t$, 'USD')}<span class="pt-vol-w"> today</span></span>` : ''}${watch.has(m.id) ? '<span class="pt-star" title="On your watchlist">★</span>' : ''}</span>${chip(ch)}</span>
     <span class="pt-head">${icon(m)}<span class="pt-htxt"><span class="pt-title">${esc(tp[0])}</span>${tp[1] ? `<span class="pt-full">${esc(tp[1])}</span>` : ''}</span></span>
     <span class="pt-verdict">${verdict(m, h)}</span>
     <span class="pt-ans">${esc(answer(m, h))}</span>
-    <span class="pt-nums"><b class="pt-p">${pct(h.p)}</b>${spark(m, size === 'l' ? 120 : 64, size === 'l' ? 30 : 18)}${(d => d != null && Math.abs(d) >= SINCE_MIN ? `<span class="pt-since" title="Since your last visit (${esc(sinceWhen())})">${arrow(d)}${pts(d).replace(' pts', '')} since ${esc(sinceWhen())}</span>` : '')(done ? null : sinceMove(m, h))}</span>
+    <span class="pt-nums"><b class="pt-p">${pct(h.p)}</b>${spark(m, size === 'l' ? 96 : 64, size === 'l' ? 24 : 18)}${(d => d != null && Math.abs(d) >= SINCE_MIN ? `<span class="pt-since" title="Since your last visit (${esc(sinceWhen())})">${arrow(d)}${pts(d).replace(' pts', '')} since ${esc(sinceWhen())}</span>` : '')(done ? null : sinceMove(m, h))}</span>
     ${size !== 's' && !done ? raceHTML(m, h) : ''}
     ${cmp ? `<span class="pt-cmp${cmp.spread >= DIFFER ? ' differ' : ''}" title="The same answer on each venue${cmp.spread >= DIFFER ? `: they differ by ${Math.round(cmp.gap * 100)} points` : ''}">${cmp.spread >= DIFFER ? '⚡ ' : ''}${cmp.rows.map(r => `${VTAG[r.x.venue]} ${pct(r.p)}`).join(' · ')}</span>` : ''}
     ${also.length ? alsoHTML(m, also, size) : ''}
-    <span class="pt-foot">${done ? esc(decidedWhy(m)) : `${endHTML(m, size === 'l')}${t$ != null ? `<b>${money(t$, 'USD')}</b> today · ` : ''}${T$ != null ? `${money(T$, 'USD')} total${playNote(m)}` : ''}${thin(m) ? ' · thin market' : ''}`}${m.stale ? ' · ⚠ not refreshed' : ''}</span>
+    <span class="pt-foot">${done ? esc(decidedWhy(m)) : `${endHTML(m, size === 'l')}${T$ != null ? `${money(T$, 'USD')} total${playNote(m)}` : ''}${thin(m) ? ' · thin market' : ''}`}${m.stale ? ' · ⚠ not refreshed' : ''}</span>
   </button>`;
 }
 // one card per story: the first question of a story (in the tab's order) leads, the others ride along as short lines
@@ -438,7 +441,7 @@ function grid(ms, top = false) {
     ({ out: ms, also } = stack(ms));
     if (groupBy === 'none') { pos.clear(); ms.forEach((m, i) => pos.set(m.id, i + 1)); }
   }
-  const sz = sizes(ms), cut = top && !query && ms.length > showN + 6 ? showN : ms.length, left = ms.length - cut;
+  const sz = sizes(ms, also), cut = top && !query && ms.length > showN + 6 ? showN : ms.length, left = ms.length - cut;
   return `<div class="grid pgrid">${ms.slice(0, cut).map(m => tileHTML(m, sz.get(m.id), false, also.get(m.id) || [])).join('')}</div>`
     + (left ? `<p class="p-morewrap"><button class="btn p-more" id="pmore">Show ${Math.min(SHOW_STEP, left)} more <span class="r-muted">· ${left} left</span></button></p>` : '');
 }
