@@ -21,12 +21,12 @@ On the price pages every tile combines the move with technical indicators, and a
 Each page is built to answer "what's happening?" in a couple of seconds (Nov 2026):
 
 - **A headline above the tiles:** the typical move (weighted by market cap on the crypto page; elsewhere the median, so one devaluation or one wild fund can't drag it), how many rose and fell with a bar of the split, and the biggest gain and drop, each opening its chart card. It describes what's shown, so a filter narrows it. ETF group headings carry their own average ("avg +0.4% · 7 of 11 up").
-- **Every market's figure on the market switch:** Bitcoin, the US Dollar Index, gold, Brent, the S&P 500 (SPY) and the US 10-year yield (in basis points), coloured like the tiles, on every page. They come from the `xm` part of the tiny `pulse.json` the deploy builds (`scripts/pulse.mjs`), so no page loads another page's data.
+- **Every market's figure on its tab:** Bitcoin, the US Dollar Index, gold, Brent, the S&P 500 (SPY) and the US 10-year yield (in basis points), coloured like the tiles, on every page; each tab is also filled with a lighter shade of that colour (see Top of the page). They come from the `xm` part of the tiny `pulse.json` the deploy builds (`scripts/pulse.mjs`), so no page loads another page's data.
 - **Map view** (crypto and ETFs, next to Grid): each tile's area follows its size, market cap for coins and dollars traded a day (20-day average) for ETFs, on a square-root scale so the small ones stay readable next to Bitcoin or SPY; ETFs sit in a block per group. Colour is the move, as on the grid; a tile opens its chart card. `?view=map` links to it. Forex, metals and energy have nothing to size by, so no Map.
 - **A week's line on heatmap tiles:** the last 8 daily closes (6 trading days on forex, energy and ETFs) under the price, so a red day in a strong rally reads differently from one in a slide.
 - **Finer colour steps:** the grey "flat" band is narrower (crypto ±0.5% a day, ETFs ±0.2%, energy ±0.25%, metals ±0.15%, rates ±1 bp a day / ±2 bp a week), so a calm day still shows which way things leaned. Forex stays at ±0.1%.
 - **The warning is one slim line** above the page on a first visit (and 30 days after it's dismissed), never over it; "More" or **⚠ WIP** shows the full text.
-- **Phones:** the market switch and a **⚙ View** button (with a badge for settings that differ from the default) replace the rows of controls, the countdown and secondary buttons fold away, and the first tiles start about a third of the way down the screen (they started three quarters down).
+- **Phones:** the market tabs (scrolling sideways) and a small **⚙ View** button beside the colour key (with a badge for settings that differ from the default) replace the rows of controls, the countdown and secondary buttons fold away, and the first tiles start about a third of the way down the screen (they started three quarters down).
 - **Rates** lead with the 10-year yield and its move, with a column chart of every market's yield, highest first, above the cards; **predictions** put today's news, since-your-last-visit and just-decided results in one row of small cards, so the board starts in the top half of a laptop screen. Details in their sections below.
 
 ### The next click (Nov 2026, round 2)
@@ -39,7 +39,7 @@ Each page is built to answer "what's happening?" in a couple of seconds (Nov 202
 - **Instant repeat visits:** the page draws the last copy this browser saw at once ("Showing your last visit’s prices · updating…") and swaps in the fresh file when it arrives; only copies under a day old and 3 MB.
 - **The chart's labels don't collide:** the stop labels are pushed apart and a price-scale number next to one is left out.
 - **Table:** shorter headers (the full name on hover), a **Week** line per row, and the symbol column stays put while the table scrolls sideways.
-- **Small fixes:** a flat figure on the market switch is outlined, so it reads in dark mode; the energy summary links to the weekly pump-price tables below the tiles.
+- **Small fixes:** a flat figure on the market tabs is outlined, so it reads in dark mode; the energy summary links to the weekly pump-price tables below the tiles.
 
 ## Prediction markets
 
@@ -290,7 +290,7 @@ GitHub Actions: daily 00:20 UTC (via cron-job.org)
 | `.github/workflows/test.yml` | Runs the unit tests on every push to any branch |
 | `.github/workflows/freshness.yml`, `scripts/check-fresh.mjs` | **Hourly freshness check** of the live site: fails (and GitHub emails you) if `data.json`, `forex.json`, `metals.json`, `energy.json`, `etfs.json`, `rates.json`, `predictions.json` (or a prediction venue keeps failing for a day) or a scorecard stops updating, even when every other job "succeeds" |
 | `data/universe-history.json` | Each day's top-100 list, for the point-in-time scorecard |
-| `.github/workflows/e2e.yml` | **Browser tests** (Playwright, headless Chrome) on every push to any branch: no outside API calls, filters, both stop states, the popup (fits a 13-inch screen, opens only on a resting mouse, closes when moving away, stays put when moving onto it, pins and closes), the phone bottom sheet, the Scorecard view, and the at-a-glance parts: the warning line, the summary line (counts match the tiles), the market-switch figures, the Map view, the week lines, the phone header (first tiles in the top third, ⚙ View), the rates column chart and the predictions news strip, and yes/no tiles (statement, labelled chance, the two-sided bar) |
+| `.github/workflows/e2e.yml` | **Browser tests** (Playwright, headless Chrome) on every push to any branch: no outside API calls, filters, both stop states, the popup (fits a 13-inch screen, opens only on a resting mouse, closes when moving away, stays put when moving onto it, pins and closes), the phone bottom sheet, the Scorecard view, and the at-a-glance parts: the warning line, the summary line (counts match the tiles), the market-switch figures, the Map view, the week lines, the phone header (first tiles in the top third, ⚙ View), the rates column chart and the predictions news strip, and yes/no tiles (statement, labelled chance, the two-sided bar), and the market tabs (raised open tab joined to the panel, tabs in their figure's colour with a 2px outline) |
 | `tests/e2e/` | The browser tests, deterministic test data (`fixtures.mjs`) and a local server (`serve.mjs`, also `npm run dev`) |
 
 **How the data stays safe and fresh:**

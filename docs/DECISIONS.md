@@ -210,3 +210,6 @@ Why the project works the way it does. Add new decisions at the end, and keep ea
 ### 51. Tabs take their market's colour
 **Decision:** each tab is filled with a lighter shade of its headline figure's colour (about 30% of the chip's colour mixed into the panel colour, so the chip stays the stronger one) and outlined 2px in a darker shade, so the row shows at a glance which markets are up or down before any click. The open tab keeps the panel's colour and the flame strip, so it still reads as the open folder joined to the panel; Predictions and any market whose figure is missing stay neutral. In dark mode the shades mix into the dark panel colour, and the text stays dark on light fills and light on dark ones.
 
+### 52. Visual changes: options first, then a yes before code
+**Decision:** for a change to how something looks, the working pattern that emerged is: the user shows a screenshot of the live site, Claude proposes a few concrete options (with how each would read), the user picks or combines them (yes/no tiles: options 1, 3 and 5), and Claude says exactly what it will do and waits for a yes when asked to (the tab colours) before coding. Choices that change the agreed design (the open tab keeping the panel's colour, the laptop limit moving to 40% for the bigger tabs) are said up front, not discovered after the merge.
+

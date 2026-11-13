@@ -54,5 +54,6 @@ No lint script. `package-lock.json` is gitignored.
 - Browser tests must make no outside API calls (fixtures only). Phone layout (bottom sheet, sideways-scrolling tabs) and 13-inch popup fit are tested; check both when changing UI.
 - Keep FAQ JSON-LD in sync with the visible About text. Line endings are LF (`.gitattributes`).
 - Docs move with the code: a behaviour change updates `README.md`, adds a decision to `docs/DECISIONS.md` (append, numbered) when the reason is worth keeping, and adds a prompt to `docs/rebuild-prompts.md` for a new feature.
-- The market switch (`#market`) is a row of folder tabs outside `.controls` (decision 50); rates and predictions hide `.controls`.
+- The market switch (`#market`) is a row of folder tabs outside `.controls` (decision 50), each filled with its figure's colour by `renderXM` (decision 51); rates and predictions hide `.controls`.
+- For visual changes the user often asks for options or a yes/no confirmation before coding: give them and wait (decision 52).
 - Plain words in page text, code and docs (see decision 27 in `docs/DECISIONS.md`).

@@ -193,5 +193,6 @@ These 30 prompts cover everything we built, up to 13 Nov 2026. Paste them in ord
 ## Tips for a smooth rebuild
 - Ask for **real-data checks before publishing** at each step. Several bugs only showed up against live data: the Toncoin rename, the biased "good exit" measurement, blank tuner scores, and sources that refuse GitHub's servers (check a new source from a GitHub runner before building on it).
 - If you work from a machine without Node, ask Claude to run the tests in the browser.
+- For a visual change, show a screenshot of what bothers you and ask for a few options first; pick or combine them, and ask Claude to confirm the plan before coding.
 - For a visual change, ask for screenshots of the local preview on a laptop and a phone, light and dark, before it goes live: a Claude cloud session can't open the live site.
 - Keep API tokens and passwords out of chat completely. Share only status codes, like "204".
