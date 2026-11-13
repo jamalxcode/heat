@@ -34,9 +34,9 @@ test('loads everything from data.json, with no outside API calls', async ({ page
   expect(external).toEqual([]);
 });
 
-test('compact top: coins start in the top third of a 13-inch screen; the full legend opens on demand and is remembered', async ({ page }) => {
+test('compact top: coins start in the top 40% of a 13-inch screen (the market tabs take a row of their own); the full legend opens on demand and is remembered', async ({ page }) => {
   const gridTop = await page.locator('#grid').evaluate(el => el.getBoundingClientRect().top);
-  expect(gridTop).toBeLessThan(page.viewportSize().height / 3);
+  expect(gridTop).toBeLessThan(page.viewportSize().height * 0.4);
   await expect(page.locator('#fresh')).toContainText('not real-time');
   const more = page.locator('#legendMore');
   await expect(more).toBeHidden();
@@ -445,11 +445,11 @@ test('Heatmap tiles are the default: whole tile in its colour, symbol, change, p
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('hm.prefs')).tiles)).toBe('detailed');
 });
 
-test('↺ Reset, right before the market switch, puts every control back to the default view and remembers it', async ({ page }) => {
+test('↺ Reset, first in the controls under the market tabs, puts every control back to the default view and remembers it', async ({ page }) => {
   await page.goto('/?tf=7d');
   await expect(page.locator('#status')).toContainText('with indicators');
   const reset = page.locator('#reset');
-  expect(await reset.evaluate(el => el.nextElementSibling?.id)).toBe('market');
+  expect(await reset.evaluate(el => el === el.parentElement.firstElementChild && el.parentElement.previousElementSibling?.id === 'market')).toBe(true);
   await page.locator('#pegged').check();
   await page.locator('#density [data-v="detailed"]').click();   // (tests start on detailed; Reset brings heatmap back)
   await page.locator('#filters .chip[data-f="up"]').click();
@@ -1047,6 +1047,17 @@ test.describe('phone', () => {
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), url).toBe(true);
     }
   });
+});
+
+test('the market switch is a row of folder tabs: the open page’s tab is raised and joined to the panel below', async ({ page }) => {
+  const tabs = page.locator('#market a'), open = page.locator('#market a[aria-current="page"]');
+  await expect(tabs).toHaveCount(7);
+  expect(parseFloat(await tabs.first().evaluate(e => getComputedStyle(e).fontSize))).toBeGreaterThanOrEqual(15);
+  const [ob, other, panel] = [await open.boundingBox(), await tabs.nth(1).boundingBox(), await page.locator('.controls').boundingBox()];
+  expect(ob.y).toBeLessThan(other.y);                                          // raised above the others
+  expect(Math.abs(ob.y + ob.height - panel.y)).toBeLessThan(3);               // its bottom meets the panel's top
+  expect(await open.evaluate(e => getComputedStyle(e).backgroundColor)).toBe(await page.locator('.controls').evaluate(e => getComputedStyle(e).backgroundColor));
+  await expect(page.locator('#reset')).toBeVisible();
 });
 
 // Prediction markets: the same page at /predictions/, drawing its own view from predictions.json (tests/e2e/fixtures.mjs)

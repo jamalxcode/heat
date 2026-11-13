@@ -674,9 +674,6 @@ tr.r-row.done { opacity: .65; }
 /* phones: filter chips become one swipeable row, and the top bar, controls and scale tighten up */
 @media (max-width: 640px) {
   .controls .ctl { flex: 1 1 100%; min-width: 0; }
-  .seg.market { max-width: 100%; overflow-x: auto; scrollbar-width: none; }   /* six markets: swipe sideways if they don't fit */
-  .seg.market::-webkit-scrollbar { display: none; }
-  .seg.market a { flex: none; }
   .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
   .chips::-webkit-scrollbar { display: none; }
   .chip { flex: none; }
@@ -912,7 +909,7 @@ footer .about p { margin: 0; }
 .ctl-more { display: contents; }
 .ctl-toggle { display: none; }
 /* the market switch carries each market's headline move: Bitcoin, the dollar index, gold, Brent, the S&P 500, the US 10-year */
-.seg.market a .mk-x { margin-left: 5px; padding: 0 4px; border-radius: 4px; font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums; background: var(--tint, var(--neutral)); color: var(--tint-ink, var(--ink)); }
+#market a .mk-x { margin-left: 2px; padding: 1px 6px; border-radius: 5px; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; background: var(--tint, var(--neutral)); color: var(--tint-ink, var(--ink)); }
 /* the headline above the tiles */
 .summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin: -2px 2px 10px; font-size: 13px; color: var(--ink-2); }
 .summary[hidden] { display: none; }
@@ -959,7 +956,6 @@ footer .about p { margin: 0; }
   body:not(.ctl-open) #share, body:not(.ctl-open) #theme, body:not(.ctl-open) .leg-toggle { display: none; }
   .wip { margin: -12px 0 8px; font-size: 12px; }
   .controls { gap: 8px; padding: 6px 8px; }
-  .controls .seg.market { flex: 1 1 0; min-width: 0; }
   .ctl-toggle { display: inline-flex; align-items: center; gap: 4px; flex: none; padding: 5px 9px; }
   .ctl-toggle[aria-expanded="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
   .ctl-sum:not(:empty) { font-size: 10.5px; font-weight: 700; padding: 0 5px; border-radius: 999px; background: var(--amber); color: #1a1206; }
@@ -1036,7 +1032,7 @@ body.view-score .q, body.view-score #colorBy, body.view-score .controls .ctl, bo
 .tablewrap th:nth-child(2), .tablewrap td:nth-child(2) { position: sticky; left: 40px; z-index: 2; background: var(--surface); box-shadow: 1px 0 0 var(--grid); }
 .tablewrap th:nth-child(1), .tablewrap th:nth-child(2) { z-index: 3; }
 /* small fixes: a flat figure on the market switch stays readable in dark mode; energy points to its weekly tables */
-.seg.market a .mk-x.h0 { background: transparent; color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--axis); }
+#market a .mk-x.h0 { background: transparent; color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--axis); }
 .sum-jump { margin-left: auto; font-size: 12.5px; color: var(--ink-2); text-decoration: none; border-bottom: 1px solid var(--axis); white-space: nowrap; }
 .sum-jump:hover { color: var(--ink); }
 @media (max-width: 640px) {
@@ -1057,6 +1053,36 @@ body.view-score .q, body.view-score #colorBy, body.view-score .controls .ctl, bo
 .sz-l .pt-yn { font-size: 13px; } .sz-l .pt-ynb i { height: 9px; } .sz-l .pt-ynb i.y { height: 12px; border-radius: 6px 0 0 6px; }
 .p-pop .pt-yn { max-width: 420px; margin: -2px 0 8px; font-size: 13px; }
 .p-say-w { font-size: 14px; color: var(--ink-2); }
+/* ---------- the market switch as folder tabs (Nov 2026) ----------
+   One tab per page, big enough to read as navigation: the open tab is the panel's own colour, a flame-coloured strip
+   on top and no line underneath, so it joins the controls below like a folder; the others sit behind it and lift on hover */
+.tabs { display: flex; align-items: flex-end; gap: 4px; padding: 0 10px; margin: 2px 0 -1px; position: relative; z-index: 2; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tabs a { position: relative; flex: none; display: inline-flex; align-items: center; gap: 7px; padding: 7px 16px 8px; font-size: 15px; font-weight: 600; letter-spacing: -.005em; color: var(--ink-2); text-decoration: none; white-space: nowrap;
+  background: var(--neutral); border: 1px solid var(--border); border-bottom: 0; border-radius: 12px 12px 0 0; margin-top: 5px; transition: background .15s, color .15s, margin .15s, padding .15s; }
+.tabs a:hover { background: color-mix(in oklab, var(--neutral) 45%, var(--surface)); color: var(--ink); margin-top: 2px; padding-bottom: 11px; }
+.tabs a:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+.tabs a[aria-current="page"] { background: var(--surface); color: var(--ink); font-weight: 800; margin-top: 0; padding: 10px 18px 11px; box-shadow: 0 -4px 12px rgba(0,0,0,.06); }
+.tabs a[aria-current="page"]::before { content: ''; position: absolute; left: -1px; right: -1px; top: -1px; height: 4px; border-radius: 12px 12px 0 0; background: linear-gradient(90deg, #ff9a1a, #e0301e 60%, #9b1c1c); }
+.tabs a[aria-current="page"]::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--surface); }   /* covers the panel's top line: the tab and panel are one piece */
+.controls { position: relative; z-index: 1; border-top-left-radius: 4px; }
+/* rates and predictions have no controls panel under the tabs: a shelf line instead, and the open tab sits on it */
+.rates-page .tabs { box-shadow: inset 0 -1px 0 var(--border); margin-bottom: 12px; }
+.rates-page .tabs a[aria-current="page"]::after { background: var(--page); }
+.rates-page .tabs a[aria-current="page"] { background: var(--page); }
+@media (max-width: 640px) {
+  .tabs { padding: 0 2px; gap: 3px; margin-top: 2px; }
+  .tabs a { font-size: 14px; padding: 8px 11px; gap: 5px; }
+  .tabs a[aria-current="page"] { padding: 10px 13px 11px; }
+  .tabs a:hover { margin-top: 6px; padding-bottom: 9px; }
+  /* closed: no empty panel under the tabs; the open tab sits on a shelf line and ⚙ View moves into the free space at
+     the right of the colour-key line below (the scorecard view, which has no colour key, keeps the panel) */
+  body:not(.ctl-open):not(.view-score) .tabs { box-shadow: inset 0 -1px 0 var(--border); margin-bottom: 0; }
+  body:not(.ctl-open):not(.view-score) .tabs a[aria-current="page"], body:not(.ctl-open):not(.view-score) .tabs a[aria-current="page"]::after { background: var(--page); }
+  body:not(.view-score) .controls:not(.open) { border: 0; background: none; padding: 0; height: 0; min-height: 0; margin: 0; }
+  body:not(.view-score) .controls:not(.open) .ctl-toggle { position: absolute; right: 0; top: 7px; z-index: 3; padding: 2px 9px; font-size: 12.5px; line-height: 18px; }
+  body:not(.view-score) .controls:not(.open) + .legend { margin-top: 10px; }
+}
 </style>
 </head>
 <body>
@@ -1084,19 +1110,20 @@ body.view-score .q, body.view-score #colorBy, body.view-score .controls .ctl, bo
     </div>
   </header>
 
+  <!-- Market: folder tabs, one per page (/ and /forex/ …, each built from this same file); the open one joins the panel below -->
+  <nav class="tabs market" id="market" aria-label="Market">
+    <a href="/" data-m="crypto">🪙 Crypto</a>
+    <a href="/forex/" data-m="forex">💱 Forex</a>
+    <a href="/metals/" data-m="metals">🥇 Metals</a>
+    <a href="/energy/" data-m="energy">🛢️ Energy</a>
+    <a href="/etfs/" data-m="etfs">📊 ETFs</a>
+    <a href="/rates/" data-m="rates">📈 Rates</a>
+    <a href="/predictions/" data-m="predictions">🎯 Predictions</a>
+  </nav>
+
   <div class="controls" role="toolbar" aria-label="Heatmap controls">
     <!-- Reset: back to the default view (filters, timeframe, view, tile size, quote, pegged); the theme is kept -->
     <button class="chip reset" id="reset" title="Back to the default view: all coins, 24h, grid, detailed tiles">↺ Reset</button>
-    <!-- Market: each is its own page (/ and /forex/), built from this same file -->
-    <nav class="seg market" id="market" aria-label="Market">
-      <a href="/" data-m="crypto">🪙 Crypto</a>
-      <a href="/forex/" data-m="forex">💱 Forex</a>
-      <a href="/metals/" data-m="metals">🥇 Metals</a>
-      <a href="/energy/" data-m="energy">🛢️ Energy</a>
-      <a href="/etfs/" data-m="etfs">📊 ETFs</a>
-      <a href="/rates/" data-m="rates">📈 Rates</a>
-      <a href="/predictions/" data-m="predictions">🎯 Predictions</a>
-    </nav>
     <!-- phones: the market switch stays; the rest of the controls fold behind this button -->
     <button class="btn ctl-toggle" id="ctlToggle" aria-expanded="false" aria-controls="ctlMore" title="Timeframe, view, tile style and filters">⚙ View<span class="ctl-sum" id="ctlSum"></span></button>
     <div class="ctl-more" id="ctlMore">

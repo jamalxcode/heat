@@ -1,6 +1,6 @@
 # Rebuild transcript: heat.sala.company
 
-These 29 prompts cover everything we built, up to 13 Nov 2026. Paste them in order, and wait for each step to be live and verified before sending the next. The fixes we found along the way are folded in, so a rebuild skips those detours.
+These 30 prompts cover everything we built, up to 13 Nov 2026. Paste them in order, and wait for each step to be live and verified before sending the next. The fixes we found along the way are folded in, so a rebuild skips those detours.
 
 ---
 
@@ -182,7 +182,10 @@ These 29 prompts cover everything we built, up to 13 Nov 2026. Paste them in ord
 ### 28. Yes/no that can't be misread
 > On prediction tiles, "Almost certain · No, it won't · 92%" is confusing: which answer is winning? Make a yes/no answer a statement of what the market expects with a ✓ / ✗ mark ("Market expects · ✗ No, it won't happen"), label the number as a chance ("92% chance"), and add a bar with both sides named ("Yes 8% · No 92%", the likelier bold). Say "Too close to call · leaning" under 60%. Use the short form ("✗ Won't happen 92%") on small tiles and one-line places, and the same wording on the static question pages. Make the Yes side of the bar 3px thicker than the No side, and keep decided questions as results ("✓ Yes" / "✗ No").
 
-### 29. Status checks (repeat as needed)
+### 29. Folder tabs for the markets
+> Make the market switch bigger and eye-catching, like folder tabs, so it's obvious each one opens a new page: a row of its own above the controls, the open tab raised in the panel's colour with a flame strip on top and joined to the panel below, the others lifting on hover, each with its headline figure. Rates and predictions show the tabs on a shelf line; phones scroll them sideways and move ⚙ View beside the colour key. Keep the first tiles in the top 40% of a 13-inch laptop screen and the top third of a phone.
+
+### 30. Status checks (repeat as needed)
 > Status check on heat.sala.company: scheduled and manual runs over the last 24 hours, refresh gaps, data age, the latest scorecard and tuner decision, failures, and anything to sync to GitHub.
 
 ---
