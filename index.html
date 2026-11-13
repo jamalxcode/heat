@@ -1044,6 +1044,18 @@ body.view-score .q, body.view-score #colorBy, body.view-score .controls .ctl, bo
   .controls:not(.open) .q { display: none; }
   .sum-jump { margin-left: 0; }
 }
+/* predictions: yes/no that can't be misread. The answer as a statement with ✓ / ✗, the number labelled as a chance,
+   and a bar with both sides named, the likelier one bold and filled */
+.pt-pw { font-size: 12px; font-weight: 600; opacity: .85; align-self: flex-end; margin-bottom: 2px; }
+.sz-l .pt-pw { font-size: 14px; margin-bottom: 4px; }
+.pt-yn { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 11.5px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--tint-ink, var(--ink)); }
+.pt-yn .win { font-weight: 800; }
+.pt-ynb { flex: 1; display: flex; height: 7px; min-width: 40px; border-radius: 4px; overflow: hidden; gap: 1px; }
+.pt-ynb i { display: block; height: 100%; background: currentColor; opacity: .28; }
+.pt-ynb i.win { opacity: .95; }
+.sz-l .pt-yn { font-size: 13px; } .sz-l .pt-ynb { height: 9px; }
+.p-pop .pt-yn { max-width: 420px; margin: -2px 0 8px; font-size: 13px; }
+.p-say-w { font-size: 14px; color: var(--ink-2); }
 </style>
 </head>
 <body>

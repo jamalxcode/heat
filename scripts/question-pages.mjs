@@ -52,7 +52,9 @@ function page(m, P, slug, others) {
   const today = members.reduce((t, x) => t + (x.usd24 || 0), 0), total = members.reduce((t, x) => t + (x.usdTotal || 0), 0);
   const vlist = members.map(x => VNAME[x.venue]).join(', ');
   const when = new Date(P.generated).toUTCString().replace(':00 GMT', ' UTC').replace(/ \d\d:\d\d:\d\d GMT$/, ' UTC');
-  const head = `${a.name} ${pct(a.p)}`;
+  // yes/no in words that can't be misread: "No, it won't happen (92% chance)", with both sides named underneath
+  const words = a.yn ? (a.no ? 'No, it won’t happen' : 'Yes, it will happen') : a.name, yes = a.yn && a.p != null ? (a.no ? 1 - a.p : a.p) : null;
+  const head = a.yn ? `${words} (${pct(a.p)} chance)` : `${a.name} ${pct(a.p)}`;
   const desc = `${titleOf(m)} The market says ${head} on ${vlist}${total ? `, with ${usd(total)} bet` : ''}. Odds from every prediction market in one place, updated every 10 minutes.`;
   const url = `${SITE}/predictions/q/${slug}/`, live = `/predictions/?m=${encodeURIComponent(m.id)}`;
   return `<!doctype html>
@@ -80,7 +82,7 @@ ul{padding-left:18px} li{margin:4px 0}
 </style></head><body><main>
 <nav><a href="/predictions/">Prediction market heatmap</a> › <a href="/predictions/q/">Top questions</a></nav>
 <h1>${esc(titleOf(m))}</h1>
-<p class="say">The market says: <strong>${esc(a.name)}</strong> <b>${pct(a.p)}</b></p>
+<p class="say">${a.yn ? `The market expects: <strong>${a.no ? '✗' : '✓'} ${esc(words)}</strong> <b>${pct(a.p)}</b> chance` : `The market says: <strong>${esc(a.name)}</strong> <b>${pct(a.p)}</b>`}</p>${yes != null ? `<p class="muted">Yes ${pct(yes)} · No ${pct(1 - yes)}</p>` : ''}
 <p class="muted">On ${esc(vlist)} · ${today ? `${usd(today)} bet today · ` : ''}${total ? `${usd(total)} bet in total · ` : ''}${m.end ? `ends ${esc(day(m.end))} · ` : ''}updated ${esc(when)}</p>
 <a class="go" href="${live}">See it live on the heat map →</a>
 ${venues.length > 1 ? `<h2>“${esc(a.name)}” on each venue</h2><table><thead><tr><th>Venue</th><th>Chance</th></tr></thead><tbody>${venues.map(v => `<tr><td><a href="${esc(v.x.url)}" rel="noopener nofollow">${VNAME[v.x.venue]}</a></td><td class="n">${pct(v.p)}</td></tr>`).join('')}</tbody></table>` : ''}

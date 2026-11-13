@@ -124,7 +124,20 @@ function inWords(m, name) {
   }
   return s;
 }
-const answer = (m, h = shownOutcome(m)) => h.yn || h.step ? (h.no ? 'No, it won’t' : 'Yes, it will') : inWords(m, h.name);
+// Yes/no in words that can't be misread (Nov 2026: "Almost certain · No, it won't · 92%" left people unsure which side
+// won): a statement with a ✓ / ✗ mark ("✗ Won’t happen"), the full form on tiles and in the popup ("✗ No, it won’t
+// happen"), the number labelled as a chance, and a Yes/No bar with both sides named
+const answer = (m, h = shownOutcome(m)) => h.yn || h.step ? (h.no ? '✗ Won’t happen' : '✓ Will happen') : inWords(m, h.name);
+const answerFull = (m, h = shownOutcome(m)) => h.yn || h.step ? (h.no ? '✗ No, it won’t happen' : '✓ Yes, it will happen') : inWords(m, h.name);
+const isYN = h => !!(h.yn || h.step);
+// the heading over a yes/no answer says it's the market's expectation; too close to call when it's under 60%
+const kicker = (m, h = shownOutcome(m)) => isYN(h) ? (h.p != null && h.p < 0.6 ? 'Too close to call · leaning' : 'Market expects') : verdict(m, h);
+// Yes 8% ▕██░░░░▏ No 92%: both sides named, the likelier one bold and filled
+function ynBar(h) {
+  if (!isYN(h) || h.p == null) return '';
+  const yes = h.no ? 1 - h.p : h.p, w = Math.round(yes * 1000) / 10;
+  return `<span class="pt-yn" aria-label="Yes ${pct(yes)}, No ${pct(1 - yes)}"><span class="${h.no ? '' : 'win'}">Yes ${pct(yes)}</span><span class="pt-ynb"><i class="y${h.no ? '' : ' win'}" style="width:${w}%"></i><i class="n${h.no ? ' win' : ''}" style="width:${(100 - w).toFixed(1)}%"></i></span><span class="${h.no ? 'win' : ''}">No ${pct(1 - yes)}</span></span>`;
+}
 // for a decided question the same, in the past: "Yes" / "No" / the name
 const resultWord = (m, h) => h.yn || h.step ? (h.no ? 'No' : 'Yes') : inWords(m, h.name);
 // how sure the market already is (for "decided")
@@ -404,14 +417,15 @@ const chip = v => `<span class="pt-chg ${heat(v)}" title="Move ${TFS.find(t => t
 function tileHTML(m, size, done = false, also = []) {
   const h = shownOutcome(m), ch = h[tfKey()], cmp = merged() ? comparison(m) : null;
   const badges = (cmp ? cmp.rows.map(r => r.x) : [m]).map(x => `<span class="pv pv-${x.venue}" title="${VNAME[x.venue]}">${VTAG[x.venue]}</span>`).join('');
-  const label = `${m.title}: ${verdict(m, h)}, ${h.name}, ${pct(h.p)}. Move ${TFS.find(t => t[0] === tf)[2]} ${pts(ch)}. ${(cmp ? cmp.rows.map(r => VNAME[r.x.venue]) : [VNAME[m.venue]]).join(', ')}`;
+  const label = `${m.title}: ${kicker(m, h)}, ${isYN(h) ? answerFull(m, h).slice(2) : h.name}, ${pct(h.p)}${isYN(h) ? ' chance' : ''}. Move ${TFS.find(t => t[0] === tf)[2]} ${pts(ch)}. ${(cmp ? cmp.rows.map(r => VNAME[r.x.venue]) : [VNAME[m.venue]]).join(', ')}`;
   const t$ = mToday(m), T$ = mTotal(m), place = pos.get(m.id), tp = titleParts(m);
   return `<button class="ptile sz-${size} ${sureClass(h)}${m.id === sel ? ' sel' : ''}${m.stale ? ' stale' : ''}${thin(m) ? ' thin' : ''}${done ? ' done' : ''}" data-id="${esc(m.id)}" data-coin="1" aria-haspopup="dialog" aria-label="${esc(label)}">
     <span class="pt-top"><span class="pt-id">${badges}${place && !done ? `<span class="pt-rank">#${place}</span>` : ''}${t$ != null && !done ? `<span class="pt-vol" title="${money(t$, 'USD')} bet in the last 24 hours">${money(t$, 'USD')}<span class="pt-vol-w"> today</span></span>` : ''}${watch.has(m.id) ? '<span class="pt-star" title="On your watchlist">★</span>' : ''}</span>${chip(ch)}</span>
     <span class="pt-head">${icon(m)}<span class="pt-htxt"><span class="pt-title">${esc(tp[0])}</span>${tp[1] ? `<span class="pt-full">${esc(tp[1])}</span>` : ''}</span></span>
-    <span class="pt-verdict">${verdict(m, h)}</span>
-    <span class="pt-ans">${esc(answer(m, h))}</span>
-    <span class="pt-nums"><b class="pt-p">${pct(h.p)}</b>${spark(m, size === 'l' ? 96 : 64, size === 'l' ? 24 : 18)}${(d => d != null && Math.abs(d) >= SINCE_MIN ? `<span class="pt-since" title="Since your last visit (${esc(sinceWhen())})">${arrow(d)}${pts(d).replace(' pts', '')} since ${esc(sinceWhen())}</span>` : '')(done ? null : sinceMove(m, h))}</span>
+    <span class="pt-verdict">${done ? verdict(m, h) : kicker(m, h)}</span>
+    <span class="pt-ans${isYN(h) && !done ? (h.no ? ' yn-no' : ' yn-yes') : ''}">${esc(size === 's' ? answer(m, h) : answerFull(m, h))}</span>
+    <span class="pt-nums"><b class="pt-p">${pct(h.p)}</b>${isYN(h) && !done ? '<span class="pt-pw">chance</span>' : ''}${spark(m, size === 'l' ? 96 : 64, size === 'l' ? 24 : 18)}${(d => d != null && Math.abs(d) >= SINCE_MIN ? `<span class="pt-since" title="Since your last visit (${esc(sinceWhen())})">${arrow(d)}${pts(d).replace(' pts', '')} since ${esc(sinceWhen())}</span>` : '')(done ? null : sinceMove(m, h))}</span>
+    ${!done ? ynBar(h) : ''}
     ${size !== 's' && !done ? raceHTML(m, h) : ''}
     ${cmp ? `<span class="pt-cmp${cmp.spread >= DIFFER ? ' differ' : ''}" title="The same answer on each venue${cmp.spread >= DIFFER ? `: they differ by ${Math.round(cmp.gap * 100)} points` : ''}">${cmp.spread >= DIFFER ? '⚡ ' : ''}${cmp.rows.map(r => `${VTAG[r.x.venue]} ${pct(r.p)}`).join(' · ')}</span>` : ''}
     ${also.length ? alsoHTML(m, also, size) : ''}
@@ -604,7 +618,7 @@ function tableHTML(ms) {
   return `<div class="r-tblwrap"><table class="r-tbl p-tbl"><thead><tr>${th}</tr></thead><tbody>${rows.map(m => {
     const h = shownOutcome(m), ch = h[tfKey()], vs = merged() ? membersOf(m) : [m];
     return `<tr class="r-row${decided(m) ? ' done' : ''}" data-id="${esc(m.id)}" tabindex="0"><td>${pos.get(m.id) ?? (decided(m) ? '✓' : '—')}</td><td class="p-tt">${watch.has(m.id) ? '★ ' : ''}${icon(m)}${esc(fullTitle(m, h))}</td><td>${vs.map(x => `<span class="pv pv-${x.venue}" title="${VNAME[x.venue]}">${VTAG[x.venue]}</span>`).join(' ')}${vs.length === 1 ? ' ' + VNAME[m.venue] : ''}</td>
-      <td class="p-tt"><span class="r-muted">${verdict(m, h)}:</span> ${esc(answer(m, h))}</td><td class="${likeFont(h)}"><b>${pct(h.p)}</b></td><td><span class="cell-heat ${heat(ch)}">${arrow(ch)}${pts(ch)}</span></td><td>${money(mToday(m), 'USD')}</td><td>${money(mTotal(m), 'USD')}${playNote(m) ? ' <span class="r-muted">play</span>' : ''}</td><td>${endHTML(m) || '—'}</td><td>${esc(m.cat)}</td></tr>`;
+      <td class="p-tt"><span class="r-muted">${kicker(m, h)}:</span> ${esc(answer(m, h))}</td><td class="${likeFont(h)}"><b>${pct(h.p)}</b></td><td><span class="cell-heat ${heat(ch)}">${arrow(ch)}${pts(ch)}</span></td><td>${money(mToday(m), 'USD')}</td><td>${money(mTotal(m), 'USD')}${playNote(m) ? ' <span class="r-muted">play</span>' : ''}</td><td>${endHTML(m) || '—'}</td><td>${esc(m.cat)}</td></tr>`;
   }).join('')}</tbody></table></div>`;
 }
 
@@ -757,7 +771,7 @@ function detailHTML(m) {
       <button class="btn p-linkbtn" title="Copy a link that opens this question">🔗 Copy link</button>
       <button class="btn p-fullbtn" aria-pressed="${full}" title="${full ? 'Back to the small view' : 'Full screen'}">${full ? '⤡ Smaller' : '⤢ Full view'}</button></div>
     <h2 class="p-q">${icon(m)}${esc(titleParts(m)[0])}</h2>${titleParts(m)[1] ? `<p class="p-qfull">${esc(titleParts(m)[1])}</p>` : ''}
-    <p class="p-say${likeFont(h)}"><span class="p-say-v">${verdict(m, h)}:</span> <b class="p-say-a">${esc(answer(m, h))}</b> <b class="p-say-p">${pct(h.p)}</b></p>
+    <p class="p-say${likeFont(h)}"><span class="p-say-v">${kicker(m, h)}:</span> <b class="p-say-a">${esc(answerFull(m, h))}</b> <b class="p-say-p">${pct(h.p)}</b>${isYN(h) ? ' <span class="p-say-w">chance</span>' : ''}</p>${ynBar(h)}
     <p class="p-moves">${moves}${m.end ? `<span class="p-mv">${endHTML(m, true)} <span class="r-muted">${dayLabel(m.end)}</span></span>` : ''}</p>
     ${m.stale ? '<p class="r-says">⚠ This venue didn’t answer in the latest update: these are its last known prices.</p>' : ''}
     ${chartHTML(m)}
@@ -839,7 +853,7 @@ async function load() {
 }
 
 const HELP = `<div class="leg-more p-help" id="phelp" hidden>
-  <p><b>A tile</b> says what the market thinks: an icon for the topic, a short headline (the full question under it when shortened), the answer and its chance, the trend over the last weeks, the time left (the ring fills as the end nears; amber in the last week, red on the last day) and the money bet. A chance is the price of a contract that pays 1 if it happens: 62% means traders pay 62¢ for a dollar if it does. For yes/no questions the likelier side is shown in words (“No, it won’t · 98%”); on a ladder (“above 50 seats”, “by 31 October”) the step nearest 50%, written into the question (“Netanyahu out by June 30, 2027?”). Big tiles of a race show the top three as bars.</p>
+  <p><b>A tile</b> says what the market thinks: an icon for the topic, a short headline (the full question under it when shortened), the answer and its chance (on a yes/no question, what the market expects with ✓ or ✗, “✗ No, it won’t happen · 92% chance”, and a bar with both sides, “Yes 8% · No 92%”), the trend over the last weeks, the time left (the ring fills as the end nears; amber in the last week, red on the last day) and the money bet. A chance is the price of a contract that pays 1 if it happens: 62% means traders pay 62¢ for a dollar if it does. For yes/no questions the likelier side is shown in words (“No, it won’t · 98%”); on a ladder (“above 50 seats”, “by 31 October”) the step nearest 50%, written into the question (“Netanyahu out by June 30, 2027?”). Big tiles of a race show the top three as bars.</p>
   <p><b>Colour and type say how likely the answer is</b>: <span class="p-sw c0"></span><span class="p-sw c1"></span><span class="p-sw c2"></span><span class="p-sw c3"></span><span class="p-sw c4"></span> light and italic for unlikely, dark and bold for likely (one blue hue, so it reads the same with colour blindness). <b>The chip is the move</b> today, this week or this month, in points (40% → 52% is ▲ +12 pts): teal ▲ when the answer became more likely, amber ▼ when less.</p>
   <p><b>Story cards</b>: related questions (all of Iran, every 2028 race, Senate control and its seat counts…) share one card; the others are short lines under the first, each opening its own question. <b>Mix topics</b> (Filters, on by default) lets each further question from the same topic count a little less, so the top of the page has a few from each topic.</p>
   <p><b>The tabs</b> ask a question: <b>Biggest bets</b>, <b>Surest bets</b>, <b>Close calls</b> (near 50/50, lots of money), <b>Big movers</b>, <b>Ending soon</b>, and in “All”, <b>Venues disagree</b>. <b>Just decided</b> lists results of the last days with the chance a week before (an <b>upset</b> was under 50%); <b>Today</b> picks out the biggest swing, the most money, the closest big call and the widest disagreement.</p>

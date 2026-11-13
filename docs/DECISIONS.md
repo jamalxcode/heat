@@ -191,3 +191,10 @@ Why the project works the way it does. Add new decisions at the end, and keep ea
 ### 46. The open View panel never runs off a phone screen
 **Decision:** everything in the phone's ⚙ View panel (search included) is held to the panel's width, and the browser test checks nothing runs past its edge.
 
+## Prediction tiles: which answer is winning
+
+*13 Nov 2026, from a live tile: "Putin out as President of Russia by June 30, 2027? · Almost certain · No, it won’t · 92%". Readers couldn't tell whether the market expected Putin out or not.*
+
+### 47. Yes/no as a statement, a labelled chance and a two-sided bar
+**Decision:** three problems stacked up: the verdict word ("Almost certain") described the No side but read as describing the event; "No, it won't" answered a positively worded question, so it had to be reversed in the head; and "92%" didn't say what it was a chance of. Now a yes/no answer reads as the market's expectation ("Market expects · ✗ No, it won't happen"), with a ✓ / ✗ mark so it doesn't rely on colour, the number says it's a chance ("92% chance"), and a bar names both sides ("Yes 8% · No 92%", the likelier one bold and filled). Under 60% the heading says "Too close to call · leaning" rather than claiming an expectation. Small tiles and one-line places (news strip, money map, table, page title) use the short form "✗ Won't happen 92%". Ladder steps written into the question ("by June 30, 2027?") are yes/no and read the same. Who-wins questions and number ladders keep their verdict words, since there the verdict describes a named answer. The static question pages follow ("The market expects: ✗ No, it won't happen 92% chance", with "Yes 8% · No 92%" under it).
+

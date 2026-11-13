@@ -1083,7 +1083,7 @@ test.describe('predictions', () => {
     await expect(top.locator('.pt-foot')).toContainText('$90M total');
     await expect(top.locator('.pt-foot')).not.toContainText('today');
     const fed = page.locator('.ptile[data-id="pm:fed"]');
-    await expect(fed.locator('.pt-ans')).toHaveText('No, it won’t');                               // 30% yes shown as its likelier side, in words
+    await expect(fed.locator('.pt-ans')).toHaveText(/^✗ (No, it won’t happen|Won’t happen)$/)   /* the short form on small tiles */;                     // 30% yes shown as its likelier side, in words
     await expect(fed.locator('.pt-p')).toHaveText('70%');
     await expect(fed.locator('.pt-chg')).toHaveText('▲ +8 pts');                                   // its move turned round
     await expect(page.locator('.ptile[data-id="pi:8000"] .pt-ans')).toHaveText('Vance');           // one named option isn't a yes/no
@@ -1158,7 +1158,7 @@ test.describe('predictions', () => {
     await page.keyboard.press('Escape');
     // yes/no in words; small tiles drop the verdict word
     const fed = page.locator('.ptile[data-id="pm:fed"]');
-    await expect(fed.locator('.pt-ans')).toHaveText('No, it won’t');
+    await expect(fed.locator('.pt-ans')).toHaveText(/^✗ (No, it won’t happen|Won’t happen)$/)   /* the short form on small tiles */;
     await expect(page.locator('.ptile.sz-s .pt-verdict').first()).toBeHidden();
     // short-term price bets are off to start with; switched on, the blank in the title is filled with the step shown
     await expect(page.locator('.ptile[data-id="pm:btc"]')).toHaveCount(0);
@@ -1166,7 +1166,7 @@ test.describe('predictions', () => {
     await page.locator('#ptopics button[data-topic="short"]').click();
     const btc = page.locator('.ptile[data-id="pm:btc"]');
     await expect(btc.locator('.pt-title')).toHaveText('Bitcoin above 80,000 on November 5?');
-    await expect(btc.locator('.pt-ans')).toHaveText('Yes, it will');
+    await expect(btc.locator('.pt-ans')).toHaveText(/^✓ (Yes, it will happen|Will happen)$/);
     await expect(btc.locator('.pt-p')).toHaveText('60%');
   });
 
@@ -1181,7 +1181,7 @@ test.describe('predictions', () => {
     await expect(page.locator('.ptile[data-id="pm:fed"] .pt-race')).toHaveCount(0);                // yes/no: no race
     // "Netanyahu out by...?" takes the step shown
     await expect(page.locator('.ptile[data-id="pm:by"] .pt-title')).toHaveText('Netanyahu out by June 30, 2027?');
-    await expect(page.locator('.ptile[data-id="pm:by"] .pt-ans')).toHaveText('No, it won’t');    // 43% yes: its likelier side, like a yes/no
+    await expect(page.locator('.ptile[data-id="pm:by"] .pt-ans')).toHaveText(/^✗ (No, it won’t happen|Won’t happen)$/)   /* the short form on small tiles */;    // 43% yes: its likelier side, like a yes/no
     await expect(page.locator('.ptile[data-id="pm:by"] .pt-p')).toHaveText('57%');
     // a both-ways price ladder says which way; past tense on a decided result
     await expect(page.locator('.ptile[data-id="pm:eth"] .pt-title')).toHaveText('Ethereum price in 2026');
@@ -1509,5 +1509,24 @@ test.describe('the next click', () => {
   test('energy points to its weekly pump-price tables', async ({ page }) => {
     await page.goto('/energy/');
     await expect(page.locator('#summary .sum-jump')).toHaveAttribute('href', '#fuel');
+  });
+});
+
+test.describe('predictions, yes/no that can’t be misread', () => {
+  test('a yes/no tile says what the market expects as a statement, labels the number as a chance, and shows both sides on a bar', async ({ page }) => {
+    await page.goto('/predictions/');
+    const fed = page.locator('.ptile[data-id="pm:fed"]');                    // 30% yes
+    await expect(fed.locator('.pt-verdict')).toHaveText('Market expects');
+    await expect(fed.locator('.pt-ans')).toHaveText(/^✗ (No, it won’t happen|Won’t happen)$/)   /* the short form on small tiles */;
+    await expect(fed.locator('.pt-p')).toHaveText('70%');
+    await expect(fed.locator('.pt-pw')).toHaveText('chance');
+    await expect(fed.locator('.pt-yn')).toHaveText(/Yes 30%.*No 70%/);
+    await expect(fed.locator('.pt-yn > .win')).toHaveText('No 70%');          // the likelier side is the bold one
+    await expect(fed).toHaveAttribute('aria-label', /Market expects, No, it won’t happen, 70% chance/);
+    await fed.click();
+    await expect(page.locator('#detail .p-say')).toContainText('Market expects: ✗ No, it won’t happen 70% chance');
+    await expect(page.locator('#detail .pt-yn')).toHaveText(/Yes 30%.*No 70%/);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.p-today .p-news[data-id="pm:fed"] .p-news-l')).toContainText('✗ Won’t happen');   // the short form in the news strip
   });
 });
