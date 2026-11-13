@@ -1058,6 +1058,13 @@ test('the market switch is a row of folder tabs: the open page’s tab is raised
   expect(Math.abs(ob.y + ob.height - panel.y)).toBeLessThan(3);               // its bottom meets the panel's top
   expect(await open.evaluate(e => getComputedStyle(e).backgroundColor)).toBe(await page.locator('.controls').evaluate(e => getComputedStyle(e).backgroundColor));
   await expect(page.locator('#reset')).toBeVisible();
+  // each tab with a figure is filled with a lighter shade of the figure's colour and outlined 2px; Predictions stays neutral
+  const forex = page.locator('#market a[data-m="forex"]');
+  await expect(forex).toHaveClass(/tinted/);
+  await expect(forex).toHaveClass(new RegExp((await forex.locator('.mk-x').getAttribute('class')).split(' ')[1]));   // same colour step as its chip
+  expect(await forex.evaluate(e => getComputedStyle(e).borderTopWidth)).toBe('2px');
+  expect(await forex.evaluate(e => getComputedStyle(e).backgroundColor)).not.toBe(await forex.locator('.mk-x').evaluate(e => getComputedStyle(e).backgroundColor));
+  await expect(page.locator('#market a[data-m="predictions"]')).not.toHaveClass(/tinted/);
 });
 
 // Prediction markets: the same page at /predictions/, drawing its own view from predictions.json (tests/e2e/fixtures.mjs)

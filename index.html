@@ -1083,6 +1083,16 @@ body.view-score .q, body.view-score #colorBy, body.view-score .controls .ctl, bo
   body:not(.view-score) .controls:not(.open) .ctl-toggle { position: absolute; right: 0; top: 7px; z-index: 3; padding: 2px 9px; font-size: 12.5px; line-height: 18px; }
   body:not(.view-score) .controls:not(.open) + .legend { margin-top: 10px; }
 }
+/* the tabs in their figure's colour: a lighter shade of the chip's colour fills the tab (the chip stays the stronger one),
+   a 2px border in a darker shade outlines it; Predictions, with no figure, stays neutral; the open tab keeps the panel's
+   colour so it still joins the panel below */
+.tabs a { border-width: 2px; border-color: var(--axis); }
+.tabs a.tinted { background: color-mix(in oklab, var(--tint) 30%, var(--surface)); border-color: color-mix(in oklab, var(--tint) 85%, var(--ink) 15%); color: var(--ink); }
+.tabs a.tinted:hover { background: color-mix(in oklab, var(--tint) 42%, var(--surface)); }
+.tabs a[aria-current="page"] { background: var(--surface); }
+.tabs a[aria-current="page"]::before { left: -2px; right: -2px; top: -2px; }
+.tabs a[aria-current="page"]::after { bottom: -2px; height: 3px; }
+.rates-page .tabs a[aria-current="page"] { background: var(--page); }
 </style>
 </head>
 <body>

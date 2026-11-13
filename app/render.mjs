@@ -291,12 +291,14 @@ export function renderXM(p) {
   for (const a of $$('#market a[data-m]')) {
     const k = a.dataset.m, h = p?.xm?.[k], mk = MARKETS[k];
     a.querySelector('.mk-x')?.remove();
+    a.classList.remove('tinted', ...[...a.classList].filter(c => /^h-?\d$/.test(c)));
     if (!h || !mk?.xm) continue;
     const bins = Object.values(mk.bins)[0], v = h.bp ?? h.chg;
     const lvl = v == null ? 0 : [0, 1, 2, 3].filter(i => Math.abs(v) >= bins[i]).length;
     const cls = !lvl ? 'h0' : (v > 0 ? 'h' : 'h-') + lvl;
     const txt = h.bp != null ? `${h.bp > 0 ? '+' : h.bp < 0 ? '−' : '±'}${Math.abs(h.bp)}bp` : fmtPct(h.chg, 1);
     const val = h.unit === '%' ? `${h.price.toFixed(2)}%` : h.unit.startsWith('USD') ? '$' + h.price.toLocaleString('en-US', { maximumFractionDigits: h.price >= 1000 ? 0 : 2 }) : h.price.toLocaleString('en-US', { maximumFractionDigits: 2 });
+    a.classList.add('tinted', cls);            // the tab takes a lighter shade of its figure's colour (index.html)
     a.insertAdjacentHTML('beforeend', `<span class="mk-x ${cls}" title="${esc(`${h.label} ${val}, ${txt} on the day`)}">${esc(txt)}</span>`);
   }
 }
