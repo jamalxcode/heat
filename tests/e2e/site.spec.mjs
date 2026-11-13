@@ -1166,7 +1166,7 @@ test.describe('predictions', () => {
     await page.locator('#ptopics button[data-topic="short"]').click();
     const btc = page.locator('.ptile[data-id="pm:btc"]');
     await expect(btc.locator('.pt-title')).toHaveText('Bitcoin above 80,000 on November 5?');
-    await expect(btc.locator('.pt-ans')).toHaveText(/^✓ (Yes, it will happen|Will happen)$/);
+    await expect(btc.locator('.pt-ans')).toHaveText('✓ Yes');                                  // in the decided / waiting row: a result, not a forecast
     await expect(btc.locator('.pt-p')).toHaveText('60%');
   });
 

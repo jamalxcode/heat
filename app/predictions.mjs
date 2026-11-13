@@ -423,7 +423,7 @@ function tileHTML(m, size, done = false, also = []) {
     <span class="pt-top"><span class="pt-id">${badges}${place && !done ? `<span class="pt-rank">#${place}</span>` : ''}${t$ != null && !done ? `<span class="pt-vol" title="${money(t$, 'USD')} bet in the last 24 hours">${money(t$, 'USD')}<span class="pt-vol-w"> today</span></span>` : ''}${watch.has(m.id) ? '<span class="pt-star" title="On your watchlist">★</span>' : ''}</span>${chip(ch)}</span>
     <span class="pt-head">${icon(m)}<span class="pt-htxt"><span class="pt-title">${esc(tp[0])}</span>${tp[1] ? `<span class="pt-full">${esc(tp[1])}</span>` : ''}</span></span>
     <span class="pt-verdict">${done ? verdict(m, h) : kicker(m, h)}</span>
-    <span class="pt-ans${isYN(h) && !done ? (h.no ? ' yn-no' : ' yn-yes') : ''}">${esc(size === 's' ? answer(m, h) : answerFull(m, h))}</span>
+    <span class="pt-ans${isYN(h) && !done ? (h.no ? ' yn-no' : ' yn-yes') : ''}">${esc(done && isYN(h) ? (h.no ? '✗ No' : '✓ Yes') : size === 's' ? answer(m, h) : answerFull(m, h))}</span>
     <span class="pt-nums"><b class="pt-p">${pct(h.p)}</b>${isYN(h) && !done ? '<span class="pt-pw">chance</span>' : ''}${spark(m, size === 'l' ? 96 : 64, size === 'l' ? 24 : 18)}${(d => d != null && Math.abs(d) >= SINCE_MIN ? `<span class="pt-since" title="Since your last visit (${esc(sinceWhen())})">${arrow(d)}${pts(d).replace(' pts', '')} since ${esc(sinceWhen())}</span>` : '')(done ? null : sinceMove(m, h))}</span>
     ${!done ? ynBar(h) : ''}
     ${size !== 's' && !done ? raceHTML(m, h) : ''}

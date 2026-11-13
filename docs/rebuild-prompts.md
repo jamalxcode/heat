@@ -180,7 +180,7 @@ These 29 prompts cover everything we built, up to 13 Nov 2026. Paste them in ord
 > Test each in the browser, and check the phone's ⚙ View panel fits its screen.
 
 ### 28. Yes/no that can't be misread
-> On prediction tiles, "Almost certain · No, it won't · 92%" is confusing: which answer is winning? Make a yes/no answer a statement of what the market expects with a ✓ / ✗ mark ("Market expects · ✗ No, it won't happen"), label the number as a chance ("92% chance"), and add a bar with both sides named ("Yes 8% · No 92%", the likelier bold). Say "Too close to call · leaning" under 60%. Use the short form ("✗ Won't happen 92%") on small tiles and one-line places, and the same wording on the static question pages.
+> On prediction tiles, "Almost certain · No, it won't · 92%" is confusing: which answer is winning? Make a yes/no answer a statement of what the market expects with a ✓ / ✗ mark ("Market expects · ✗ No, it won't happen"), label the number as a chance ("92% chance"), and add a bar with both sides named ("Yes 8% · No 92%", the likelier bold). Say "Too close to call · leaning" under 60%. Use the short form ("✗ Won't happen 92%") on small tiles and one-line places, and the same wording on the static question pages. Make the Yes side of the bar 3px thicker than the No side, and keep decided questions as results ("✓ Yes" / "✗ No").
 
 ### 29. Status checks (repeat as needed)
 > Status check on heat.sala.company: scheduled and manual runs over the last 24 hours, refresh gaps, data age, the latest scorecard and tuner decision, failures, and anything to sync to GitHub.
