@@ -163,3 +163,6 @@ Why the project works the way it does. Add new decisions at the end, and keep ea
 ### 38. Predictions: one news strip
 **Decision:** Today, Since your last visit and Just decided were three stacked sections above the board; they're now one row of small cards (a sideways swipe when they don't fit), so the board starts in the top half of a laptop screen. On the palest tiles only the answer and its chance fade; the question stays at full strength.
 
+### 39. UI changes are checked in the preview, at two sizes and in both themes
+**Decision:** a Claude cloud session can't reach heat.sala.company or download the deploy's files (the network blocks both), so a UI change is checked in the local preview (`npm run dev`, deterministic test data) with screenshots on a laptop (1440×900) and a phone, in light and dark mode, and measured where it matters (where the first tile starts, no sideways scroll), before it's merged. Each new part gets a browser test. The limit: test data isn't live data, so a change that depends on the shape of real data (the market-switch figures read `forex.json` and `rates.json` through `pulse.json`) is confirmed on the live site after the deploy.
+

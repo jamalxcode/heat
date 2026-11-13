@@ -12,6 +12,7 @@ heat.sala.company (live at https://heat.sala.company) is a set of market heatmap
 npm test                                  # node --test: unit tests in tests/*.test.mjs
 npm install && npx playwright install chromium
 npm run test:e2e                          # playwright test: browser tests in tests/e2e/ (starts tests/e2e/serve.mjs)
+# cloud sessions: npm install --no-save @playwright/test@<preinstalled playwright version>, so it finds the preinstalled browser
 npm run dev                               # node tests/e2e/serve.mjs: local preview on :4173 with deterministic fixture data
 node scripts/build-data.mjs data.json     # build crypto data locally (live APIs)
 node scripts/score.mjs --tune             # scorer + tuner (uses the live data.json via SITE_URL)
@@ -49,6 +50,7 @@ No lint script. `package-lock.json` is gitignored.
 - Cache busting is automatic (`?v=<sha>`); don't add manual version strings.
 - Keep the GoatCounter snippet at the end of `index.html` intact (endpoint `https://salacompany.goatcounter.com/count`); market pages inherit it from `index.html`.
 - Fonts are self-hosted (`fonts/inter-latin.woff2`); no calls to Google.
+- The live site is unreachable from cloud sessions: check UI in `npm run dev` with laptop and phone screenshots, light and dark (decision 39).
 - Browser tests must make no outside API calls (fixtures only). Phone layout (bottom sheet, sideways-scrolling tabs) and 13-inch popup fit are tested; check both when changing UI.
 - Keep FAQ JSON-LD in sync with the visible About text. Line endings are LF (`.gitattributes`).
 - Docs move with the code: a behaviour change updates `README.md`, adds a decision to `docs/DECISIONS.md` (append, numbered) when the reason is worth keeping, and adds a prompt to `docs/rebuild-prompts.md` for a new feature.
