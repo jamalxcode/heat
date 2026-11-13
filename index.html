@@ -1050,10 +1050,11 @@ body.view-score .q, body.view-score #colorBy, body.view-score .controls .ctl, bo
 .sz-l .pt-pw { font-size: 14px; margin-bottom: 4px; }
 .pt-yn { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 11.5px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--tint-ink, var(--ink)); }
 .pt-yn .win { font-weight: 800; }
-.pt-ynb { flex: 1; display: flex; height: 7px; min-width: 40px; border-radius: 4px; overflow: hidden; gap: 1px; }
-.pt-ynb i { display: block; height: 100%; background: currentColor; opacity: .28; }
+.pt-ynb { flex: 1; display: flex; align-items: center; min-width: 40px; gap: 1px; }   /* the Yes side is 3px thicker than the No side */
+.pt-ynb i { display: block; height: 7px; background: currentColor; opacity: .28; }
+.pt-ynb i.y { height: 10px; border-radius: 5px 0 0 5px; } .pt-ynb i.n { border-radius: 0 4px 4px 0; }
 .pt-ynb i.win { opacity: .95; }
-.sz-l .pt-yn { font-size: 13px; } .sz-l .pt-ynb { height: 9px; }
+.sz-l .pt-yn { font-size: 13px; } .sz-l .pt-ynb i { height: 9px; } .sz-l .pt-ynb i.y { height: 12px; border-radius: 6px 0 0 6px; }
 .p-pop .pt-yn { max-width: 420px; margin: -2px 0 8px; font-size: 13px; }
 .p-say-w { font-size: 14px; color: var(--ink-2); }
 </style>
