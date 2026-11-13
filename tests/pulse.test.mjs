@@ -48,3 +48,18 @@ test('pulse CLI: writes pulse.json, and fails when there are no prices', () => {
   assert.deepEqual(out.items.map(i => i.label), ['BTC', 'ETH', 'Gold']);
   assert.throws(() => execFileSync(process.execPath, [script, f('none.json'), f('missing.json')], { stdio: 'pipe' }));
 });
+
+test('pulse xm: each market’s headline figure for the market switch (items unchanged); missing ones left out', () => {
+  const day = 20000, packed = v => ({ t0: day * 864e5, c: v });
+  const forex = { hist: { eur: packed([0.9, 0.91]), jpy: packed([150, 151]), gbp: packed([0.78, 0.785]), cad: packed([1.36, 1.37]), sek: packed([10.5, 10.6]), chf: packed([0.88, 0.89]) } };
+  const rates = { countries: [{ id: 'us', y10: 4.3123, series: { d: [day, day + 1], y10: [4.27, 4.31] } }] };
+  const etfs = { markets: [{ id: 'spy', current_price: 580.12, price_change_percentage_24h_in_currency: 0.42 }] };
+  const p = pulse({ crypto, metals, energy, forex, etfs, rates }, 1);
+  assert.deepEqual(p.items.map(i => i.label), ['BTC', 'ETH', 'Gold', 'Brent'], 'go.sala.company’s strip is unchanged');
+  assert.deepEqual(Object.keys(p.xm), ['crypto', 'forex', 'metals', 'energy', 'etfs', 'rates']);
+  assert.deepEqual(p.xm.rates, { label: 'US 10y', price: 4.31, bp: 4, unit: '%' });
+  assert.equal(p.xm.etfs.chg, 0.42);
+  assert.ok(p.xm.forex.chg > 0, 'every currency fell against the dollar, so the index rose');
+  assert.ok(JSON.stringify(p).length < 1024, 'still tiny');
+  assert.deepEqual(Object.keys(pulse({ crypto }).xm), ['crypto']);
+});

@@ -13,6 +13,7 @@
 import { $, $$, esc, M, S, store } from './core.mjs';
 import { renderHealth } from './render.mjs';
 import { bestMatch } from './names.mjs';
+import { squarify } from './treemap.mjs';
 
 const DAY = 864e5, REFRESH = 10 * 60e3, ALL_MAX = 200;
 const DECIDED = 0.97;                  // a question whose likeliest outcome is at least this sure counts as decided
@@ -470,25 +471,6 @@ function decidedHTML(done) {
 }
 
 /* ---------- money map: every open question sized by the money on it, in blocks by topic ---------- */
-// squarified treemap (Bruls, Huizing & van Wijk): lays items (each with .v) into a rectangle in rows that keep the
-// pieces close to square
-export function squarify(items, x, y, w, h) {
-  const out = [], total = items.reduce((s, i) => s + i.v, 0);
-  if (!total || w <= 0 || h <= 0) return out;
-  let rest = items.map(i => ({ ...i, a: i.v / total * w * h })).sort((a, b) => b.a - a.a);
-  const worst = (row, side) => { const s = row.reduce((t, r) => t + r.a, 0), mx = Math.max(...row.map(r => r.a)), mn = Math.min(...row.map(r => r.a)); return Math.max(side * side * mx / (s * s), (s * s) / (side * side * mn)); };
-  while (rest.length) {
-    const side = Math.min(w, h);
-    const row = [rest[0]];
-    let i = 1;
-    while (i < rest.length && worst([...row, rest[i]], side) <= worst(row, side)) { row.push(rest[i]); i++; }
-    rest = rest.slice(i);
-    const s = row.reduce((t, r) => t + r.a, 0);
-    if (w >= h) { const cw = s / h; let cy = y; for (const r of row) { const ch = r.a / cw; out.push({ ...r, x, y: cy, w: cw, h: ch }); cy += ch; } x += cw; w -= cw; }
-    else { const rh = s / w; let cx = x; for (const r of row) { const cw = r.a / rh; out.push({ ...r, x: cx, y, w: cw, h: rh }); cx += cw; } y += rh; h -= rh; }
-  }
-  return out;
-}
 // a few words for a small rectangle: the story ("Iran · 6") or the start of the short headline
 function fewWords(m, h, n) {
   if (n > 1) return `${storyOf(m.title)} · ${n}`;
@@ -546,12 +528,12 @@ function recentHTML(done) {
   const score = new Map(rows.map(r => { const k = r.m.cat, i = seenCat.get(k) || 0; seenCat.set(k, i + 1); return [r, mInterest(r.m) * MIX ** i]; }));
   rows.sort((a, b) => score.get(b) - score.get(a)).splice(10);
   if (!rows.length) return '';
-  return `<section class="p-recent" aria-label="Just decided"><h3 class="p-recent-h">Just decided <span class="r-muted">${rows.length} · results of the last days, and what the market said a week before</span></h3><div class="p-row">${rows.map(({ m, h, was }) => {
+  return `<div class="p-recent" role="group" aria-label="Just decided: results of the last days, and what the market said a week before">${rows.map(({ m, h, was }) => {
     // an upset only where the answer is a name or a yes/no: on a margin or seat ladder the step shown changes, so "a week
     // ago 6%" is about a different line, not a surprise winner
     const settled = (h.p ?? 0) >= DECIDED, isCalled = !settled && called(m), numeric = !h.yn && /\d/.test(h.name), upset = was != null && was < 0.5 && !isLadder(m) && !h.step && !numeric;
     return `<button class="p-news p-res${upset ? ' upset' : ''}" data-id="${esc(m.id)}" data-coin="1"><span class="p-news-k">${settled ? '✓ Decided' : isCalled ? '📣 Called · not yet settled' : '⏳ Awaiting the result'}${upset ? ' · upset' : ''}</span><span class="p-news-t">${icon(m)}${esc(shortTitle(fullTitle(m, h)))}</span><span class="p-news-l"><b>${esc(settled || isCalled ? resultWord(m, h) : answer(m, h))}</b> ${pct(h.p)}${was != null && !isLadder(m) && !numeric ? ` · a week ago <b>${pct(was)}</b>` : ''}</span></button>`;
-  }).join('')}</div></section>`;
+  }).join('')}</div>`;
 }
 
 /* ---------- since your last visit: what moved while you were away (kept in this browser only) ---------- */
@@ -583,8 +565,8 @@ function sinceHTML(live) {
     .filter(r => r.d != null && Math.abs(r.d) >= SINCE_MIN).sort((a, b) => Math.abs(b.d) * lg(b.m) - Math.abs(a.d) * lg(a.m))
     .filter((r, i, all) => { const k = storyOf(r.m.title) || r.m.group || r.m.id; return all.findIndex(x => (storyOf(x.m.title) || x.m.group || x.m.id) === k) === i; })   // one card per story
     .slice(0, 8);
-  if (!rows.length) return `<p class="p-since-none r-muted">Since your last visit (${esc(sinceWhen())}): nothing moved 5 points or more.</p>`;
-  return `<section class="p-recent p-since" aria-label="Since your last visit"><h3 class="p-recent-h">Since your last visit <span class="r-muted">${esc(sinceWhen())} · the biggest moves, saved in this browser</span></h3><div class="p-row">${rows.map(({ m, h, d }) => `<button class="p-news" data-id="${esc(m.id)}" data-coin="1"><span class="p-news-k"><span class="pt-chg ${heat(d)}">${arrow(d)}${pts(d)}</span></span><span class="p-news-t">${icon(m)}${esc(shortTitle(fullTitle(m, h)))}</span><span class="p-news-l">${esc(answer(m, h))} ${pct(h.p - d)} → <b>${pct(h.p)}</b></span></button>`).join('')}</div></section>`;
+  if (!rows.length) return `<span class="p-news p-since-none"><span class="p-news-k">Since your last visit · ${esc(sinceWhen())}</span><span class="p-news-l">Nothing moved 5 points or more.</span></span>`;
+  return `<div class="p-since" role="group" aria-label="Since your last visit (${esc(sinceWhen())}): the biggest moves, saved in this browser">${rows.map(({ m, h, d }) => `<button class="p-news" data-id="${esc(m.id)}" data-coin="1"><span class="p-news-k">Since ${esc(sinceWhen())} <span class="pt-chg ${heat(d)}">${arrow(d)}${pts(d)}</span></span><span class="p-news-t">${icon(m)}${esc(shortTitle(fullTitle(m, h)))}</span><span class="p-news-l">${esc(answer(m, h))} ${pct(h.p - d)} → <b>${pct(h.p)}</b></span></button>`).join('')}</div>`;
 }
 
 /* ---------- the Today strip: the news at a glance ---------- */
@@ -604,7 +586,14 @@ function todayHTML(live) {
     if (dis) { const c = comparison(dis); cards.push(['Venues disagree', dis, `⚡ ${c.rows.map(r => `${VTAG[r.x.venue]} ${pct(r.p)}`).join(' · ')}`]); }
   }
   if (!cards.length) return '';
-  return `<section class="p-today" aria-label="Today at a glance">${cards.map(([k, m, line]) => `<button class="p-news" data-id="${esc(m.id)}" data-coin="1"><span class="p-news-k">${k}</span><span class="p-news-t">${icon(m)}${esc(shortTitle(fullTitle(m)))}</span><span class="p-news-l">${line}</span></button>`).join('')}</section>`;
+  return `<div class="p-today" role="group" aria-label="Today at a glance">${cards.map(([k, m, line]) => `<button class="p-news" data-id="${esc(m.id)}" data-coin="1"><span class="p-news-k">${k}</span><span class="p-news-t">${icon(m)}${esc(shortTitle(fullTitle(m)))}</span><span class="p-news-l">${line}</span></button>`).join('')}</div>`;
+}
+// The news at a glance in ONE row of small cards above the board (a sideways swipe when they don't fit): today's
+// biggest swing, most money and closest call, what moved since your last visit, and what was just decided. Before,
+// these were three stacked sections and the board started halfway down a laptop screen.
+function stripHTML(live, done) {
+  const cards = todayHTML(live) + sinceHTML(live) + recentHTML(done);
+  return cards ? `<section class="p-strip" aria-label="News at a glance"><div class="p-row">${cards}</div></section>` : '';
 }
 
 /* ---------- table ---------- */
@@ -680,10 +669,10 @@ function render() {
   $('#pfiltBtn').innerHTML = `⚙ Filters${n ? ` <span class="n">${n}</span>` : ''}`;
   const note = merged() ? VENUES.map(v => P.venues?.[v[0]]?.state === 'stale' ? venueNote(v[0]) : '').join('') : venueNote(venue);
   const all = [...live, ...done];
-  // on a phone each strip is a sideways swipe: only Just decided and Since your last visit sit above the heatmap, Today below it
-  const phone = innerWidth <= 640, strips = !query && viewAs !== 'table';
-  const intro = strips ? recentHTML(done) + sinceHTML(live) + (phone ? '' : todayHTML(live)) + watchHTML() : '';
-  const after = strips && phone ? todayHTML(live) : '';
+  // the news strip is one row above the board (a sideways swipe on a phone), then the watchlist
+  const strips = !query && viewAs !== 'table';
+  const intro = strips ? stripHTML(live, done) + watchHTML() : '';
+  const after = '';
   if (!all.length) main.innerHTML = note + intro + (query ? `<p class="p-empty">No question matches “${esc(query)}”.</p>` : order === 'disagree' ? '<p class="p-empty">No question is priced 5 or more points apart on two venues right now.</p>' : '<p class="p-empty">No open questions in the topics shown.</p>');
   else if (viewAs === 'table') main.innerHTML = note + tableHTML(all);
   else if (viewAs === 'map') main.innerHTML = note + intro + mapHTML(live) + after + decidedHTML(done) + trackHTML();
@@ -859,7 +848,7 @@ const HELP = `<div class="leg-more p-help" id="phelp" hidden>
 
 export function start() {
   document.body.classList.add('rates-page', 'pred-page');
-  for (const s of ['#colorBy', '#quote', '#view', '#density', '.controls .ctl', '#legend', '#reset', '#refresh', '#share', '#excluded']) { const el = $(s); if (el) el.hidden = true; }
+  for (const s of ['#colorBy', '#quote', '#view', '#density', '.controls .ctl', '#ctlToggle', '#legend', '#reset', '#refresh', '#share', '#excluded']) { const el = $(s); if (el) el.hidden = true; }
   $('main').insertAdjacentHTML('afterbegin', `<div class="r-bar p-bar">
     <div class="seg p-venues" id="pvenue" role="group" aria-label="Venue"></div>
     <input type="search" id="psearch" class="p-search" placeholder="Search questions…" aria-label="Search questions">

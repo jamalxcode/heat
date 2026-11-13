@@ -1,6 +1,7 @@
 // heat.sala.company page script: render (split from index.html; see app/main.mjs for the order things start in)
 import * as SIG from '/signals.mjs';
-import { $, $$, BINS, chgOf, esc, fmtBig, fmtPct, fmtPrice, heatClass, logo, M, S, syncURL, TF, TOP_N } from './core.mjs';
+import { $, $$, BINS, chgOf, esc, fmtBig, fmtPct, fmtPrice, heatClass, logo, M, MARKETS, S, syncURL, TF, TOP_N } from './core.mjs';
+import { squarify } from './treemap.mjs';
 import { computeFor, match, P } from './data.mjs';
 import { emo, pc, renderScorecard } from './scorecard.mjs';
 import { showDetail } from './interact.mjs';
@@ -148,6 +149,15 @@ function flashCls(c) {
   if (c.current_price > 0 && p.px !== c.current_price) Object.assign(p, { dir: c.current_price > p.px ? "up" : "down", at: now, px: c.current_price });
   return now - p.at < 1500 ? ` flash-${p.dir}` : "";
 }
+// The last week as a small line under the price on heatmap tiles (8 daily closes; 6 trading days on forex, energy and
+// ETFs), drawn in the tile's own ink, so a red day in a strong rally reads differently from one in a slide
+export function weekLine(ind) {
+  const c = ind?.c, n = (M.back['7d'] || 7) + 1;
+  if (!c || c.length < n) return '';
+  const v = c.slice(-n), lo = Math.min(...v), hi = Math.max(...v), span = hi - lo || 1;
+  const pts = v.map((x, i) => `${(i / (n - 1) * 100).toFixed(1)},${(18 - (x - lo) / span * 16).toFixed(1)}`).join(' ');
+  return `<svg class="spk" viewBox="0 0 100 20" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+}
 export function tileHTML(c) {
   const ind = S.ind[c.id], ch = chgOf(c, S.colorBy);
   const sg = signals(ind);
@@ -159,6 +169,7 @@ export function tileHTML(c) {
       <div class="chg">${fmtPct(ch, ch != null && Math.abs(ch) >= 10 ? 1 : 2)}</div>
       <div class="name"><span class="nm">${esc(c.name)}</span>${emojiHTML(ind)}</div>
       <div class="px">${fmtPrice(c.current_price)}</div>
+      ${weekLine(ind)}
     </div>
     <div class="ind">${indHTML(ind)}</div>
     <span class="ti" aria-hidden="true" title="Open the chart card now">ⓘ</span>
@@ -228,13 +239,107 @@ export const visibleCoins = () => S.coins.filter(c => (S.filter === 'all' || mat
 export const heatWords = () => { const b = $(`#legendScale [data-heat="${S.heat}"]`); return b ? `with a ${TF(S.colorBy)} change of ${b.textContent}%` : ''; };
 export const emptyHTML = () => `<div class="empty">No ${M.noun} are ${[S.filter !== 'all' && (FILTER_WORDS[S.filter] || 'matching'), S.heat && heatWords()].filter(Boolean).join(' and ') || 'matching'} right now. <button class="btn" data-show-all>Show all ${M.noun}</button></div>`;
 
+// "avg +0.4% · 7 of 11 up" on a group heading (ETFs)
+export function groupAvg(g) {
+  const v = g.map(c => chgOf(c, S.colorBy)).filter(x => x != null && isFinite(x));
+  if (!v.length) return '';
+  const avg = v.reduce((a, b) => a + b, 0) / v.length;
+  return `<span class="tg-sum">avg <b class="tg-avg ${heatClass(avg, S.colorBy)}">${fmtPct(avg)}</b> · ${v.filter(x => x > 0).length} of ${v.length} up</span>`;
+}
+
+/* ---------- the headline above the tiles ---------- */
+// The typical move (weighted by market cap on the crypto page; elsewhere the median, so one devaluation or one wild
+// fund can't drag it), how many rose and fell with a bar of the split, and the biggest gain and drop (a click opens its
+// chart card). It describes what's shown, so a filter narrows it too.
+export function summaryOf(list, tf = S.colorBy) {
+  const rows = list.map(c => ({ c, v: chgOf(c, tf) })).filter(r => r.v != null && isFinite(r.v));
+  if (!rows.length) return null;
+  const weighted = M.sizeBy === 'cap' && rows.some(r => r.c.market_cap > 0);
+  const w = r => r.c.market_cap > 0 ? r.c.market_cap : 0;
+  const vs = rows.map(r => r.v).sort((a, b) => a - b), mid = vs.length >> 1;
+  const avg = weighted ? rows.reduce((a, r) => a + r.v * w(r), 0) / rows.reduce((a, r) => a + w(r), 0)
+    : vs.length % 2 ? vs[mid] : (vs[mid - 1] + vs[mid]) / 2;
+  const best = rows.reduce((a, r) => r.v > a.v ? r : a), worst = rows.reduce((a, r) => r.v < a.v ? r : a);
+  return { n: rows.length, avg, weighted, up: rows.filter(r => r.v > 0).length, down: rows.filter(r => r.v < 0).length, best, worst };
+}
+export function renderSummary() {
+  const el = $('#summary');
+  const sm = S.view === 'score' ? null : summaryOf(visibleCoins());
+  el.hidden = !sm;
+  if (!sm) return;
+  const tf = TF(S.colorBy), all = S.filter === 'all' && !S.heat;
+  const x = (r, word) => `<button type="button" class="sum-x" data-id="${esc(r.c.id)}" data-coin="1" title="Open ${esc(r.c.name)}">${word} <b>${esc(M.grouped && r.c.name ? r.c.name : r.c.symbol.toUpperCase())}</b> <span class="cell-heat ${heatClass(r.v, S.colorBy)}">${fmtPct(r.v, Math.abs(r.v) >= 10 ? 1 : 2)}</span></button>`;
+  const note = M.upNote?.(S.quote);
+  el.innerHTML = `<span class="sum-avg">${all ? esc(M.sumLabel(sm.n)) : `${sm.n} ${esc(M.noun)} shown`}, ${esc(tf)} <b class="${heatClass(sm.avg, S.colorBy)}" title="${sm.weighted ? 'Average move, weighted by market cap' : 'Median move: half moved more, half less'}">${fmtPct(sm.avg)}</b><span class="sum-note">${sm.weighted ? 'weighted by market cap' : 'median'}</span></span>
+    <span class="sum-split" title="${sm.up} up, ${sm.down} down${note ? ` (${esc(note)})` : ''}"><span class="sum-up">▲ ${sm.up}</span><span class="sum-bar" aria-hidden="true"><i class="h2" style="width:${(sm.up / sm.n * 100).toFixed(1)}%"></i><i class="h0" style="width:${((sm.n - sm.up - sm.down) / sm.n * 100).toFixed(1)}%"></i><i class="h-2" style="width:${(sm.down / sm.n * 100).toFixed(1)}%"></i></span><span class="sum-dn">▼ ${sm.down}</span></span>
+    ${sm.n > 1 ? x(sm.best, 'Best') + x(sm.worst, 'Worst') : ''}${note ? `<span class="sum-note">${esc(note)}</span>` : ''}`;
+}
+// ⚙ View on phones: a badge with how many settings differ from the default view
+export function renderCtlSum() {
+  const n = [S.filter !== 'all', !!S.heat, S.colorBy !== '24h', S.view !== 'grid', S.density !== 'heatmap', M.quoteSwitch && S.quote === 'usd'].filter(Boolean).length;
+  $('#ctlSum').textContent = n ? String(n) : '';
+}
+
+/* ---------- each market's headline figure on the market switch (pulse.json, built at deploy) ---------- */
+export function renderXM(p) {
+  for (const a of $$('#market a[data-m]')) {
+    const k = a.dataset.m, h = p?.xm?.[k], mk = MARKETS[k];
+    a.querySelector('.mk-x')?.remove();
+    if (!h || !mk?.xm) continue;
+    const bins = Object.values(mk.bins)[0], v = h.bp ?? h.chg;
+    const lvl = v == null ? 0 : [0, 1, 2, 3].filter(i => Math.abs(v) >= bins[i]).length;
+    const cls = !lvl ? 'h0' : (v > 0 ? 'h' : 'h-') + lvl;
+    const txt = h.bp != null ? `${h.bp > 0 ? '+' : h.bp < 0 ? '−' : '±'}${Math.abs(h.bp)}bp` : fmtPct(h.chg, 1);
+    const val = h.unit === '%' ? `${h.price.toFixed(2)}%` : h.unit.startsWith('USD') ? '$' + h.price.toLocaleString('en-US', { maximumFractionDigits: h.price >= 1000 ? 0 : 2 }) : h.price.toLocaleString('en-US', { maximumFractionDigits: 2 });
+    a.insertAdjacentHTML('beforeend', `<span class="mk-x ${cls}" title="${esc(`${h.label} ${val}, ${txt} on the day`)}">${esc(txt)}</span>`);
+  }
+}
+
+/* ---------- Map view: each tile's area follows its size ---------- */
+// Crypto: market cap; ETFs: dollars traded a day (20-day average). The area is the square root of the size, so the
+// smaller ones stay readable next to Bitcoin or SPY (it still orders them by size); ETFs sit in a block per group.
+export function sizeOf(c) {
+  if (M.sizeBy === 'cap') return c.market_cap > 0 ? c.market_cap : 0;
+  if (M.sizeBy === 'dollarVol') {
+    const v = S.hist[c.id]?.vols?.filter(x => x > 0).slice(-20);
+    return v?.length ? v.reduce((a, b) => a + b, 0) / v.length * c.current_price : 0;
+  }
+  return 1;
+}
+function mapTile(c, r) {
+  const ch = chgOf(c, S.colorBy), side = Math.min(r.w, r.h), fs = Math.max(9, Math.min(30, Math.sqrt(r.w * r.h) / 4.2));
+  const ind = S.ind[c.id], stop = ind?.stop && [ind.stop.longState, ind.stop.shortState].includes('closed') ? ' stop-closed' : '';
+  const label = `${c.name}, ${fmtPrice(c.current_price)}, ${TF(S.colorBy)} ${fmtPct(ch)}`;
+  const inner = side < 18 ? '' : `<span class="mt-s">${esc(c.symbol.toUpperCase())}</span>${side >= 34 ? `<span class="mt-c">${fmtPct(ch, ch != null && Math.abs(ch) >= 10 ? 1 : 2)}</span>` : ''}${M.grouped && side >= 58 && r.w >= 80 ? `<span class="mt-n">${esc(c.name)}</span>` : ''}`;
+  return `<button class="tile mt ${heatClass(ch, S.colorBy)}${stop}" data-id="${esc(c.id)}" aria-label="${esc(label)}" title="${esc(label)}" style="left:${r.x.toFixed(1)}px;top:${r.y.toFixed(1)}px;width:${Math.max(0, r.w - 2).toFixed(1)}px;height:${Math.max(0, r.h - 2).toFixed(1)}px;font-size:${fs.toFixed(1)}px">${inner}</button>`;
+}
+export function renderMap(list) {
+  const grid = $('#grid'), W = grid.clientWidth, H = grid.clientHeight;
+  const item = c => ({ c, v: Math.sqrt(sizeOf(c)) || 0 });
+  const groups = M.grouped && S.groups
+    ? S.groups.map(([k, label]) => ({ label, xs: list.filter(c => c.group === k).map(item) })).filter(g => g.xs.length)
+    : [{ label: '', xs: list.map(item) }];
+  for (const g of groups) { const min = Math.max(...g.xs.map(i => i.v)) * 0.02 || 1; for (const i of g.xs) i.v = Math.max(i.v, min); g.v = g.xs.reduce((a, i) => a + i.v, 0); }
+  let html = '';
+  for (const b of squarify(groups, 0, 0, W, H)) {
+    const head = b.label ? 16 : 0;
+    if (b.label) html += `<div class="mgrp" style="left:${b.x.toFixed(1)}px;top:${b.y.toFixed(1)}px;width:${(b.w - 2).toFixed(1)}px;height:${(b.h - 2).toFixed(1)}px"><span class="mgrp-h">${esc(b.label)}${groupAvg(b.xs.map(i => i.c)).replace('tg-sum', 'tg-sum r-muted')}</span></div>`;
+    for (const r of squarify(b.xs, b.x + (b.label ? 2 : 0), b.y + head, b.w - (b.label ? 4 : 0), b.h - head - (b.label ? 2 : 0))) html += mapTile(r.c, r);
+  }
+  grid.innerHTML = html;
+  $('#mapNote')?.remove();
+  grid.insertAdjacentHTML('afterend', `<p class="map-note" id="mapNote">Area: ${M.sizeBy === 'cap' ? 'market cap' : 'dollars traded a day (20-day average)'}, on a square-root scale so smaller ones stay readable. Colour: the ${esc(TF(S.colorBy))} change. Hover or tap a tile for its chart card.</p>`);
+}
+
 export function renderGrid() {
   const list = visibleCoins();
+  if (S.view === 'map') { if (!list.length) { $('#grid').innerHTML = emptyHTML(); return; } renderMap(list); return; }
+  $('#mapNote')?.remove();
   if (!list.length) { $('#grid').innerHTML = emptyHTML(); return; }
   // ETFs: a heading per group (US market, sectors, themes, abroad), each with the tiles that are showing
   $('#grid').innerHTML = M.grouped && S.groups ? S.groups.map(([k, label]) => {
     const g = list.filter(c => c.group === k);
-    return g.length ? `<h2 class="tgroup" data-g="${esc(k)}">${esc(label)} <span>${g.length}</span></h2>${g.map(tileHTML).join('')}` : '';
+    return g.length ? `<h2 class="tgroup" data-g="${esc(k)}">${esc(label)} <span>${g.length}</span>${groupAvg(g)}</h2>${g.map(tileHTML).join('')}` : '';
   }).join('') : list.map(tileHTML).join('');
 }
 
@@ -242,6 +347,7 @@ export function updateCoin(c) {
   const el = $(`.tile[data-id="${CSS.escape(c.id)}"]`);
   // with a filter on, a coin can start or stop matching when its numbers update: redraw the grid
   if (S.filter !== 'all' && S.view === 'grid' && !!el !== match(S.ind[c.id], S.filter)) { scheduleGrid(); return; }
+  if (S.view === 'map') { scheduleGrid(); return; }        // a map tile's place depends on the others: redraw the map
   if (el) {
     const tmp = document.createElement('div');
     tmp.innerHTML = tileHTML(c);
@@ -259,7 +365,7 @@ export let sideQueued = false;
 export function scheduleSide() {
   if (sideQueued) return;
   sideQueued = true;
-  requestAnimationFrame(() => { sideQueued = false; renderCounts(); if (S.view === 'table') renderTable(); if (S.pinned) showDetail(S.pinned, null, true); });
+  requestAnimationFrame(() => { sideQueued = false; renderCounts(); renderSummary(); if (S.view === 'table') renderTable(); if (S.pinned) showDetail(S.pinned, null, true); });
 }
 
 export function renderCounts() {
@@ -335,13 +441,17 @@ export function renderFooter() {
 
 export function renderAll() {
   renderLegend();
-  $('#grid').hidden = S.view !== 'grid';
+  $('#grid').hidden = S.view !== 'grid' && S.view !== 'map';
+  $('#grid').classList.toggle('map', S.view === 'map');
+  if (S.view !== 'map') $('#mapNote')?.remove();
   $('#tablewrap').hidden = S.view !== 'table';
   $('#scorewrap').hidden = S.view !== 'score';
-  $('#grid').classList.toggle('heatmap', S.density === 'heatmap');   // heatmap tiles: colour, symbol, change, price
+  $('#grid').classList.toggle('heatmap', S.density === 'heatmap' && S.view !== 'map');   // heatmap tiles: colour, symbol, change, price
   $('#grid').classList.toggle('named', !!M.grouped);                  // ETFs: tickers say little, so heatmap tiles keep the short name
   $('#density').hidden = S.view !== 'grid';
-  if (S.view === 'grid') renderGrid(); else if (S.view === 'table') renderTable(); else renderScorecard();
+  if (S.view === 'grid' || S.view === 'map') renderGrid(); else if (S.view === 'table') renderTable(); else renderScorecard();
+  renderSummary();
+  renderCtlSum();
   if (M.key === 'forex') renderDxy();         // the US Dollar Index bar above the grid
   renderCounts();
   renderFooter();

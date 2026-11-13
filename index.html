@@ -172,20 +172,16 @@ h1 .tld { color: var(--ink-2); font-weight: 600; }
 .fresh .cg-attr:hover { color: var(--ink); }
 .cg-foot a { color: inherit; }
 .fresh.late { background: color-mix(in oklab, var(--amber) 16%, var(--surface)); border: 1px solid var(--amber); border-radius: 8px; padding: 4px 10px; }
-/* work-in-progress notice: floating card, never blocks the page */
-.wip {
-  position: fixed; z-index: 30; top: 14px; left: 50%; width: min(560px, calc(100vw - 32px));
-  display: flex; gap: 12px; align-items: flex-start;
-  background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-left: 4px solid var(--amber);
-  border-radius: 14px; padding: 12px 14px; box-shadow: var(--shadow);
-  transform: translate(-50%, 0); animation: wip-in .35s ease-out;
-}
+/* work in progress: one slim line above the page, never covering it */
+.wip { display: flex; align-items: center; gap: 8px; margin: -10px 0 10px; padding: 4px 6px 4px 10px; border-radius: 8px; font-size: 12.5px; color: var(--ink-2);
+  background: color-mix(in oklab, var(--amber) 14%, var(--surface)); border: 1px solid color-mix(in oklab, var(--amber) 60%, transparent); }
 .wip[hidden] { display: none; }
-.wip .wip-ic { font-size: 22px; line-height: 1.2; }
-.wip b { display: block; font-size: 14px; margin-bottom: 2px; }
-.wip p { margin: 0; font-size: 13px; color: var(--ink-2); }
-.wip .wip-ok { flex: none; align-self: center; font-weight: 600; }
-@keyframes wip-in { from { transform: translate(-50%, -24px); opacity: 0; } }
+.wip .wip-ic { color: #a66a00; font-weight: 800; }
+.wip p { margin: 0; flex: 1; min-width: 0; line-height: 1.35; }
+.wip b { color: var(--ink); }
+.wip-more { border: 0; background: none; padding: 0 2px; cursor: pointer; font-size: 12.5px; color: var(--ink); text-decoration: underline; }
+.wip-ok { flex: none; border: 0; background: none; cursor: pointer; font-size: 14px; line-height: 1; padding: 4px 7px; border-radius: 6px; color: var(--ink-2); }
+.wip-ok:hover, .wip-more:hover { background: var(--neutral); color: var(--ink); }
 /* scorecard view */
 #scorewrap { display: grid; gap: 12px; }
 .sc-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
@@ -225,7 +221,6 @@ button.sc-chip:hover, button.sc-chip[aria-expanded="true"] { box-shadow: inset 0
 .sc-chart { position: relative; }
 .sc-chart svg { display: block; width: 100%; height: auto; touch-action: pan-y; }
 .sc-tip { position: absolute; top: 4px; z-index: 2; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); padding: 6px 9px; font-size: 12px; line-height: 1.45; white-space: nowrap; font-variant-numeric: tabular-nums; }
-@media (max-width: 640px) { .wip { flex-wrap: wrap; } .wip .wip-ok { width: 100%; } }
 .sub { color: var(--ink-2); margin: 0; font-size: 13px; }
 .status { color: var(--muted); font-size: 12px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; margin-right: 6px; vertical-align: 1px; }
@@ -912,10 +907,117 @@ footer .about h3 { font-size: 13.5px; margin: 12px 0 2px; color: var(--ink); }
 footer .about p { margin: 0; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+/* ---------- at a glance (Nov 2026) ---------- */
+/* phones: the market switch and a ⚙ View button; the other controls open below it */
+.ctl-more { display: contents; }
+.ctl-toggle { display: none; }
+/* the market switch carries each market's headline move: Bitcoin, the dollar index, gold, Brent, the S&P 500, the US 10-year */
+.seg.market a .mk-x { margin-left: 5px; padding: 0 4px; border-radius: 4px; font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums; background: var(--tint, var(--neutral)); color: var(--tint-ink, var(--ink)); }
+/* the headline above the tiles */
+.summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin: -2px 2px 10px; font-size: 13px; color: var(--ink-2); }
+.summary[hidden] { display: none; }
+.sum-avg { display: inline-flex; align-items: baseline; gap: 6px; }
+.sum-avg b { font-size: 15px; font-weight: 800; padding: 1px 8px; border-radius: 6px; background: var(--tint); color: var(--tint-ink); font-variant-numeric: tabular-nums; }
+.sum-split { display: inline-flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
+.sum-bar { display: inline-flex; width: 120px; height: 9px; border-radius: 5px; overflow: hidden; background: var(--grid); }
+.sum-bar i { display: block; height: 100%; background: var(--tint); }
+.sum-up { color: var(--up-text); font-weight: 700; } .sum-dn { color: var(--down-text); font-weight: 700; }
+.sum-x { all: unset; cursor: pointer; display: inline-flex; align-items: baseline; gap: 4px; white-space: nowrap; }
+.sum-x b { color: var(--ink); }
+.sum-x .cell-heat { padding: 0 5px; border-radius: 4px; background: var(--tint); font-weight: 700; font-variant-numeric: tabular-nums; }
+.sum-x:hover b, .sum-x:focus-visible b { text-decoration: underline; }
+.sum-note { color: var(--muted); font-size: 12px; }
+.grid .tgroup .tg-avg { padding: 0 6px; border-radius: 4px; background: var(--tint); color: var(--tint-ink); font-variant-numeric: tabular-nums; }
+/* heatmap tiles: the last week as a small line, so a red day in a strong rally reads differently from one in a slide */
+.tile .spk { display: none; }
+.grid.heatmap .tile .spk { display: block; width: 72%; max-width: 120px; height: 16px; margin: 2px auto 0; opacity: .7; overflow: visible; }
+@media (max-width: 700px) { .grid.heatmap .tile .spk { height: 12px; width: 80%; } }
+/* Map: each tile's area follows its size (market cap, trading volume), in group blocks on the ETF page */
+.grid.map { display: block; position: relative; height: min(76vh, 760px); min-height: 440px; }
+.grid.map .mgrp { position: absolute; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--border); }
+.grid.map .mgrp-h { position: absolute; left: 4px; top: 1px; right: 4px; font-size: 11px; font-weight: 700; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.grid.map .tile.mt { position: absolute; border-radius: 3px; background: var(--tint, var(--neutral)); color: var(--tint-ink, var(--ink)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--page) 70%, transparent);
+  align-items: center; justify-content: center; text-align: center; gap: 0; line-height: 1.1; padding: 1px; }
+.grid.map .tile.mt:hover { transform: none; filter: brightness(1.08) saturate(1.05); z-index: 2; }
+.mt .mt-s { font-weight: 800; letter-spacing: .01em; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mt .mt-c { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mt .mt-n { font-size: .62em; opacity: .85; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mt.stop-closed::after { content: '🛑'; position: absolute; top: 2px; right: 3px; font-size: 10px; }
+.map-note { margin: 6px 2px 0; font-size: 12px; color: var(--muted); }
+.mgrp-h .tg-sum { margin-left: 6px; font-weight: 500; }
+.grid .tgroup .tg-sum { font-size: 12px; font-weight: 500; color: var(--ink-2); }
+@media (max-width: 640px) {
+  header { gap: 4px 10px; margin-bottom: 8px; }
+  h1 { font-size: 18px; }
+  .logo { width: 28px; height: 28px; border-radius: 9px; font-size: 16px; }
+  .status { margin-left: auto; }
+  .status #status, #refresh { display: none; }
+  .fresh { order: 3; flex-basis: 100%; display: block; font-size: 12px; line-height: 1.4; }
+  .fresh > span:first-child { display: inline; }
+  .fresh .cg-attr { margin-left: 6px; font-size: 11.5px; }
+  .fresh .fr-next { display: none; }
+  body:not(.ctl-open) #share, body:not(.ctl-open) #theme, body:not(.ctl-open) .leg-toggle { display: none; }
+  .wip { margin: -12px 0 8px; font-size: 12px; }
+  .controls { gap: 8px; padding: 6px 8px; }
+  .controls .seg.market { flex: 1 1 0; min-width: 0; }
+  .ctl-toggle { display: inline-flex; align-items: center; gap: 4px; flex: none; padding: 5px 9px; }
+  .ctl-toggle[aria-expanded="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+  .ctl-sum:not(:empty) { font-size: 10.5px; font-weight: 700; padding: 0 5px; border-radius: 999px; background: var(--amber); color: #1a1206; }
+  .controls:not(.open) .ctl-more, .controls:not(.open) .reset { display: none; }
+  .controls.open .ctl-more { display: flex; flex-wrap: wrap; gap: 8px 10px; flex-basis: 100%; }
+  .controls.open .ctl-more > .seg { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .controls.open .ctl-more > .seg button { flex: none; }
+  body:not(.ctl-open) .leg-peg, body:not(.ctl-open) #legendEdge { display: none; }
+  .legend { margin-bottom: 8px; }
+  .leg-line { gap: 4px 10px; }
+  .leg-line .leg-toggle { padding: 2px 7px; font-size: 11px; }
+  .summary { gap: 3px 10px; font-size: 12px; margin-bottom: 8px; }
+  .sum-bar { width: 70px; }
+  .sum-note { display: none; }
+  .grid.map { height: 128vw; min-height: 0; }
+  .rates-page #fresh .fr-more { display: none; }
+  .r-bar { gap: 6px 8px; }
+  #rlegend { flex: 1 1 100%; display: block; line-height: 1.7; }
+  #rlegend .r-bpnote { display: none; }
+  .rb-cap .r-muted { display: none; }
+}
+/* predictions: the news strip, one row of small cards above the board */
+.p-strip { margin: 0 0 10px; }
+.p-strip .p-row { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x proximity; padding-bottom: 4px; scrollbar-width: thin; }
+.p-strip .p-today, .p-strip .p-recent, .p-strip .p-since { display: contents; }
+.p-strip .p-news { flex: 0 0 232px; scroll-snap-align: start; padding: 7px 11px; }
+.p-strip .p-news-k .pt-chg { margin-left: 4px; }
+.p-since-none { cursor: default; }
+/* pale prediction tiles: only the answer and its chance fade; the question stays at full strength */
+.ptile.c0 .pt-title, .ptile.c1 .pt-title, .ptile.c0 .pt-full, .ptile.c1 .pt-full { color: #16202b; opacity: 1; }
+:root[data-theme="dark"] .ptile.c0 .pt-title, :root[data-theme="dark"] .ptile.c1 .pt-title, :root[data-theme="dark"] .ptile.c0 .pt-full, :root[data-theme="dark"] .ptile.c1 .pt-full { color: #eef2f5; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .ptile.c0 .pt-title, :root:not([data-theme="light"]) .ptile.c1 .pt-title, :root:not([data-theme="light"]) .ptile.c0 .pt-full, :root:not([data-theme="light"]) .ptile.c1 .pt-full { color: #eef2f5; } }
+@media (max-width: 640px) { .p-strip .p-news { flex-basis: 64%; } }
+/* rates: the card leads with the 10-year yield and its move; the bar chart above shows every market's yield at once */
+.rt-y { font-size: 24px; letter-spacing: -.01em; }
+.rt-bot.rt-flags { padding-top: 0; justify-content: flex-start; gap: 6px; }
+.r-bars { margin: 0 0 12px; padding: 8px 12px 6px; background: var(--surface); border-radius: 12px; box-shadow: inset 0 0 0 1px var(--border); }
+.r-bars[hidden] { display: none; }
+.rb-cap { margin: 0 0 6px; font-size: 12.5px; font-weight: 700; }
+.rb-cols { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(30px, 1fr); gap: 6px; align-items: end; overflow-x: auto; scrollbar-width: thin; }
+.rb { all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; border-radius: 6px; padding: 2px 0; }
+.rb:hover, .rb:focus-visible { background: var(--neutral); }
+.rb-v { font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); }
+.rb-bar { display: block; height: calc(var(--h, 0) * 84px + 3px); width: 72%; max-width: 46px; border-radius: 4px 4px 1px 1px; background: var(--tint, var(--neutral)); box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+.rb-f { line-height: 1; height: 18px; display: flex; align-items: center; }
+.rb-s { height: 12px; font-size: 11px; line-height: 1; }
+@media (max-width: 640px) { .rb-bar { max-width: 26px; height: calc(var(--h, 0) * 50px + 3px); } .rt-y { font-size: 21px; } }
 </style>
 </head>
 <body>
 <div class="wrap">
+  <!-- Work in progress: one slim line above the page on a first visit (again 30 days after it's dismissed); ⚠ WIP brings it back -->
+  <div class="wip" id="wip" role="note" aria-labelledby="wip-t" hidden>
+    <span class="wip-ic" aria-hidden="true">⚠</span>
+    <p><b id="wip-t">Beta, use at your own risk:</b> data can be late, wrong or missing, and nothing here is financial advice.<span id="wip-d" hidden> This site is experimental. Don't trust anyone, ever. That includes this page, so check everything yourself.</span>
+      <button type="button" class="wip-more" id="wipMore" aria-expanded="false" aria-controls="wip-d">More</button></p>
+    <button type="button" class="wip-ok" id="wipOk" aria-label="Dismiss the warning" title="Dismiss (⚠ WIP brings it back)">✕</button>
+  </div>
   <!-- One slim top bar: title · when the data was refreshed (not real-time) · status and buttons -->
   <header>
     <div class="brand">
@@ -945,6 +1047,9 @@ footer .about p { margin: 0; }
       <a href="/rates/" data-m="rates">📈 Rates</a>
       <a href="/predictions/" data-m="predictions">🎯 Predictions</a>
     </nav>
+    <!-- phones: the market switch stays; the rest of the controls fold behind this button -->
+    <button class="btn ctl-toggle" id="ctlToggle" aria-expanded="false" aria-controls="ctlMore" title="Timeframe, view, tile style and filters">⚙ View<span class="ctl-sum" id="ctlSum"></span></button>
+    <div class="ctl-more" id="ctlMore">
     <div class="seg" id="colorBy" role="group" aria-label="Color by">
       <button data-v="24h" aria-pressed="true" title="Color by 24h change">24h</button>
       <button data-v="7d" aria-pressed="false" title="Color by 7-day change">7d</button>
@@ -957,6 +1062,7 @@ footer .about p { margin: 0; }
     </div>
     <div class="seg" id="view" role="group" aria-label="View">
       <button data-v="grid" aria-pressed="true">Grid</button>
+      <button data-v="map" aria-pressed="false" title="A map where each tile's area follows its size (market cap, trading volume)" hidden>Map</button>
       <button data-v="table" aria-pressed="false">Table</button>
       <button data-v="score" aria-pressed="false">Scorecard</button>
     </div>
@@ -983,6 +1089,7 @@ footer .about p { margin: 0; }
         </details>
       </div>
     </div>
+    </div>
   </div>
 
   <!-- Legend: one line (color scale, track-record badge); "How to read" opens the rest (remembered per browser) -->
@@ -992,6 +1099,9 @@ footer .about p { margin: 0; }
       <button class="btn leg-toggle" id="legendToggle" aria-expanded="false" aria-controls="legendMore">ⓘ How to read</button></div>
     <div class="leg-more" id="legendMore" hidden></div>
   </div>
+
+  <!-- the headline above the tiles: average move, how many rose and fell, the biggest gain and drop (render.mjs renderSummary) -->
+  <section class="summary" id="summary" aria-label="Summary" hidden></section>
 
   <!-- forex only: the US Dollar Index, computed from the ECB rates on this page (app/dxy.mjs) -->
   <section class="dxy" id="dxy" aria-label="US Dollar Index" hidden></section>
@@ -1030,14 +1140,6 @@ footer .about p { margin: 0; }
   </footer>
 </div>
 
-<div class="wip" id="wip" role="alertdialog" aria-labelledby="wip-t" aria-describedby="wip-d" hidden>
-  <span class="wip-ic" aria-hidden="true">⚠️</span>
-  <div>
-    <b id="wip-t">Work in progress: use at your own risk</b>
-    <p id="wip-d">This site is experimental. Data can be late, wrong or missing, and nothing here is financial advice. Don't trust anyone, ever. That includes this page, so check everything yourself.</p>
-  </div>
-  <button class="btn wip-ok" id="wipOk">I understand</button>
-</div>
 <div id="scrim"></div>
 <div id="detail" role="dialog" aria-label="Coin details"><button class="x" aria-label="Close">×</button><div class="body"></div></div>
 

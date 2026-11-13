@@ -267,6 +267,10 @@ $('#grid').addEventListener('click', e => {
   if (!t) return;
   if (S.pinned === t.dataset.id) hideDetail(true); else pinDetail(t.dataset.id, t);
 });
+$('#summary').addEventListener('click', e => {
+  const b = e.target.closest('[data-id]');
+  if (b) { if (S.pinned === b.dataset.id) hideDetail(true); else pinDetail(b.dataset.id, b); }
+});
 $('#tablewrap').addEventListener('click', e => {
   const b = e.target.closest('th button');
   if (b) {
@@ -287,6 +291,8 @@ document.addEventListener('click', e => {
   if (!inside) hideDetail(true);
 });
 addEventListener('scroll', () => { if (!S.pinned) hideDetail(); }, { passive: true });
+let resizeT = 0;   // the Map lays its tiles out for the grid's size: lay them out again when it changes
+addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (S.view === 'map' && !M.custom) renderAll(); }, 150); });
 
 export function seg(id, key, after) {
   $('#' + id).addEventListener('click', e => {
@@ -316,6 +322,13 @@ $('#reset').addEventListener('click', () => {
   savePrefs();
   if (quoteChanged && S.raw) { S.coins = []; show(S.raw, S.mode === 'live'); }   // flipped pairs: redraw from the rates
   else { pickCoins(); renderAll(); applyHist(); done(); }
+});
+// Phones: the controls fold behind ⚙ View (the market switch stays out); its badge counts what differs from the default view
+$('#ctlToggle').addEventListener('click', e => {
+  const open = !$('.controls').classList.contains('open');
+  $('.controls').classList.toggle('open', open);
+  document.body.classList.toggle('ctl-open', open);
+  e.currentTarget.setAttribute('aria-expanded', open);
 });
 // "How to read": the full legend opens below the one-line legend, and stays open or closed per browser
 export const setLegend = open => { S.legendOpen = open; $('#legendMore').hidden = !open; $('#legendToggle').setAttribute('aria-expanded', open); $('#legendToggle').textContent = open ? '✕ Hide legend' : 'ⓘ How to read'; };
@@ -404,6 +417,7 @@ if (M.pegLabel) {
   $('#pegged').parentElement.lastChild.textContent = ' ' + M.pegLabel;
   $('#pegged').parentElement.title = M.pegTitle;
 } else $('#pegged').parentElement.hidden = true;     // metals: no pegged assets to hide
+$('#view button[data-v="map"]').hidden = !M.sizeBy;     // Map: crypto (market cap) and ETFs (trading volume) only
 if (!M.scorecard) {                                  // metals: too few assets to score, so no Scorecard view
   $('#view button[data-v="score"]').hidden = true;
 }
@@ -417,12 +431,14 @@ $('#theme').addEventListener('click', () => { const cur = document.documentEleme
 
 $('#refresh').addEventListener('click', () => { if (Date.now() >= (S.nextAuto || 0)) run(); });
 
-// Work-in-progress notice: shown on first visit, then again 30 days after it was dismissed
+// Work-in-progress notice: one slim line above the page (never over it) on a first visit, then again 30 days after it
+// was dismissed; ⚠ WIP brings it back, "More" shows the full warning
 export const WIP_AGAIN = 30 * DAY;
-export const showWip = () => { $('#wip').hidden = false; $('#wipOk').focus({ preventScroll: true }); };
+export const showWip = (full = false) => { $('#wip').hidden = false; setWipMore(full); };
 export const hideWip = () => { $('#wip').hidden = true; store.set('hm.wip', Date.now()); };
+const setWipMore = open => { $('#wip-d').hidden = !open; $('#wipMore').hidden = open; $('#wipMore').setAttribute('aria-expanded', open); };
 $('#wipOk').addEventListener('click', hideWip);
-$('#wipBtn').addEventListener('click', () => ($('#wip').hidden ? showWip() : hideWip()));
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#wip').hidden) hideWip(); });
-if (!(Date.now() - (store.get('hm.wip') || 0) < WIP_AGAIN)) setTimeout(showWip, 600);
+$('#wipMore').addEventListener('click', () => setWipMore(true));
+$('#wipBtn').addEventListener('click', () => ($('#wip').hidden ? showWip(true) : hideWip()));
+if (!(Date.now() - (store.get('hm.wip') || 0) < WIP_AGAIN)) showWip();
 

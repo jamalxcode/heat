@@ -7,6 +7,7 @@ import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { makeFixtures, makeForexFixtures, makeMetalsFixtures, makeEnergyFixtures, makeEtfsFixture, makeRatesFixture, makeFuelFixture, makeTvFixture, makeHealthFixture, makePredictionsFixture } from './fixtures.mjs';
 import { marketPage, PAGES } from '../../scripts/market-page.mjs';
+import { pulse } from '../../scripts/pulse.mjs';
 
 const root = normalize(fileURLToPath(new URL('../../', import.meta.url)));
 const port = +process.env.PORT || 4173;
@@ -25,6 +26,11 @@ http.createServer(async (req, res) => {
   if (path === '/predictions.json' && process.env.PREDICTIONS_FILE) {
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
     return res.end(await readFile(process.env.PREDICTIONS_FILE));
+  }
+  if (path === '/pulse.json') {             // each market's headline figure for the market switch, made from the fixtures like the deploy job
+    const f = fixtures();
+    res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+    return res.end(JSON.stringify(pulse({ crypto: f.data, forex: f.fxData, metals: f.metals, energy: f.energy, etfs: f.etfs, rates: f.rates })));
   }
   if (JSON_ROUTES[path]) {
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });

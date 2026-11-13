@@ -763,15 +763,16 @@ test.describe('etfs', () => {
     expect(external).toEqual([]);
   });
 
-  test('grouped: a heading per group with its count, tiles in order under it; filters keep the headings honest', async ({ page }) => {
-    await expect(page.locator('#grid .tgroup')).toHaveText(['US stock market 28', 'Sectors 11', 'Industries & themes 39', 'International 34']);
+  test('grouped: a heading per group with its count and its average move, tiles in order under it; filters keep the headings honest', async ({ page }) => {
+    await expect(page.locator('#grid .tgroup')).toHaveText([/^US stock market 28/, /^Sectors 11/, /^Industries & themes 39/, /^International 34/]);
+    await expect(page.locator('#grid .tgroup[data-g="sector"] .tg-sum')).toHaveText(/^avg [+−]?\d+\.\d\d% · \d+ of 11 up$/);   // the group's average move and how many rose
     await expect(page.locator('#grid .tgroup[data-g="sector"] + .tile')).toHaveAttribute('data-id', 'xlk');
     await expect(page.locator('#grid > *').first()).toHaveClass(/tgroup/);
     await page.locator('#colorBy [data-v="7d"]').click();
     const heat = page.locator('#legendScale [data-heat]').first();
     await heat.click();
     const shown = await tiles(page).count();
-    const counts = (await page.locator('#grid .tgroup span').allTextContents()).map(Number);
+    const counts = (await page.locator('#grid .tgroup > span:not(.tg-sum)').allTextContents()).map(Number);
     expect(counts.reduce((a, b) => a + b, 0)).toBe(shown);
   });
 
@@ -861,18 +862,22 @@ test.describe('rates', () => {
     await expect(pop.locator('h2')).toContainText('Italy');
   });
 
-  test('cards: a sketch of each curve, the real yield and inflation; a date more than 2 business days old is greyed', async ({ page }) => {
+  test('cards lead with the yield: a sketch of each curve, only what is unusual (a yield below inflation); a date more than 2 business days old is greyed', async ({ page }) => {
     await expect(page.locator('#grid .rt-spark')).toHaveCount(14);
     const us = page.locator('.rtile[data-id="us"]');
-    await expect(us.locator('.rt-real .r-real')).toContainText('Real yield');
-    await expect(us.locator('.rt-real .r-real')).toHaveClass(/pos/);           // ▲ on blue above zero
-    await expect(us.locator('.rt-real .r-real')).toContainText('▲');
     // readable without telling colours apart: every reading has an arrow for its slope
     await expect(us.locator('.rt-state .st-ico')).toContainText('↗');
     await expect(page.locator('.rtile[data-id="ca"] .rt-state .st-ico')).toContainText('↘');
     await expect(page.locator('.rtile[data-id="ea"] .rt-state .st-ico')).toContainText('→');
-    await expect(us.locator('.rt-real .r-infl')).toHaveText('CPI 2.5% · Aug');
-    await expect(page.locator('.rtile[data-id="ch"] .rt-real .r-real')).toContainText('Real yield —');
+    // the real yield shows on a card only when it is below zero (▼ on orange); inflation and the rest are in the popup
+    await expect(us.locator('.r-real, .r-infl')).toHaveCount(0);
+    await expect(page.locator('.rtile[data-id="cn"] .rt-flags .r-real')).toHaveClass(/neg/);
+    await expect(page.locator('.rtile[data-id="cn"] .rt-flags .r-real')).toContainText('▼');
+    await expect(page.locator('.rtile[data-id="ch"] .r-real')).toHaveCount(0);       // no inflation figure: nothing to flag
+    await us.click();
+    await expect(page.locator('#detail .r-mini2 .r-real')).toHaveClass(/pos/);
+    await expect(page.locator('#detail .r-mini2 .r-infl')).toHaveText('CPI 2.5% · Aug');
+    await page.keyboard.press('Escape');
     await expect(page.locator('.rtile[data-id="jp"] .rt-date')).toHaveClass(/old/);
     await expect(us.locator('.rt-date')).not.toHaveClass(/old/);
     await expect(page.locator('#ratesMonthly .rt-spark')).toHaveCount(15);
@@ -965,21 +970,24 @@ test.describe('rates', () => {
     await expect(pop).toHaveClass(/pinned/);                                 // stays open once pinned
   });
 
-  test('risk tag on every card: the gap to the US (Germany for Europe) ranked in its own history; benchmarks say so; sortable; explained', async ({ page }) => {
-    await expect(page.locator('.rtile[data-id="us"] .r-risk')).toHaveText('Benchmark');
-    await expect(page.locator('.rtile[data-id="de"] .r-risk')).toHaveText('Benchmark');
-    await expect(page.locator('.rtile[data-id="ea"] .r-risk')).toHaveCount(0);           // the AAA curve: Germany is part of it
-    const uk = page.locator('.rtile[data-id="uk"]');
-    await expect(uk.locator('.r-risk')).toHaveText(/^[▲●▼] (High|Average|Low) risk$/);
-    await expect(uk.locator('.r-vs')).toContainText('vs US');
-    await expect(uk.locator('.r-risk')).toHaveAttribute('title', /than the US on 10-year debt.*inflation and currency risk/);
+  test('risk: the gap to the US (Germany for Europe) ranked in its own history; a card shows only a high-risk tag, the popup every level; sortable; explained', async ({ page }) => {
+    // on the cards only the exception: ▲ High risk. Benchmarks, average and low risk are in the popup and the table
+    await expect(page.locator('.rtile[data-id="us"] .r-risk')).toHaveCount(0);
+    await expect(page.locator('#grid .rtile .r-risk')).toHaveText(Array((await page.locator('#grid .rtile .r-risk').count())).fill('▲ High risk'));
     const it = page.locator('.mtile[data-id="it"]'), es = page.locator('.mtile[data-id="es"]');
     await expect(it.locator('.r-risk')).toHaveText('▲ High risk');                         // its widest gap in the five years
     await expect(it.locator('.r-risk')).toHaveAttribute('title', /0\.85 pp more than Germany.*the widest of the last 5 years.*credit risk/);
-    await expect(it.locator('.r-vs')).toHaveCount(0);                                     // the gap is on the card already
-    await expect(es.locator('.r-risk')).toHaveText('▼ Low risk');
-    await expect(page.locator('.mtile[data-id="pl"] .r-risk')).toHaveAttribute('title', /inflation and currency risk/);
-    await expect(page.locator('.mtile[data-id="pl"] .r-vs')).toContainText('vs DE');
+    await expect(es.locator('.r-risk')).toHaveCount(0);                                   // low risk: in the popup
+    await page.locator('.rtile[data-id="us"]').click();
+    await expect(page.locator('#detail .r-mini2 .r-risk')).toHaveText('Benchmark');
+    await page.keyboard.press('Escape');
+    await page.locator('.rtile[data-id="uk"]').click();
+    await expect(page.locator('#detail .r-mini2 .r-risk')).toHaveText(/^[▲●▼] (High|Average|Low) risk$/);
+    await expect(page.locator('#detail .r-mini2 .r-risk')).toHaveAttribute('title', /than the US on 10-year debt.*inflation and currency risk/);
+    await page.keyboard.press('Escape');
+    await es.click();
+    await expect(page.locator('#detail .r-mini2 .r-risk')).toHaveText('▼ Low risk');
+    await page.keyboard.press('Escape');
     await page.locator('#rsort').selectOption('risk');
     await expect(page.locator('#ratesMonthly .mtile').first()).toHaveAttribute('data-id', 'it');
     await expect(page.locator('#ratesMonthly .mtile').last()).toHaveAttribute('data-id', 'es');
@@ -1265,5 +1273,150 @@ test.describe('predictions', () => {
     await expect(page.locator('#grid tbody tr').first()).toHaveAttribute('data-id', 'pm:mayor');
     await page.locator('#psearch').fill('fed');
     await expect(page.locator('#grid tbody tr')).toHaveCount(1);
+  });
+});
+
+// At a glance (Nov 2026): the warning as a slim line, a headline above the tiles, each market's figure on the switch,
+// a Map view, a week's line on the tiles, a compact phone header, a yield chart on rates and one news strip on predictions
+test.describe('at a glance', () => {
+  test('first visit: the warning is one slim line above the page, never over it; ✕ hides it, ⚠ WIP brings it back with the full text', async ({ browser }) => {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+    const page = await ctx.newPage();
+    await page.goto('/');
+    const wip = page.locator('#wip');
+    await expect(wip).toBeVisible();
+    await expect(wip).toContainText('nothing here is financial advice');
+    const wb = await wip.boundingBox(), hb = await page.locator('header').boundingBox();
+    expect(wb.y + wb.height).toBeLessThanOrEqual(hb.y + 1);                     // above the header, in the flow
+    expect(wb.height).toBeLessThan(48);                                         // one line on a laptop
+    await expect(page.locator('#wip-d')).toBeHidden();
+    await page.locator('#wipMore').click();
+    await expect(page.locator('#wip-d')).toContainText("Don't trust anyone");
+    await page.locator('#wipOk').click();
+    await expect(wip).toBeHidden();
+    await page.reload();
+    await expect(page.locator('#status')).toContainText('coins with indicators');
+    await expect(wip).toBeHidden();                                             // remembered
+    await page.locator('#wipBtn').click();
+    await expect(wip).toBeVisible();
+    await expect(page.locator('#wip-d')).toBeVisible();
+    await ctx.close();
+  });
+
+  test('summary above the tiles: the move weighted by market cap, how many rose and fell, the best and worst (each opens its card); a filter narrows it', async ({ page }) => {
+    const sm = page.locator('#summary');
+    await expect(sm).toContainText(`Top ${N} coins, 24h`);
+    await expect(sm).toContainText('weighted by market cap');
+    const chg = await tiles(page).evaluateAll(els => els.map(e => parseFloat(e.querySelector('.chg').textContent.replace('−', '-'))));
+    await expect(sm.locator('.sum-up')).toHaveText(`▲ ${chg.filter(v => v > 0).length}`);
+    await expect(sm.locator('.sum-dn')).toHaveText(`▼ ${chg.filter(v => v < 0).length}`);
+    await expect(sm.locator('.sum-x').last()).toContainText('INT');             // the biggest drop
+    await sm.locator('.sum-x').last().click();
+    await expect(page.locator('#detail')).toHaveClass(/pinned/);
+    await expect(page.locator('#detail .d-head')).toContainText('INT');
+    await page.keyboard.press('Escape');
+    await page.locator('#filters [data-f="down"]').click();
+    await expect(sm).toContainText(`${await tiles(page).count()} coins shown`);
+    await page.locator('#view [data-v="score"]').click();
+    await expect(sm).toBeHidden();
+  });
+
+  test('forex and ETFs use the median, so one outlier can’t drag the headline; ETF groups carry their own average', async ({ page }) => {
+    await page.goto('/forex/');
+    await expect(page.locator('#summary')).toContainText('median');
+    await expect(page.locator('#summary')).toContainText('up = the dollar gained');
+    await page.goto('/etfs/');
+    await expect(page.locator('#summary')).toContainText('US stock ETFs');
+    await expect(page.locator('#grid .tgroup .tg-avg').first()).toHaveText(/^[+−]?\d+\.\d\d%$/);
+  });
+
+  test('the market switch carries each market’s headline figure from pulse.json, on every page', async ({ page }) => {
+    for (const url of ['/', '/rates/', '/predictions/']) {
+      await page.goto(url);
+      await expect(page.locator('#market a[data-m="forex"] .mk-x')).toHaveText(/^[+−]?\d+\.\d%$/);     // the dollar index
+      await expect(page.locator('#market a[data-m="rates"] .mk-x')).toHaveText('+4bp');               // the US 10-year
+      await expect(page.locator('#market a[data-m="rates"] .mk-x')).toHaveAttribute('title', /US 10y \d\.\d\d%/);
+      await expect(page.locator('#market a[data-m="predictions"] .mk-x')).toHaveCount(0);
+    }
+    expect(external).toEqual([]);
+  });
+
+  test('Map: crypto tiles sized by market cap (bigger first), coloured by the move; a tile opens its card; ETFs in group blocks; no Map on forex', async ({ page }) => {
+    await page.locator('#view [data-v="map"]').click();
+    await expect(page.locator('#grid')).toHaveClass(/map/);
+    await expect(page.locator('#grid .tile.mt')).toHaveCount(N);
+    await expect(page).toHaveURL(/view=map/);
+    const area = id => page.locator(`.mt[data-id="${id}"]`).evaluate(e => e.offsetWidth * e.offsetHeight);
+    expect(await area('alpha-coin') ?? 0).toBeGreaterThan(0);
+    const areas = await page.locator('#grid .mt').evaluateAll(els => els.map(e => [e.dataset.id, e.offsetWidth * e.offsetHeight]));
+    const caps = await page.evaluate(async () => Object.fromEntries((await (await fetch('/data.json')).json()).markets.map(m => [m.id, m.market_cap])));
+    const byCap = [...areas].sort((a, b) => caps[b[0]] - caps[a[0]]);
+    expect(byCap[0][1]).toBeGreaterThan(byCap.at(-1)[1]);                       // the biggest coin has the biggest tile
+    await expect(page.locator('#mapNote')).toContainText('market cap');
+    await page.locator('.mt').first().click();
+    await expect(page.locator('#detail')).toHaveClass(/pinned/);
+    await page.keyboard.press('Escape');
+    await page.locator('#view [data-v="grid"]').click();
+    await expect(page.locator('#mapNote')).toHaveCount(0);
+    await page.goto('/etfs/?view=map');
+    await expect(page.locator('#grid .mgrp')).toHaveCount(4);
+    await expect(page.locator('#grid .mt')).toHaveCount(112);
+    await page.goto('/forex/?view=map');
+    await expect(page.locator('#view [data-v="map"]')).toBeHidden();
+    await expect(page.locator('#grid .tile').first()).not.toHaveClass(/\bmt\b/);
+  });
+
+  test('heatmap tiles show the last week as a small line; detailed tiles don’t need it', async ({ page }) => {
+    await page.locator('#density [data-v="heatmap"]').click();
+    await expect(page.locator('#grid .tile .spk')).toHaveCount(N);
+    await expect(page.locator('#grid .tile .spk').first()).toBeVisible();
+    await page.locator('#density [data-v="detailed"]').click();
+    await expect(page.locator('#grid .tile .spk').first()).toBeHidden();
+  });
+
+  test('rates: a column per market, highest 10-year yield first; a column opens its curve', async ({ page }) => {
+    await page.goto('/rates/');
+    const cols = page.locator('#ratesBars .rb');
+    await expect(cols).toHaveCount(14);
+    const ys = (await cols.locator('.rb-v').allTextContents()).map(Number);
+    expect(ys).toEqual([...ys].sort((a, b) => b - a));
+    await expect(cols.first()).toHaveAttribute('data-id', 'br');
+    await cols.first().click();
+    await expect(page.locator('#detail')).toHaveClass(/pinned/);
+    await expect(page.locator('#detail h2')).toContainText('Brazil');
+    await page.keyboard.press('Escape');
+    await page.locator('#rview button[data-v="table"]').click();
+    await expect(page.locator('#ratesBars')).toBeHidden();
+    await page.locator('#rview button[data-v="cards"]').click();
+  });
+
+  test('predictions: the news is one row of small cards, and the board starts in the top half of a laptop screen', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/predictions/');
+    const strip = page.locator('.p-strip');
+    await expect(strip.locator('.p-news').first()).toBeVisible();
+    const tops = await strip.locator('.p-news').evaluateAll(els => [...new Set(els.map(e => Math.round(e.getBoundingClientRect().top)))]);
+    expect(tops.length).toBe(1);                                                // a single row
+    const first = await page.locator('#grid .ptile').first().boundingBox();
+    expect(first.y).toBeLessThan(900 / 2);
+  });
+});
+
+test.describe('phone, at a glance', () => {
+  test.use({ viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true });
+
+  test('the first tiles sit in the top third of the screen; the controls fold behind ⚙ View, with a badge for what differs', async ({ page }) => {
+    const top = await tiles(page).first().evaluate(e => e.getBoundingClientRect().top);
+    expect(top).toBeLessThan(812 / 3);
+    await expect(page.locator('#colorBy')).toBeHidden();
+    await expect(page.locator('#market')).toBeVisible();
+    await page.locator('#ctlToggle').tap();
+    await expect(page.locator('#ctlToggle')).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator('#colorBy')).toBeVisible();
+    await page.locator('#colorBy [data-v="7d"]').tap();
+    await expect(page.locator('#ctlSum')).toHaveText(/^[1-9]$/);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.locator('#ctlToggle').tap();
+    await expect(page.locator('#colorBy')).toBeHidden();
   });
 });

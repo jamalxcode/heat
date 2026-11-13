@@ -97,8 +97,6 @@ const riskTag = x => {
   if (!r.level) return `<span class="r-risk none" title="${t}">Risk: building history</span>`;
   return `<span class="r-risk ${r.level}" title="${t}"><span aria-hidden="true">${RISK[r.level][0]}</span> ${RISK[r.level][1]}</span>`;
 };
-// its own line on the card: the tag, and the gap it comes from (the monthly euro cards show that gap already)
-const riskRow = (x, shown = false) => x.risk ? `<div class="rt-bot rt-risk">${riskTag(x)}${x.risk.bench || shown ? '' : `<span class="r-vs" title="10-year yield minus ${VS[x.risk.vs][0]}’s">vs ${VS[x.risk.vs][1]} ${fmtPP(x.risk.spread)}</span>`}</div>` : '';
 const riskAria = x => x.risk?.level ? `, ${RISK[x.risk.level][1].toLowerCase()}` : '';
 const rankNote = c => c.slopePct == null ? null : `steeper than ${c.slopePct}% of the last ${c.longYears >= 9.5 ? '10' : Math.max(1, Math.round(c.longYears))} years`;
 
@@ -126,14 +124,19 @@ export function colourOf(x, monthly, mode = colorBy, tfKey = tf) {
   return { cls: heat(bp, tfKey), corner: fmtBp(bp) };
 }
 
+// What's unusual about a market, on its card: a high-risk tag, or a yield below inflation. Everything else (the real
+// yield, inflation, the risk rank, the gap to the benchmark) is in the popup, so the card leads with the yield and its move.
+function flagsHTML(x) {
+  const f = [x.risk?.level === 'high' ? riskTag(x) : '', x.real != null && x.real <= -0.05 ? realPill(x) : ''].filter(Boolean);
+  return f.length ? `<div class="rt-bot rt-flags">${f.join('')}</div>` : '';
+}
 function tileHTML(c) {
   const k = TFS.find(x => x[0] === tf)[1], bp = changeBp(c, k), st = STATE[c.state], old = bizDaysSince(c.date) > 2, col = colourOf(c, false);
   return `<button class="rtile ${col.cls}${c.id === sel ? ' sel' : ''}" data-id="${esc(c.id)}" data-coin="1" aria-haspopup="dialog" aria-label="${esc(`${c.name}: 10-year ${fmtY(c.y10)}, ${tf} ${fmtBp(bp)}, curve ${st?.label || 'unknown'}, real yield ${fmtReal(c.real)}${riskAria(c)}`)}">
     <div class="rt-top"><span class="rt-name">${logoOf(c)}<b>${esc(c.name)}</b></span><span class="rt-chg">${col.corner}</span>
       <span class="rt-y"><span class="rt-yl">10-year</span> ${fmtY(c.y10)}</span><span class="rt-date${old ? ' old' : ''}"${old ? ' title="More than 2 business days old: this source publishes late, or didn’t update"' : ''}>${c.notRefreshed ? '⚠ ' : ''}${dayLabel(c.date)}</span></div>
     <div class="rt-bot"><span class="rt-state st-${esc(c.state || 'none')}">${st ? `<span class="st-ico" aria-hidden="true">${st.icon}</span> ${st.label}` : '—'}</span>${curveSpark(c)}<span class="rt-slope" title="10-year minus ${shortLabel(c)}, in percentage points">10y−${shortTag(c)} ${fmtPP(c.slope).replace(' pp', '')}</span></div>
-    <div class="rt-bot rt-real">${realPill(c)}${inflTag(c)}</div>
-    ${riskRow(c)}
+    ${flagsHTML(c)}
   </button>`;
 }
 function mTileHTML(m) {
@@ -142,8 +145,7 @@ function mTileHTML(m) {
     <div class="rt-top"><span class="rt-name">${logoOf(m)}<b>${esc(m.name)}</b></span><span class="rt-chg">${col.corner}</span>
       <span class="rt-y"><span class="rt-yl">10-year</span> ${fmtY(m.y10)}</span><span class="rt-date">${m.notRefreshed ? '⚠ ' : ''}${monthLabel(m.month)}</span></div>
     <div class="rt-bot"><span>${m.vsDE != null ? `vs 🇩🇪 ${fmtPP(m.vsDE)}` : 'not in the euro'}</span>${monthSpark(m)}<span class="rt-slope">1y ${fmtBp(m.chg12m)}</span></div>
-    <div class="rt-bot rt-real">${realPill(m)}${inflTag(m)}</div>
-    ${riskRow(m, m.vsDE != null)}
+    ${flagsHTML(m)}
   </button>`;
 }
 
@@ -287,11 +289,28 @@ const HELP = `<div class="r-help" id="rhelp" hidden>
   <p><b>Europe, monthly:</b> countries with no free daily source, from the ECB’s monthly averages (no curve, so no reading), with the gap to Germany for euro members.</p>
 </div>`;
 
+/* ---------- every 10-year yield at a glance: a column per market, highest first ---------- */
+function barsHTML(cs) {
+  const list = [...cs].filter(c => c.y10 != null).sort((a, b) => b.y10 - a.y10);
+  if (!list.length) return '';
+  const max = Math.max(...list.map(c => c.y10), 0.01);
+  const how = colorBy === 'change' ? `the ${tf} change` : colorBy === 'curve' ? 'the curve' : 'the real yield';
+  return `<p class="rb-cap">10-year yields, highest first <span class="r-muted">· colour: ${how} · ↘ an inverted curve · click a column for its curve</span></p>
+    <div class="rb-cols">${list.map(c => {
+      const col = colourOf(c, false), st = STATE[c.state];
+      return `<button class="rb ${col.cls}" data-id="${esc(c.id)}" data-coin="1" title="${esc(`${c.name}: 10-year ${fmtY(c.y10)}${col.corner ? ` · ${col.corner}` : ''} · curve ${st?.label || 'unknown'}`)}">
+        <span class="rb-v">${c.y10.toFixed(c.y10 >= 10 ? 1 : 2)}</span><span class="rb-bar" style="--h:${(c.y10 / max).toFixed(3)}"></span>
+        <span class="rb-f">${logoOf(c)}</span><span class="rb-s st-${esc(c.state || 'none')}">${c.state === 'inverted' ? `<span class="st-ico">${st.icon}</span>` : ''}</span></button>`;
+    }).join('')}</div>`;
+}
+
 /* ---------- drawing ---------- */
 function render() {
   if (!R) return;
   const grid = $('#grid'), cs = sorted(R.countries, false), ms = sorted(R.monthly || [], true);
   $('#ratesTable').hidden = viewAs !== 'table';
+  $('#ratesBars').hidden = viewAs === 'table';
+  if (viewAs !== 'table') $('#ratesBars').innerHTML = barsHTML(R.countries);
   grid.hidden = viewAs === 'table';
   $('#ratesMonthly').hidden = viewAs === 'table' || !ms.length;
   if (viewAs === 'table') $('#ratesTable').innerHTML = tableHTML(cs, ms);
@@ -381,7 +400,7 @@ function renderFresh() {
   const mins = Math.floor((Date.now() - R.generated) / 60e3), ago = mins < 1 ? 'just now' : mins < 120 ? `${mins} min ago` : `${Math.floor(mins / 60)} h ago`;
   const latest = R.countries.map(c => `${c.badge} ${dayLabel(c.date)}`).join(' · ');
   const eu = R.monthly?.length ? ` · Europe monthly: ${monthLabel(R.monthly[0].month)}` : '';
-  const html = `<span>🕒 <b>Official closing yields</b>, published once a business day · <b>not real-time</b> · latest: ${latest}${eu} · checked ${ago}</span>`;
+  const html = `<span>🕒 <b>Official closing yields</b>, published once a business day · <b>not real-time</b><span class="fr-more"> · latest: ${latest}${eu}</span> · checked ${ago}</span>`;   // phones drop the list of dates
   if ($('#fresh').innerHTML !== html) $('#fresh').innerHTML = html;
 }
 
@@ -404,7 +423,7 @@ export function start() {
   fetch('/tv.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).then(j => { TV = j?.sym || null; }).catch(() => {});
   document.body.classList.add('rates-page');
   // this page has none of the price controls: no filters, views, tile styles, quote switch, legend or refresh button
-  for (const s of ['#colorBy', '#quote', '#view', '#density', '.controls .ctl', '#legend', '#reset', '#refresh', '#share', '#excluded']) { const el = $(s); if (el) el.hidden = true; }
+  for (const s of ['#colorBy', '#quote', '#view', '#density', '.controls .ctl', '#ctlToggle', '#legend', '#reset', '#refresh', '#share', '#excluded']) { const el = $(s); if (el) el.hidden = true; }
   $('main').insertAdjacentHTML('afterbegin', `<div class="r-bar">
     <div class="seg" id="rcolor" role="group" aria-label="Colour the cards by"><button data-v="change" title="The change in the 10-year yield">Change</button><button data-v="curve" title="How steep or inverted the curve is">Curve</button><button data-v="real" title="The 10-year yield minus inflation">Real yield</button></div>
     <div class="seg" id="rtf" role="group" aria-label="Change over">${TFS.map(([v]) => `<button data-v="${v}" aria-pressed="${v === tf}">${v}</button>`).join('')}</div>
@@ -413,6 +432,7 @@ export function start() {
     <label class="r-sel">Group <select id="rgroup"><option value="none">None</option><option value="region">Region</option></select></label>
     <button class="btn leg-toggle" id="rhelpBtn" aria-expanded="false" aria-controls="rhelp">ⓘ How to read</button>
     <span id="rlegend" class="leg-item"></span></div>${HELP}`);
+  $('#grid').insertAdjacentHTML('beforebegin', '<section id="ratesBars" class="r-bars" aria-label="10-year yields, highest first"></section>');
   $('#grid').insertAdjacentHTML('afterend', `<section id="ratesMonthly" class="r-month" aria-label="Europe, monthly 10-year yields" hidden></section><section id="ratesTable" aria-label="Yields as a table" hidden></section>`);
   $('#detail').setAttribute('aria-label', 'Yield curve');
   const linked = new URLSearchParams(location.search).get('c');
@@ -423,7 +443,7 @@ export function start() {
   $('#rgroup').addEventListener('change', e => { groupBy = e.target.value; store.set('hm.ratesGroup', groupBy); render(); });
   $('#rhelpBtn').addEventListener('click', e => { const open = $('#rhelp').hidden; $('#rhelp').hidden = !open; e.currentTarget.setAttribute('aria-expanded', open); e.currentTarget.textContent = open ? '✕ Hide' : 'ⓘ How to read'; });
   const pick = e => { const b = e.target.closest('[data-id]'); if (b && R) openPopup(b.dataset.id, { anchor: b }); };
-  for (const el of ['#grid', '#ratesMonthly', '#ratesTable']) $(el).addEventListener('click', pick);
+  for (const el of ['#grid', '#ratesMonthly', '#ratesTable', '#ratesBars']) $(el).addEventListener('click', pick);
   $('#ratesTable').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.closest('.r-row')) pick(e); });
   // with a mouse, resting on a card for 0.7 s previews its curve beside it (as the price pages do); moving away closes
   // it unless the mouse goes onto the popup; a click on the card or the popup pins it

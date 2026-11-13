@@ -1,6 +1,6 @@
 // heat.sala.company page script: main (split from index.html; see app/main.mjs for the order things start in)
 import * as SIG from '/signals.mjs';
-import { applyEdge, applyParams, renderAll, renderCounts, renderFooter, renderHealth } from './render.mjs';
+import { applyEdge, applyParams, renderAll, renderCounts, renderFooter, renderHealth, renderXM } from './render.mjs';
 import { $, DAY, fmtWait, linkedCoin, LIVE_EVERY, M, MARKETS_TTL, REFRESH_MIN, S, setStatus, SNAPSHOT_GRACE, SNAPSHOT_MAX_AGE, SNAPSHOT_RETRY, store } from './core.mjs';
 import { loadScorecard } from './scorecard.mjs';
 import { applyHist, buildBench, pickCoins } from './data.mjs';
@@ -48,7 +48,8 @@ export function renderFresh(now) {
   const late = age > REFRESH_MIN * 2.5 * 60e3;
   const next = S.busy ? 'refreshing now' : S.nextAuto > now ? `next in ~${Math.max(1, Math.ceil((S.nextAuto - now) / 60e3))} min` : 'checking for new prices';
   el.classList.toggle('late', late);
-  const html = M.fresh({ tm, ago, next, late, refreshMin: REFRESH_MIN, rateDate: S.rateDate, latestDate: S.latestDate });   // includes the data credit
+  let html = M.fresh({ tm, ago, next, late, refreshMin: REFRESH_MIN, rateDate: S.rateDate, latestDate: S.latestDate });   // includes the data credit
+  html = html.replace(` · ${next}`, `<span class="fr-next"> · ${next}</span>`);   // phones drop the countdown to keep this to a line or two
   if (el.innerHTML !== html) el.innerHTML = html;
 }
 
@@ -140,6 +141,11 @@ export async function run() {
     tick();
   }
 }
+// Each market's headline figure on the market switch (Bitcoin, the dollar index, gold, Brent, the S&P 500, the US
+// 10-year), from the tiny pulse.json the deploy builds; refreshed with the data. Without it the switch just has no figures.
+const loadXM = () => fetch(`/pulse.json?b=${Math.floor(Date.now() / 60e3)}`, { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(renderXM).catch(() => {});
+loadXM();
+setInterval(() => { if (!document.hidden) loadXM(); }, 5 * 60e3);
 if (M.custom) {
   // the rates and prediction-market pages have their own views (app/rates.mjs, app/predictions.mjs): none of the price
   // pipeline below runs there

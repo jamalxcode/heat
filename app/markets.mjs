@@ -14,9 +14,12 @@ export const MARKETS = {
     live: true,                       // a live price between daily candles; today's candle is still forming
     liveBuild: true,                  // if data.json goes stale, the page builds it itself (scripts/build-data.mjs)
     ranked: true,                     // tiles show the market-cap rank (#1, #2 …) and the table has a market-cap column
+    sizeBy: 'cap',                    // Map view: area by market cap; the summary's average is weighted by it too
+    sumLabel: n => `Top ${n} coins`, upNote: () => '',
+    xm: { id: 'bitcoin', label: 'BTC' },   // the headline figure on the market switch
     quoteSwitch: false,               // no USD/… | …/USD switch
     pegPref: 'pegged',                // localStorage key for "show stablecoins"
-    bins: { '24h': [1, 3, 6, 10], '7d': [2.5, 7, 15, 25], '30d': [5, 15, 30, 50] },
+    bins: { '24h': [0.5, 3, 6, 10], '7d': [1.5, 7, 15, 25], '30d': [3, 15, 30, 50] },   // a narrow grey band, so a calm day still shows its tint
     // relative strength: measured against this asset (or, without one, an equal-weight basket of every pair); volume: shown when the data has it
     bench: 'bitcoin', benchLabel: 'BTC', volume: true,
     back: { '24h': 1, '7d': 7, '30d': 30 },          // candles back for each change (one candle per day)
@@ -48,6 +51,9 @@ export const MARKETS = {
     key: 'forex', data: '/forex.json', scorecard: '/forex-scorecard.json', top: 999, noun: 'currencies', one: 'currency', nameCol: 'Currency',
     live: false,                      // one official rate per business day: nothing forms in between
     ranked: false, quoteSwitch: true, pegPref: 'peggedFx',
+    sumLabel: n => `${n} currencies vs the dollar`,
+    upNote: q => q === 'usd' ? 'up = the currency gained on the dollar' : 'up = the dollar gained on that currency',
+    xm: { id: 'dxy', label: 'DXY' },
     bins: { '24h': [0.1, 0.3, 0.6, 1], '7d': [0.25, 0.75, 1.5, 3], '30d': [0.5, 1.5, 3, 6] },
     bench: null, benchLabel: 'basket', volume: false,   // vs the average of every pair shown; forex has no central volume
     back: { '24h': 1, '7d': 5, '30d': 21 },          // business days: 5 ≈ a week, 21 ≈ a month
@@ -84,8 +90,10 @@ MARKETS.metals = {
   key: 'metals', data: '/metals.json', scorecard: null, top: 999, noun: 'assets', one: 'asset', nameCol: 'Asset',
   live: true,                         // the crypto tiles move all day; the metals file has one value per day (today's is still forming)
   liveBuild: false,                   // the in-browser rebuild makes crypto data: here an older metals.json is shown instead
-  ranked: false, quoteSwitch: false, pegPref: null, pegLabel: null,
-  bins: { '24h': [0.25, 0.75, 1.5, 3], '7d': [1, 2.5, 5, 8], '30d': [2, 5, 10, 15] },
+  ranked: false, quoteSwitch: false, pegPref: null, pegLabel: null, sizeBy: null,
+  sumLabel: n => `${n} metals and gold tokens`, upNote: () => '',
+  xm: { id: 'xau', label: 'Gold' },
+  bins: { '24h': [0.15, 0.75, 1.5, 3], '7d': [0.5, 2.5, 5, 8], '30d': [1, 5, 10, 15] },
   bench: 'xau', benchLabel: 'gold', volume: false,     // the metal prices come without volume
   noScorecard: 'There’s no scorecard here: with only a handful of assets there’s nothing to rank each day, so the 🚀/😢 can’t be tested the way they are on the crypto and forex pages. The tiles, charts and stops work as everywhere else.',
   // ✓ once Swissquote's price matched exchange-api's close for the same day (scripts/build-metals.mjs crossCheck)
@@ -105,8 +113,8 @@ MARKETS.metals = {
 const linkYahoo = '<a class="cg-attr" href="https://finance.yahoo.com/markets/commodities/" target="_blank" rel="noopener">Source: Yahoo Finance</a>';
 MARKETS.energy = {
   ...MARKETS.metals,
-  key: 'energy', data: '/energy.json',
-  bins: { '24h': [0.5, 1.5, 3, 5], '7d': [1.5, 4, 8, 12], '30d': [3, 8, 15, 25] },
+  key: 'energy', data: '/energy.json', sumLabel: n => `${n} energy futures`, xm: { id: 'brent', label: 'Brent' },
+  bins: { '24h': [0.25, 1.5, 3, 5], '7d': [0.75, 4, 8, 12], '30d': [1.5, 8, 15, 25] },
   tradingDays: true,                  // the live price never starts a new day by itself (no weekend candles)
   bench: 'brent', benchLabel: 'Brent', volume: false,  // front-month volume jumps at every contract roll, so it isn't used
   back: { '24h': 1, '7d': 5, '30d': 21 },
@@ -131,7 +139,9 @@ const linkYahooEtf = '<a class="cg-attr" href="https://finance.yahoo.com/markets
 MARKETS.etfs = {
   ...MARKETS.energy,
   key: 'etfs', data: '/etfs.json', noun: 'ETFs', one: 'ETF', nameCol: 'ETF',
-  bins: { '24h': [0.5, 1, 2, 3.5], '7d': [1, 2.5, 5, 8], '30d': [2, 5, 10, 15] },
+  sizeBy: 'dollarVol',                // Map view: area by dollars traded a day (20-day average)
+  sumLabel: n => `${n} US stock ETFs`, xm: { id: 'spy', label: 'S&P' },
+  bins: { '24h': [0.2, 1, 2, 3.5], '7d': [0.5, 2.5, 5, 8], '30d': [1, 5, 10, 15] },
   bench: 'spy', benchLabel: 'S&P 500',
   volume: true,                       // real exchange volume: the VOL row and column work as on the crypto page
   grouped: true,                      // the grid is split into the groups in etfs.json (US market, sectors, themes, abroad)
@@ -150,15 +160,15 @@ MARKETS.etfs = {
 // instead of the tile pipeline; these settings only label the shared controls and set the color scale (in basis points).
 MARKETS.rates = {
   ...MARKETS.metals,
-  key: 'rates', data: '/rates.json', custom: true, noun: 'markets', one: 'market', nameCol: 'Market',
-  bins: { '1d': [2, 5, 10, 20], '1w': [5, 12, 25, 40], '1m': [10, 25, 50, 80] },
+  key: 'rates', data: '/rates.json', custom: true, noun: 'markets', one: 'market', nameCol: 'Market', xm: { id: 'us10y', label: 'US 10y' },
+  bins: { '1d': [1, 5, 10, 20], '1w': [2, 12, 25, 40], '1m': [5, 25, 50, 80] },
 };
 
 // Prediction markets: Polymarket, Kalshi, PredictIt, Manifold and Betfair (scripts/build-predictions.mjs). Probabilities,
 // not prices, so like rates the page draws its own view (app/predictions.mjs); the bins are percentage points.
 MARKETS.predictions = {
   ...MARKETS.metals,
-  key: 'predictions', data: '/predictions.json', custom: true, noun: 'markets', one: 'market', nameCol: 'Market',
+  key: 'predictions', data: '/predictions.json', custom: true, noun: 'markets', one: 'market', nameCol: 'Market', xm: null,
   bins: { '1d': [1, 3, 6, 10], '1w': [2, 5, 10, 20], '1m': [3, 8, 15, 25] },
 };
 

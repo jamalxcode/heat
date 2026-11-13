@@ -1,6 +1,6 @@
 # Rebuild transcript: heat.sala.company
 
-These 26 prompts cover everything we built, up to 12 Nov 2026. Paste them in order, and wait for each step to be live and verified before sending the next. The fixes we found along the way are folded in, so a rebuild skips those detours.
+These 27 prompts cover everything we built, up to 13 Nov 2026. Paste them in order, and wait for each step to be live and verified before sending the next. The fixes we found along the way are folded in, so a rebuild skips those detours.
 
 ---
 
@@ -157,7 +157,19 @@ These 26 prompts cover everything we built, up to 12 Nov 2026. Paste them in ord
 ### 25. Plain words and up-to-date docs
 > Use plain wording in the scorecard and rates text: today's list "makes the signals look better" or is "too kind to the signals", and a yield gap is "less steep". Then bring the README, `docs/DECISIONS.md` (including the reasons behind the older parts of the site) and these rebuild prompts up to date.
 
-### 26. Status checks (repeat as needed)
+### 26. At a glance
+> Critique the site as a first-time visitor sees it on a laptop and a phone, then make it immediate:
+> - a **headline** above the tiles on every price page: the typical move (weighted by market cap on crypto, the median elsewhere), how many rose and fell with a bar of the split, and the biggest gain and drop (each opens its card); ETF group headings get their own average
+> - **each market's figure on the market switch** (BTC, DXY, gold, Brent, SPY, US 10-year in bp) from a new `xm` field in `pulse.json`, leaving `items` unchanged for go.sala.company
+> - a **Map** view for crypto and ETFs: area by market cap or dollars traded, square-root scale, ETF groups as blocks
+> - a **week's line** on heatmap tiles, and a **narrower grey band** on the colour scale (forex stays at ±0.1%)
+> - the warning as **one slim line** above the page instead of a card over the header
+> - **phones:** the market switch and a ⚙ View button instead of rows of controls, so the first tiles start in the top third of the screen
+> - **rates:** cards lead with the yield; real yield, inflation and the risk rank move to the popup (a card keeps only High risk or a negative real yield); a column chart of every 10-year yield, highest first
+> - **predictions:** Today, Since your last visit and Just decided in one row of small cards, so the board starts in the top half of a laptop screen; question text at full strength on pale tiles
+> Add browser tests for each, and check light and dark mode on a laptop and a phone before merging.
+
+### 27. Status checks (repeat as needed)
 > Status check on heat.sala.company: scheduled and manual runs over the last 24 hours, refresh gaps, data age, the latest scorecard and tuner decision, failures, and anything to sync to GitHub.
 
 ---

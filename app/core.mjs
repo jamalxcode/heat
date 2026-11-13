@@ -88,7 +88,7 @@ const URLQ = new URLSearchParams(location.search);
 const fromUrl = (k, ok) => { const v = URLQ.get(k); return v != null && ok(v) ? v : null; };
 const LINKED = {
   colorBy: fromUrl('tf', v => ['24h', '7d', '30d'].includes(v)),
-  view: fromUrl('view', v => ['grid', 'table', 'score'].includes(v)),
+  view: fromUrl('view', v => ['grid', 'map', 'table', 'score'].includes(v)),
   quote: M.quoteSwitch ? fromUrl('q', v => ['usd', 'market'].includes(v)) : null,
   filter: fromUrl('f', v => /^[a-z]{1,12}$/.test(v)),      // checked against the filter buttons in interact.mjs
   heat: fromUrl('heat', v => /^h-?[0-4]$/.test(v)),
@@ -97,6 +97,7 @@ const LINKED = {
 for (const [k, v] of Object.entries(LINKED)) if (v != null) S[k] = v;
 export const linkedCoin = fromUrl('coin', v => /^[a-z0-9._-]{1,80}$/i.test(v));
 if (!M.scorecard && S.view === 'score') S.view = 'grid';   // metals has no Scorecard view
+if (!M.sizeBy && S.view === 'map') S.view = 'grid';         // nothing to size the tiles by (forex, metals, energy): no Map view
 export function syncURL() {
   if (M.custom) return;                                    // the rates page keeps its own address (?c=)
   const q = new URLSearchParams();

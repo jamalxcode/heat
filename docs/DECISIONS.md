@@ -131,3 +131,35 @@ Why the project works the way it does. Add new decisions at the end, and keep ea
 
 ### 29. Docs move with the code
 **Decision:** a change that alters behaviour also updates the README, a decision here when there's a "why" worth keeping, and `docs/rebuild-prompts.md` when it adds a feature, so the project can still be rebuilt from the prompts in order.
+
+## At a glance
+
+*13 Nov 2026, from a critique of the site as a first-time visitor sees it (laptop and phone screenshots): the data was all there, but a visitor had to work out the story; on a phone the controls filled most of the first screen, and the warning covered the header.*
+
+### 30. Every price page leads with a headline
+**Decision:** a line above the tiles gives the typical move, how many rose and fell (with a bar of the split) and the biggest gain and drop. On crypto the move is weighted by market cap, like a market index; elsewhere it's the **median**, because an equal-weight average was dragged by a single outlier (one currency's devaluation moved "the average" more than the other 47 together). It describes what's shown, so a filter narrows it, and ETF group headings carry their own average.
+
+### 31. The market switch carries each market's figure
+**Decision:** each market's tab shows its headline move (Bitcoin, the dollar index, gold, Brent, SPY, the US 10-year in bp), so every page doubles as a cross-market glance. The figures come from a separate `xm` field in `pulse.json`, built at the end of the deploy from the files just made: no page downloads another page's data, and `items`, which go.sala.company reads, is unchanged. Predictions have no single figure, so their tab has none.
+
+### 32. Map sizes by the square root
+**Decision:** crypto and ETFs get a Map view where area follows market cap (crypto) or dollars traded a day (ETFs; there's no free AUM feed). Linear sizes would give Bitcoin about half the map and leave most coins as unreadable slivers, so area follows the **square root**, as on the predictions money map; the order by size is kept and the note under the map says so. Forex, metals and energy have nothing meaningful to size by, so they don't offer it. The treemap layout moved to `app/treemap.mjs`, shared with the money map.
+
+### 33. Narrower "flat" band
+**Decision:** the grey middle of the colour scale was wide enough (±1% a day for crypto, ±0.5% for ETFs) that on a calm day most tiles were grey and the colour said nothing. The first step is now about half as wide on crypto, metals, energy, ETFs and rates; the outer steps are unchanged, so big days look the same as before. Forex already used ±0.1% and stays.
+
+### 34. A week's line on heatmap tiles
+**Decision:** heatmap tiles show the last week's closes as a small line in the tile's own ink, so a −1% day inside a strong week reads differently from one in a slide, without opening the card. Detailed tiles already carry the trend rows, so they don't.
+
+### 35. The warning sits above the page, not on it
+**Decision:** the work-in-progress notice is a slim line at the top of the page instead of a floating card over the header (which hid the refresh time and the market switch on every first visit, and most of a phone screen). It still appears on a first visit and 30 days after it's dismissed; "More" and ⚠ WIP show the full text.
+
+### 36. Phones: data before controls
+**Decision:** on a phone the market switch and a ⚙ View button replace the rows of controls (timeframe, view, tile style, filters, Reset, the stablecoin box and How to read open below the button, which shows a badge when something differs from the default). The countdown, refresh, link and theme buttons fold away. Goal, checked by a browser test: the first tiles start in the top third of the screen (they started three quarters down).
+
+### 37. Rates: the yield first, the rest on demand
+**Decision:** a rate card leads with the 10-year yield, its move and the curve reading. The real yield, inflation, the risk rank and the gap to the benchmark moved to the popup and the table; a card keeps only what's unusual: **▲ High risk**, or a yield below inflation (from −0.05%, so rounding to "−0.0%" doesn't count). A column chart above the cards, highest yield first, shows every market's level at once.
+
+### 38. Predictions: one news strip
+**Decision:** Today, Since your last visit and Just decided were three stacked sections above the board; they're now one row of small cards (a sideways swipe when they don't fit), so the board starts in the top half of a laptop screen. On the palest tiles only the answer and its chance fade; the question stays at full strength.
+
