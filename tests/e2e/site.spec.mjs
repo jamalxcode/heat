@@ -1413,10 +1413,101 @@ test.describe('phone, at a glance', () => {
     await page.locator('#ctlToggle').tap();
     await expect(page.locator('#ctlToggle')).toHaveAttribute('aria-expanded', 'true');
     await expect(page.locator('#colorBy')).toBeVisible();
+    const spill = await page.evaluate(() => { const R = document.querySelector('.controls').getBoundingClientRect().right; return [...document.querySelectorAll('#ctlMore > *')].filter(e => e.offsetParent).some(e => e.getBoundingClientRect().right > R + 1); });
+    expect(spill).toBe(false);                                                  // nothing in the open panel runs past its edge (search included)
     await page.locator('#colorBy [data-v="7d"]').tap();
     await expect(page.locator('#ctlSum')).toHaveText(/^[1-9]$/);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.locator('#ctlToggle').tap();
     await expect(page.locator('#colorBy')).toBeHidden();
+  });
+});
+
+// The next click (Nov 2026, round 2): the coin card in words, the year range, search, the watchlist, the scorecard
+// without price controls, instant repeat visits, the table
+test.describe('the next click', () => {
+  test('the card opens with what the readings say, in words, and where the price sits in its range', async ({ page }) => {
+    await tile(page, 'moon-coin').click();
+    const say = page.locator('#detail .d-say');
+    await expect(say).toContainText('Strong uptrend');
+    await expect(say).toContainText(/overbought \(RSI \d+\)/);
+    await expect(say).toContainText(/near its short stop/);
+    await expect(page.locator('#detail .d-range')).toContainText(/\d+-month range|1-year range/);
+    await expect(page.locator('#detail .d-range .rbar i')).toHaveCount(1);
+    await expect(tile(page, 'moon-coin').locator('.row .k', { hasText: 'RNG' })).toHaveCount(1);   // detailed tiles get a range row
+  });
+
+  test('the chart’s stop labels never overprint each other or the price scale', async ({ page }) => {
+    await tile(page, 'moon-coin').click();                                    // its short stop sits right at the price
+    const ys = await page.locator('#detail .d-chart svg').first().evaluate(svg => [...svg.querySelectorAll('text')].map(t => ({ stop: /stop/.test(t.textContent), y: +t.getAttribute('y') })));
+    const stops = ys.filter(t => t.stop), ticks = ys.filter(t => !t.stop);
+    expect(stops.length).toBe(2);
+    expect(Math.abs(stops[0].y - stops[1].y)).toBeGreaterThanOrEqual(10.9);
+    for (const t of ticks) for (const st of stops) expect(Math.abs(t.y - st.y)).toBeGreaterThanOrEqual(10.9);
+  });
+
+  test('search: "/" jumps to it, it filters as you type (summary follows), Escape clears it; no match says so', async ({ page }) => {
+    await page.keyboard.press('/');
+    await expect(page.locator('#q')).toBeFocused();
+    await page.keyboard.type('moon');
+    await expect(tiles(page)).toHaveCount(1);
+    await expect(page.locator('#summary')).toContainText('1 coin shown');
+    await page.keyboard.press('Escape');
+    await expect(tiles(page)).toHaveCount(N);
+    await page.locator('#q').fill('zzz');
+    await expect(page.locator('#grid .empty')).toContainText('No coins match “zzz”');
+    await page.locator('#grid .empty [data-show-all]').click();
+    await expect(page.locator('#q')).toHaveValue('');
+    await expect(tiles(page)).toHaveCount(N);
+  });
+
+  test('☆ Watch pins a coin to a watchlist at the top, remembered per market; ★ Watching takes it off', async ({ page }) => {
+    const id = await tiles(page).nth(7).getAttribute('data-id');
+    await tile(page, id).click();
+    await page.locator('#detail [data-watch]').click();
+    await expect(page.locator('#detail [data-watch]')).toHaveText('★ Watching');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#grid .tgroup.twatch')).toContainText('Your watchlist');
+    await expect(page.locator('#grid > *').nth(1)).toHaveAttribute('data-id', id);   // first tile under the heading
+    await page.reload();
+    await expect(page.locator('#grid .tgroup.twatch')).toBeVisible();
+    await page.goto('/forex/');
+    await expect(page.locator('#grid .tgroup.twatch')).toHaveCount(0);           // each market has its own list
+    await page.goto('/');
+    await tile(page, id).click();
+    await page.locator('#detail [data-watch]').click();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#grid .tgroup.twatch')).toHaveCount(0);
+  });
+
+  test('the scorecard opens on its answer: filters, colour scale, timeframe and search step aside', async ({ page }) => {
+    await page.locator('#view [data-v="score"]').click();
+    for (const s of ['#filters', '#legendScale', '#colorBy', '#q']) await expect(page.locator(s)).toBeHidden();
+    await page.locator('#view [data-v="grid"]').click();
+    for (const s of ['#filters', '#legendScale', '#colorBy', '#q']) await expect(page.locator(s)).toBeVisible();
+  });
+
+  test('a repeat visit draws the last copy at once, then swaps in the fresh file', async ({ page }) => {
+    await page.waitForTimeout(1700);                                          // the copy is saved just after the first load
+    let release;
+    const held = new Promise(r => { release = r; });
+    await page.route('**/data.json*', async route => { await held; await route.continue(); });
+    await page.reload();
+    await expect(tiles(page)).toHaveCount(N);                                 // drawn before data.json has answered
+    await expect(page.locator('#status')).toContainText('last visit');
+    release();
+    await expect(page.locator('#status')).toContainText(`${N}/${N} coins with indicators`);
+  });
+
+  test('table: a week line per row, how far from the high, and the coin column stays put while scrolling sideways', async ({ page }) => {
+    await page.locator('#view [data-v="table"]').click();
+    await expect(page.locator('#tablewrap td.t-wk svg')).toHaveCount(N);
+    await expect(page.locator('#tablewrap th', { hasText: 'From high' })).toHaveCount(1);
+    expect(await page.locator('#tablewrap tbody td:nth-child(2)').first().evaluate(e => getComputedStyle(e).position)).toBe('sticky');
+  });
+
+  test('energy points to its weekly pump-price tables', async ({ page }) => {
+    await page.goto('/energy/');
+    await expect(page.locator('#summary .sum-jump')).toHaveAttribute('href', '#fuel');
   });
 });

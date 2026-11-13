@@ -423,7 +423,7 @@ export function start() {
   fetch('/tv.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).then(j => { TV = j?.sym || null; }).catch(() => {});
   document.body.classList.add('rates-page');
   // this page has none of the price controls: no filters, views, tile styles, quote switch, legend or refresh button
-  for (const s of ['#colorBy', '#quote', '#view', '#density', '.controls .ctl', '#ctlToggle', '#legend', '#reset', '#refresh', '#share', '#excluded']) { const el = $(s); if (el) el.hidden = true; }
+  for (const s of ['#colorBy', '#quote', '#view', '#density', '.controls .ctl', '#ctlToggle', '#q', '#legend', '#reset', '#refresh', '#share', '#excluded']) { const el = $(s); if (el) el.hidden = true; }
   $('main').insertAdjacentHTML('afterbegin', `<div class="r-bar">
     <div class="seg" id="rcolor" role="group" aria-label="Colour the cards by"><button data-v="change" title="The change in the 10-year yield">Change</button><button data-v="curve" title="How steep or inverted the curve is">Curve</button><button data-v="real" title="The 10-year yield minus inflation">Real yield</button></div>
     <div class="seg" id="rtf" role="group" aria-label="Change over">${TFS.map(([v]) => `<button data-v="${v}" aria-pressed="${v === tf}">${v}</button>`).join('')}</div>

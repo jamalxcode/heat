@@ -1,6 +1,6 @@
 # Rebuild transcript: heat.sala.company
 
-These 27 prompts cover everything we built, up to 13 Nov 2026. Paste them in order, and wait for each step to be live and verified before sending the next. The fixes we found along the way are folded in, so a rebuild skips those detours.
+These 28 prompts cover everything we built, up to 13 Nov 2026. Paste them in order, and wait for each step to be live and verified before sending the next. The fixes we found along the way are folded in, so a rebuild skips those detours.
 
 ---
 
@@ -169,7 +169,17 @@ These 27 prompts cover everything we built, up to 13 Nov 2026. Paste them in ord
 > - **predictions:** Today, Since your last visit and Just decided in one row of small cards, so the board starts in the top half of a laptop screen; question text at full strength on pale tiles
 > Add browser tests for each, and check light and dark mode on a laptop and a phone before merging.
 
-### 27. Status checks (repeat as needed)
+### 27. The next click
+> Critique the site again, past the first screen (the coin card, the table, the scorecard, phones), then:
+> - open the coin card with a line in words built from its readings, and add a **year range** bar (named by the history there is: "9-month range" for crypto), a range row on detailed tiles and a "From high" table column
+> - stop the chart's stop labels overprinting the price scale
+> - add **search** (and the `/` key) and a **☆ watchlist** pinned to the top of the grid, saved per market in the browser
+> - hide the price controls in the Scorecard view
+> - draw the **last copy** the browser saw at once on a repeat visit, clearly marked, then swap in the fresh file
+> - table: shorter headers, a week line per row, the symbol column sticky; outline flat market-switch figures for dark mode; link energy's summary to its weekly tables
+> Test each in the browser, and check the phone's ⚙ View panel fits its screen.
+
+### 28. Status checks (repeat as needed)
 > Status check on heat.sala.company: scheduled and manual runs over the last 24 hours, refresh gaps, data age, the latest scorecard and tuner decision, failures, and anything to sync to GitHub.
 
 ---

@@ -95,6 +95,8 @@ export function compute(ser, vols = null, id = null) {
   r.rs = ex.rs;
   r.rsState = ex.rs == null ? null : ex.rs >= p.rsPct ? 'up' : ex.rs <= -p.rsPct ? 'down' : 'mid';
   r.vol = ex.vol && { ...ex.vol, state: ex.vol.ratio < p.volRatio ? 'normal' : ex.vol.move > 0 ? 'up' : ex.vol.move < 0 ? 'down' : 'normal' };
+  // where the price sits in its range over the last year (or all the history there is, when that's shorter)
+  r.range = rangeOf(t, c);
   // 🚀 / 😢: exactly what the daily scorecard measures
   r.sig = SIG.scoreOf(SIG.componentsAt(s, n - 1, p), p);
 
@@ -116,6 +118,20 @@ export function compute(ser, vols = null, id = null) {
     };
   }
   return r;
+}
+
+// The high and low of the closes over the last 365 days (as far back as the history goes), and where the latest close
+// sits between them. `label` names the span honestly: "1-year" only when the history covers it.
+export function rangeOf(t, c) {
+  const n = c.length;
+  if (n < 20) return null;
+  let i0 = n - 1;
+  while (i0 > 0 && t[i0 - 1] >= t[n - 1] - 365 * DAY) i0--;
+  const w = c.slice(i0), hi = Math.max(...w), lo = Math.min(...w), last = c[n - 1];
+  if (!(hi > lo)) return null;
+  const days = (t[n - 1] - t[i0]) / DAY;
+  return { hi, lo, pos: (last - lo) / (hi - lo), fromHi: (last / hi - 1) * 100, fromLo: (last / lo - 1) * 100,
+    label: days >= 350 ? '1-year' : `${Math.max(1, Math.round(days / 30.4))}-month` };
 }
 
 export const match = (ind, f) => {

@@ -29,6 +29,18 @@ Each page is built to answer "what's happening?" in a couple of seconds (Nov 202
 - **Phones:** the market switch and a **⚙ View** button (with a badge for settings that differ from the default) replace the rows of controls, the countdown and secondary buttons fold away, and the first tiles start about a third of the way down the screen (they started three quarters down).
 - **Rates** lead with the 10-year yield and its move, with a column chart of every market's yield, highest first, above the cards; **predictions** put today's news, since-your-last-visit and just-decided results in one row of small cards, so the board starts in the top half of a laptop screen. Details in their sections below.
 
+### The next click (Nov 2026, round 2)
+
+- **The coin card opens in words:** a first line built from the readings ("▲ Strong uptrend · overbought (RSI 88) · up 50% in 30 days · near its short stop"), then the numbers, as the prediction card opens with its answer.
+- **Year range:** where the price sits between its lowest and highest close of the last year, as a bar in the card ("38% below the high · 12% above the low"), a **RNG** row on detailed tiles, a sentence in the card's first line and a **From high** column in the table. The span is named honestly: crypto's history is 260 days, so it says "9-month range" there.
+- **Search** on every price page: a box (press **/**) that filters the tiles, map and table by symbol or name as you type; Escape clears it. On a phone it's in the ⚙ View panel.
+- **☆ Watchlist:** ☆ Watch in a card pins it to a **★ Your watchlist** row at the top of the grid (★ on its tile and in the table), saved in this browser, one list per market.
+- **The scorecard opens on its answer:** the filters, colour scale, timeframe and search step aside in the Scorecard view.
+- **Instant repeat visits:** the page draws the last copy this browser saw at once ("Showing your last visit’s prices · updating…") and swaps in the fresh file when it arrives; only copies under a day old and 3 MB.
+- **The chart's labels don't collide:** the stop labels are pushed apart and a price-scale number next to one is left out.
+- **Table:** shorter headers (the full name on hover), a **Week** line per row, and the symbol column stays put while the table scrolls sideways.
+- **Small fixes:** a flat figure on the market switch is outlined, so it reads in dark mode; the energy summary links to the weekly pump-price tables below the tiles.
+
 ## Prediction markets
 
 **[heat.sala.company/predictions/](https://heat.sala.company/predictions/)** shows the most traded questions on **Polymarket, Kalshi, PredictIt, Manifold and Betfair**, with a subtab for each venue and an **All** tab of the top 200 across every venue (`scripts/build-predictions.mjs` → `predictions.json`, drawn by `app/predictions.mjs`).
@@ -292,7 +304,7 @@ GitHub Actions: daily 00:20 UTC (via cron-job.org)
 - **Keep the docs in step:** a change that alters behaviour also updates this README, adds a decision to `docs/DECISIONS.md` when the reason is worth keeping, and adds a prompt to `docs/rebuild-prompts.md` for a new feature.
 
 - **Design decisions:** [`docs/DECISIONS.md`](docs/DECISIONS.md) explains why things work as they do: prediction-market fetching and tiles, the reasons behind the rest of the site (data built in Actions, fallbacks, timers, the shared signal engine, the honest scorecard, colour, deploy safety) and how the repo is worked on.
-- **Rebuild from scratch:** [`docs/rebuild-prompts.md`](docs/rebuild-prompts.md) has the 27 prompts, in order, that built this project with Claude, up to 13 Nov 2026.
+- **Rebuild from scratch:** [`docs/rebuild-prompts.md`](docs/rebuild-prompts.md) has the 28 prompts, in order, that built this project with Claude, up to 13 Nov 2026.
 - **Manual runs:** go to **Actions → Update heatmap data → Run workflow**, or **Actions → Score signals → Run workflow**. Tick *"Run the tuner now"* to tune immediately.
 - **Locally:** `node scripts/build-data.mjs data.json`, then serve the folder (for example `npx serve .`). Scoring: `node scripts/score.mjs --tune` (needs the live `data.json`, via `SITE_URL`). Tests: `npm test` (unit) and `npm run test:e2e` (browser). Preview with test data: `npm run dev`.
 - **Checking a UI change from a Claude cloud session:** the live site and the deploy's files can't be reached from there, so check the change in the local preview (`npm run dev`, test data) with screenshots at laptop (1440×900) and phone (iPhone) sizes, in light and dark mode, before merging. Install the browser test runner at the version of the Playwright already on the machine (`npm install --no-save @playwright/test@<that version>`), so it finds the preinstalled browser.

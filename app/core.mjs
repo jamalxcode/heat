@@ -78,6 +78,10 @@ export const S = {
   updated: null, marketSrc: '', stale: false, nextAuto: 0,
   params: SIG.withDefaults(null), scorecard: null, scoreWin: 'd30', scoreH: 1, chart: 'price',
 };
+// ☆ Watchlist: ids pinned to the top of the grid, saved in this browser, one list per market
+export const WATCH_KEY = 'hm.watch.' + M.key;
+S.watch = new Set(Array.isArray(store.get(WATCH_KEY)) ? store.get(WATCH_KEY) : []);
+S.query = '';                                // the search box: filters the tiles by symbol or name
 export const prefs = store.get('hm.prefs') || {};
 export const PEG_PREF = M.pegPref;   // each market remembers its own 'show pegged' choice
 Object.assign(S, { quote: prefs.fxQuote === 'usd' && M.quoteSwitch ? 'usd' : 'market', colorBy: prefs.colorBy || '24h', view: prefs.view || 'grid', pegged: !!prefs[PEG_PREF], chart: prefs.chart === 'pnf' ? 'pnf' : 'price', legendOpen: !!prefs.legendOpen, density: prefs.tiles === 'detailed' ? 'detailed' : 'heatmap' });   // 'tiles': heatmap tiles are the default since Oct 2026

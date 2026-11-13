@@ -6,6 +6,19 @@ import { loadScorecard } from './scorecard.mjs';
 import { applyHist, buildBench, pickCoins } from './data.mjs';
 import { openLinked } from './interact.mjs';   // hover, clicks, switches and keyboard: sets up its listeners when loaded
 
+/* ================= the last copy this browser saw: drawn at once on a repeat visit ================= */
+// localStorage, one per market, only while it's under 3 MB of text and less than a day old; the fresh file replaces it
+// as soon as it arrives. Any storage error just means no instant draw.
+const LAST_KEY = 'hm.last.' + M.key, LAST_MAX = 3e6, LAST_AGE = DAY;
+export function loadLast() {
+  try { const d = JSON.parse(localStorage.getItem(LAST_KEY)); return d?.v === 1 && Array.isArray(d.markets) && Date.now() - d.generated < LAST_AGE ? d : null; } catch { return null; }
+}
+export function saveLast(d) {
+  setTimeout(() => {
+    try { const t = JSON.stringify(d); if (t.length < LAST_MAX) localStorage.setItem(LAST_KEY, t); else localStorage.removeItem(LAST_KEY); } catch { try { localStorage.removeItem(LAST_KEY); } catch { /* blocked */ } }
+  }, 1500);
+}
+
 /* ================= snapshot (data.json built by GitHub Actions) ================= */
 export async function loadSnapshot() {
   try {
@@ -14,7 +27,8 @@ export async function loadSnapshot() {
     if (r.status === 404) { S.noSnapshot = true; return null; }
     if (!r.ok) return null;
     const d = await r.json();
-    return d && d.v === 1 && Array.isArray(d.markets) ? d : null;
+    if (d && d.v === 1 && Array.isArray(d.markets)) { saveLast(d); return d; }
+    return null;
   } catch { return null; }
 }
 // one close per day from t0 (crypto), or at t0 + d[i] days when the market skips days (forex: business days)
@@ -117,11 +131,17 @@ export async function run() {
   S.busy = true;
   tick();
   try {
-    if (!S.coins.length) setStatus('Loading prices…', 'busy');
+    let lastShown = null;
+    if (!S.coins.length) {
+      setStatus('Loading prices…', 'busy');
+      const last = loadLast();                // a repeat visit: draw the last copy now, while the fresh file loads
+      if (last) { await show(last, false); lastShown = last.generated; setStatus('Showing your last visit’s prices · updating…', 'busy'); }
+    }
     const snap = S.noSnapshot ? null : await loadSnapshot();
     // only the crypto page can rebuild its data in the browser; elsewhere (forex, metals, energy, ETFs) an older file is still the latest
     if (snap && (Date.now() - snap.generated < SNAPSHOT_MAX_AGE || !M.liveBuild)) {
-      const isNew = await show(snap, false);
+      // (the copy drawn from the last visit counts as new here: the next build is still ~10 min after it)
+      const isNew = (await show(snap, false)) || snap.generated === lastShown;
       // the next build lands ~10 min after this one; if it hasn't appeared yet, look again every 2 min
       S.nextAuto = isNew ? Math.max(S.updated + MARKETS_TTL + SNAPSHOT_GRACE, Date.now() + 30e3) : Date.now() + SNAPSHOT_RETRY;
     } else {

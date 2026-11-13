@@ -848,7 +848,7 @@ const HELP = `<div class="leg-more p-help" id="phelp" hidden>
 
 export function start() {
   document.body.classList.add('rates-page', 'pred-page');
-  for (const s of ['#colorBy', '#quote', '#view', '#density', '.controls .ctl', '#ctlToggle', '#legend', '#reset', '#refresh', '#share', '#excluded']) { const el = $(s); if (el) el.hidden = true; }
+  for (const s of ['#colorBy', '#quote', '#view', '#density', '.controls .ctl', '#ctlToggle', '#q', '#legend', '#reset', '#refresh', '#share', '#excluded']) { const el = $(s); if (el) el.hidden = true; }
   $('main').insertAdjacentHTML('afterbegin', `<div class="r-bar p-bar">
     <div class="seg p-venues" id="pvenue" role="group" aria-label="Venue"></div>
     <input type="search" id="psearch" class="p-search" placeholder="Search questions…" aria-label="Search questions">

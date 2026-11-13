@@ -166,3 +166,28 @@ Why the project works the way it does. Add new decisions at the end, and keep ea
 ### 39. UI changes are checked in the preview, at two sizes and in both themes
 **Decision:** a Claude cloud session can't reach heat.sala.company or download the deploy's files (the network blocks both), so a UI change is checked in the local preview (`npm run dev`, deterministic test data) with screenshots on a laptop (1440×900) and a phone, in light and dark mode, and measured where it matters (where the first tile starts, no sideways scroll), before it's merged. Each new part gets a browser test. The limit: test data isn't live data, so a change that depends on the shape of real data (the market-switch figures read `forex.json` and `rates.json` through `pulse.json`) is confirmed on the live site after the deploy.
 
+## The next click
+
+*13 Nov 2026, from a second critique: the first screen was in good shape, but the next click (the coin card, the table, the scorecard) still left the reading to the visitor, and the price pages lacked basics the predictions page already had.*
+
+### 40. The coin card says what it sees
+**Decision:** the card's first line puts the readings into words (trend, a recent cross, RSI zone, a big 30-day move, the year range, a stop that's near or crossed, a volume surge), like the prediction card's answer-first line. It only restates what the card already shows below, so it adds no new judgement; the scorecard still says whether any of it predicts anything.
+
+### 41. The year range, named by the history there is
+**Decision:** where the price sits between its lowest and highest close over the last 365 days is shown as a bar in the card, a row on detailed tiles and a table column. Crypto's `data.json` keeps 260 daily closes, so its span is about 9 months; the label says "9-month range" rather than claiming a year, and "1-year" only where the history covers it.
+
+### 42. Search and a watchlist on the price pages
+**Decision:** a search box (and the `/` key) filters by symbol or name across the grid, map and table, and ☆ Watch pins items to a row at the top of the grid. Both already existed on the predictions page; 100 coins or 112 ETFs are too many to scan. The watchlist lives in this browser only (`hm.watch.<market>`), one list per market, and pinned items leave their usual place rather than appearing twice.
+
+### 43. The scorecard view drops the price controls
+**Decision:** the filters, colour scale, timeframe and search do nothing in the Scorecard view, so they're hidden there and the view opens on its answer.
+
+### 44. A repeat visit draws the last copy first
+**Decision:** each successful load keeps a copy of the market's file in this browser (`hm.last.<market>`, only under 3 MB of text, used only if under a day old), and the next visit draws it at once, says it's showing last visit's prices, and swaps in the fresh file when it arrives. The refresh line shows the copy's own time, so it never passes old prices off as new. Any storage error just means no instant draw. The next refresh is still timed from the build, not from the copy.
+
+### 45. Chart labels: the stops win
+**Decision:** when a stop sits near the price, its label overprinted the price-scale number (and the other stop's label). The stop labels are now pushed at least 11px apart and any scale number within 11px of one is left out: the stop is the more useful number there.
+
+### 46. The open View panel never runs off a phone screen
+**Decision:** everything in the phone's ⚙ View panel (search included) is held to the panel's width, and the browser test checks nothing runs past its edge.
+

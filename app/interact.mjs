@@ -2,7 +2,7 @@
 import * as SIG from '/signals.mjs';
 import { applyHist, match, P, pickCoins } from './data.mjs';
 import { renderScorecard } from './scorecard.mjs';
-import { $, $$, chgOf, DAY, esc, fmtBig, fmtPct, fmtPrice, linkedCoin, logo, M, MARKET, prefs, S, savePrefs, store, syncURL, TF } from './core.mjs';
+import { $, $$, chgOf, DAY, esc, fmtBig, fmtPct, fmtPrice, linkedCoin, logo, M, MARKET, prefs, S, savePrefs, store, syncURL, TF, WATCH_KEY } from './core.mjs';
 import { done, run, show } from './main.mjs';
 import { renderAll, renderTable, rsWindow, signals } from './render.mjs';
 import { chartUrl, pick } from '/scripts/tradingview.mjs';
@@ -71,14 +71,18 @@ export function detailChart(ind) {
   let band = '';
   const idx = [...Array(N).keys()].filter(i => up[i] != null);
   if (idx.length) band = 'M' + idx.map(i => `${x(i).toFixed(1)} ${y(up[i]).toFixed(1)}`).join('L') + 'L' + idx.reverse().map(i => `${x(i).toFixed(1)} ${y(lo[i]).toFixed(1)}`).join('L') + 'Z';
-  const ticks = [max - pad, (max + min) / 2, min + pad];
+  // Labels on the right: the stop labels win; the two of them are pushed at least 11px apart, and a price-scale number
+  // within 11px of either is left out (they used to overprint each other when a stop sat near the price)
+  const stopY = stp ? [y(stp.long), y(stp.short)] : [];
+  if (stopY.length && Math.abs(stopY[0] - stopY[1]) < 11) { const m = (stopY[0] + stopY[1]) / 2, up = stopY[1] <= stopY[0]; stopY[up ? 1 : 0] = m - 5.5; stopY[up ? 0 : 1] = m + 5.5; }
+  const ticks = [max - pad, (max + min) / 2, min + pad].filter(v => stopY.every(sy => Math.abs(y(v) - sy) >= 11));
   const priceSvg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Price with moving averages and Bollinger Bands, last ${N} days">
     ${ticks.map(v => `<line x1="0" x2="${W - PAD_R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)" stroke-width="1"/><text x="${W - PAD_R + 6}" y="${y(v) + 3.5}" font-size="10" fill="var(--muted)">${fmtPrice(v).replace('$', '')}</text>`).join('')}
     <path d="${band}" fill="var(--band)"/>
     <path d="${linePath(m200, x, y)}" fill="none" stroke="var(--s-ma200)" stroke-width="2" stroke-linejoin="round"/>
     <path d="${linePath(m50, x, y)}" fill="none" stroke="var(--s-ma50)" stroke-width="2" stroke-linejoin="round"/>
     <path d="${linePath(c, x, y)}" fill="none" stroke="var(--s-price)" stroke-width="1.5" stroke-linejoin="round"/>
-    ${stp ? [['long', stp.long, '#b8413f'], ['short', stp.short, '#0077be']].map(([k, v, col]) => `<line x1="${x(Math.max(0, N - 30))}" x2="${W - PAD_R}" y1="${y(v)}" y2="${y(v)}" stroke="${col}" stroke-width="1.5"/><text x="${W - PAD_R + 6}" y="${y(v) + 3.5}" font-size="10" font-weight="700" fill="${col}">${k === 'long' ? 'L stop' : 'S stop'}</text>`).join('') : ''}
+    ${stp ? [['long', stp.long, '#b8413f', stopY[0]], ['short', stp.short, '#0077be', stopY[1]]].map(([k, v, col, ly]) => `<line x1="${x(Math.max(0, N - 30))}" x2="${W - PAD_R}" y1="${y(v)}" y2="${y(v)}" stroke="${col}" stroke-width="1.5"/><text x="${W - PAD_R + 6}" y="${ly + 3.5}" font-size="10" font-weight="700" fill="${col}">${k === 'long' ? 'L stop' : 'S stop'}</text>`).join('') : ''}
     <circle cx="${x(N - 1)}" cy="${y(c[N - 1])}" r="3.5" fill="var(--s-price)" stroke="var(--surface)" stroke-width="2"/>
   </svg>`;
   const RH = 46, ry = v => RH - v / 100 * RH;
@@ -93,6 +97,37 @@ export function detailChart(ind) {
     <div class="d-chart">${priceSvg}<p class="ttl">RSI (14)</p>${rsiSvg}</div>`;
 }
 
+// The card's first line: what the readings say, in words ("▲ Strong uptrend · overbought (RSI 88) · near its short stop")
+export function sayLine(ind) {
+  if (!ind || ind.error) return '';
+  const p = P(), parts = [];
+  const trend = ind.trend === 'up' ? (ind.strong ? '▲ Strong uptrend' : '▲ Uptrend, pulling back') : ind.trend === 'down' ? (ind.strong ? '▼ Strong downtrend' : '▼ Downtrend, bouncing')
+    : ind.partial ? `${ind.partial === 'above' ? 'Above' : 'Below'} its ${p.maFast}-day average` : '';
+  if (trend) parts.push(`<b class="${ind.trend === 'down' || ind.partial === 'below' ? 'dn-t' : 'up-t'}">${trend}</b>`);
+  if (ind.cross) parts.push(`✦ ${ind.cross.type} cross ${ind.cross.ago === 0 ? 'today' : `${ind.cross.ago}d ago`}`);
+  if (ind.rsiState === 'os' || ind.rsiState === 'ob') parts.push(`${ind.rsiState === 'os' ? 'oversold' : 'overbought'} (RSI ${ind.rsiNow.toFixed(0)})`);
+  const m = ind.chg?.['30d'];
+  if (m != null && Math.abs(m) >= p.momPct) parts.push(`${m > 0 ? 'up' : 'down'} ${Math.abs(m).toFixed(0)}% in ${M.days(p.momDays)}`);
+  const r = ind.range;
+  if (r) parts.push(r.fromHi > -3 ? `near its ${r.label} high` : r.pos < 0.05 ? `near its ${r.label} low` : `${Math.abs(r.fromHi).toFixed(0)}% below its ${r.label} high`);
+  const st = ind.stop;
+  if (st) {
+    const word = side => side === 'long' ? 'below' : 'above';
+    const s = ['long', 'short'].map(side => [side, st[side + 'State']]);
+    const hit = s.find(([, v]) => v === 'closed') || s.find(([, v]) => v === 'intraday') || s.find(([, v]) => v === 'near');
+    if (hit) parts.push(hit[1] === 'closed' ? `🛑 closed ${word(hit[0])} its ${hit[0]} stop` : hit[1] === 'intraday' ? `⚠ ${word(hit[0])} its ${hit[0]} stop today` : `near its ${hit[0]} stop`);
+  }
+  if (ind.vol?.state === 'up' || ind.vol?.state === 'down') parts.push(`${ind.vol.state === 'up' ? 'rising' : 'falling'} on ${ind.vol.ratio.toFixed(1)}× usual volume`);
+  return parts.length ? `<p class="d-say">${parts.join(' · ')}</p>` : '';
+}
+// Where the price sits in its range over the last year: a bar with a marker, and how far it is from the high
+export function rangeHTML(r) {
+  if (!r) return '';
+  const away = r.fromHi > -0.5 ? 'at the high' : `${Math.abs(r.fromHi).toFixed(1)}% below the high · ${r.fromLo.toFixed(1)}% above the low`;
+  return `<div class="d-range" title="Highest and lowest daily close over the ${r.label} span"><div class="d-rl"><span>${r.label} range</span><b>${away}</b></div>
+    <div class="rbar" aria-hidden="true"><i style="left:${(r.pos * 100).toFixed(1)}%"></i></div><div class="d-rv"><span>${fmtPrice(r.lo)}</span><span>${fmtPrice(r.hi)}</span></div></div>`;
+}
+
 export function showDetail(id, anchor, keepPos) {
   S.hoverId = id;
   const c = S.coins.find(x => x.id === id);
@@ -102,14 +137,16 @@ export function showDetail(id, anchor, keepPos) {
   // the logo and name link to the TradingView chart, only when that symbol is known to exist there
   const tv = pick(c, S.raw?.hist?.[id], MARKET, S.tv, S.quote === 'usd');
   const tvA = inner => tv ? `<a class="tv" href="${chartUrl(tv)}" target="_blank" rel="noopener noreferrer" title="Open the ${esc(tv)} chart on TradingView">${inner}</a>` : inner;
-  let body = `<div class="d-head">${tvA(`${logo(c, 22)}<b>${esc(c.name)}</b>`)}<span style="color:var(--ink-2)">${esc(c.symbol.toUpperCase())}${M.ranked ? ` · #${c.market_cap_rank}` : ''}</span>${tv ? tvA('<span class="tv-go">TradingView ↗</span>') : ''}<button type="button" class="d-link" data-copy-link title="Copy a link to this ${M.one}" aria-label="Copy a link to this ${M.one}">🔗</button></div>
+  let body = `<div class="d-head">${tvA(`${logo(c, 22)}<b>${esc(c.name)}</b>`)}<span style="color:var(--ink-2)">${esc(c.symbol.toUpperCase())}${M.ranked ? ` · #${c.market_cap_rank}` : ''}</span>${tv ? tvA('<span class="tv-go">TradingView ↗</span>') : ''}<button type="button" class="d-watch" data-watch="${esc(id)}" aria-pressed="${S.watch.has(id)}" title="${S.watch.has(id) ? 'Remove from your watchlist' : 'Pin to your watchlist at the top (saved in this browser)'}">${S.watch.has(id) ? '★ Watching' : '☆ Watch'}</button><button type="button" class="d-link" data-copy-link title="Copy a link to this ${M.one}" aria-label="Copy a link to this ${M.one}">🔗</button></div>
     <div class="d-price">${fmtPrice(c.current_price)}</div>
+    ${sayLine(ind)}
     <div class="d-chg"><span>${TF('24h')} ${fmtPct(chgOf(c, '24h'))}</span><span>${TF('7d')} ${fmtPct(chgOf(c, '7d'))}</span><span>${TF('30d')} ${fmtPct(chgOf(c, '30d'))}</span>${M.ranked ? `<span>Cap ${fmtBig(c.market_cap)}</span>` : ''}</div>
     ${c.warn ? `<div class="d-src">⚠ <b>${esc(c.name)}: the official rate and the street (market) rate differ a lot.</b> This rate comes from a community feed whose sources aren't documented, so it may not match what you'd actually get. It is left out of the scorecard.</div>` : ''}
     ${c.spike ? `<div class="d-src">⚠ <b>Unusual jump of ${fmtPct(c.spike.pct, 1)} on ${c.spike.date}</b>: far outside this ${M.one}'s normal daily range. ${c.src === 'x' ? 'It may be a data glitch or a real devaluation, so check another source before relying on it. The days around it are left out of the scorecard.' : 'This is an official ECB rate, so it is a real market move; it stays in the scorecard.'}</div>` : ''}`;
   if (ind && !ind.error) {
     body += `<div class="d-cols"><div class="d-left">${chartSwitch()}${S.chart === 'pnf' ? pnfChart(ind) : detailChart(ind)}</div><div class="d-right">`;
     const trendTxt = ind.trend ? `${ind.trend === 'up' ? '▲ Uptrend' : '▼ Downtrend'} (${ind.strong ? 'price agrees' : ind.trend === 'up' ? `price below ${P().maFast}MA` : `price above ${P().maFast}MA`})` : `${P().maSlow}-day history not available yet`;
+    body += rangeHTML(ind.range);
     body += `<dl class="kv">
       <dt>RSI (14)</dt><dd>${ind.rsiNow != null ? ind.rsiNow.toFixed(1) + (ind.rsiState === 'os' ? ' · Oversold' : ind.rsiState === 'ob' ? ' · Overbought' : ' · Neutral') : '—'}</dd>
       <dt>${P().maFast}-day MA</dt><dd>${fmtPrice(ind.mF)} (${fmtPct(ind.mF ? (ind.last / ind.mF - 1) * 100 : null, 1)})</dd>
@@ -246,6 +283,15 @@ $('#detail').addEventListener('mouseenter', () => { overDetail = true; cancelHid
 $('#detail').addEventListener('mouseleave', () => { overDetail = false; hideSoon(HOVER_HIDE_MS); });
 // clicking the hover popup pins it open, like clicking the tile
 $('#detail').addEventListener('click', e => {
+  const wb = e.target.closest('[data-watch]');
+  if (wb && !M.custom) {                      // ☆ Watch: pin it to the watchlist at the top of the grid (saved per market)
+    const id = wb.dataset.watch;
+    if (S.watch.has(id)) S.watch.delete(id); else S.watch.add(id);
+    store.set(WATCH_KEY, [...S.watch]);
+    renderAll();
+    showDetail(S.pinned || S.hoverId, null, true);
+    return;
+  }
   const sw = e.target.closest('[data-chart]');
   if (sw) {                                   // Price / P&F switch: redraw in place, remember the choice
     S.chart = sw.dataset.chart; savePrefs();
@@ -313,7 +359,8 @@ seg('quote', 'quote', () => { hideDetail(true); if (S.raw) { S.coins = []; show(
 $('#reset').addEventListener('click', () => {
   hideDetail(true);
   const quoteChanged = M.quoteSwitch && S.quote !== 'market';
-  Object.assign(S, { filter: 'all', heat: null, colorBy: '24h', view: 'grid', density: 'heatmap', quote: 'market', pegged: false,
+  $('#q').value = '';
+  Object.assign(S, { query: '', filter: 'all', heat: null, colorBy: '24h', view: 'grid', density: 'heatmap', quote: 'market', pegged: false,
     chart: 'price', sort: { key: 'rank', dir: 1 }, scoreWin: 'd30', scoreH: 1, scoreSet: null });
   for (const [id, key] of [['colorBy', 'colorBy'], ['view', 'view'], ['density', 'density'], ['quote', 'quote']])
     $$(`#${id} button`).forEach(b => b.setAttribute('aria-pressed', b.dataset.v === S[key]));
@@ -329,6 +376,16 @@ $('#ctlToggle').addEventListener('click', e => {
   $('.controls').classList.toggle('open', open);
   document.body.classList.toggle('ctl-open', open);
   e.currentTarget.setAttribute('aria-expanded', open);
+});
+// Search: filters the tiles (and the table and map) by symbol or name as you type; "/" jumps to it, Escape clears it
+let qT = 0;
+$('#q').addEventListener('input', e => { clearTimeout(qT); qT = setTimeout(() => { S.query = e.target.value.trim(); hideDetail(true); renderAll(); }, 120); });
+$('#q').addEventListener('keydown', e => { if (e.key === 'Escape' && e.target.value) { e.stopPropagation(); e.target.value = ''; S.query = ''; renderAll(); } });
+document.addEventListener('keydown', e => {
+  if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey || /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName) || M.custom) return;
+  e.preventDefault();
+  if (matchMedia('(max-width: 640px)').matches && !$('.controls').classList.contains('open')) $('#ctlToggle').click();
+  $('#q').focus();
 });
 // "How to read": the full legend opens below the one-line legend, and stays open or closed per browser
 export const setLegend = open => { S.legendOpen = open; $('#legendMore').hidden = !open; $('#legendToggle').setAttribute('aria-expanded', open); $('#legendToggle').textContent = open ? '✕ Hide legend' : 'ⓘ How to read'; };
@@ -356,9 +413,10 @@ export function markFilter() {
   more.toggleAttribute('data-active', !!inMore);
   more.querySelector('summary').textContent = inMore ? `More: ${inMore.firstChild.textContent.trim()} ▾` : 'More ▾';
 }
-export function setFilter(f) {
+export function setFilter(f, clearQuery = false) {
   S.filter = f;
   if (f === 'all') S.heat = null;               // "All coins" / "Show all coins" also clears a color-scale range
+  if (clearQuery) { S.query = ''; $('#q').value = ''; }
   markFilter();
   if (!phone.matches) $('#moreFilters').open = false;
   hideDetail(true);
@@ -382,7 +440,7 @@ $('#legendScale').addEventListener('click', e => {
   renderAll();
 });
 document.addEventListener('click', e => {
-  if (e.target.closest('[data-show-all]')) setFilter('all');
+  if (e.target.closest('[data-show-all]')) setFilter('all', true);
   if (e.target.closest('[data-goto-score]')) { e.preventDefault(); $('#view button[data-v=score]').click(); window.scrollTo({ top: $('#scorewrap').offsetTop - 12 }); }
 });
 // This market's names on the shared controls
