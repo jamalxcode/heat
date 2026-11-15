@@ -1,5 +1,5 @@
 {
- "t": 1794702528625,
+ "t": 1794725780423,
  "pairs": {
   "bitcoin": {
    "Binance": "BTC",
@@ -10,9 +10,9 @@
   },
   "ethereum": {
    "Binance": "ETH",
+   "KuCoin": "ETH",
    "Gate.io": "ETH",
    "OKX": "ETH",
-   "KuCoin": "ETH",
    "MEXC": "ETH"
   },
   "binancecoin": {
@@ -31,9 +31,9 @@
   },
   "solana": {
    "Binance": "SOL",
-   "Gate.io": "SOL",
    "OKX": "SOL",
    "KuCoin": "SOL",
+   "Gate.io": "SOL",
    "MEXC": "SOL"
   },
   "zcash": {
@@ -58,25 +58,23 @@
   "chainlink": {
    "Binance": "LINK",
    "KuCoin": "LINK",
-   "OKX": "LINK",
    "Gate.io": "LINK",
+   "OKX": "LINK",
    "MEXC": "LINK"
   },
   "monero": {
-   "KuCoin": "XMR",
-   "MEXC": "XMR"
+   "KuCoin": "XMR"
   },
   "cardano": {
    "Binance": "ADA",
    "OKX": "ADA",
+   "Gate.io": "ADA",
    "MEXC": "ADA",
-   "KuCoin": "ADA",
-   "Gate.io": "ADA"
+   "KuCoin": "ADA"
   },
   "rain": {
    "MEXC": "RAIN",
-   "Gate.io": "RAIN",
-   "KuCoin": "RAIN"
+   "Gate.io": "RAIN"
   },
   "leo-token": {
    "OKX": "LEO",
@@ -92,8 +90,8 @@
   "near": {
    "Binance": "NEAR",
    "Gate.io": "NEAR",
-   "KuCoin": "NEAR",
    "OKX": "NEAR",
+   "KuCoin": "NEAR",
    "MEXC": "NEAR"
   },
   "bitcoin-cash": {
@@ -131,8 +129,8 @@
   },
   "sui": {
    "Binance": "SUI",
-   "KuCoin": "SUI",
    "OKX": "SUI",
+   "KuCoin": "SUI",
    "Gate.io": "SUI",
    "MEXC": "SUI"
   },
@@ -238,8 +236,8 @@
   "sky": {
    "Binance": "SKY",
    "OKX": "SKY",
-   "Gate.io": "SKY",
    "KuCoin": "SKY",
+   "Gate.io": "SKY",
    "MEXC": "SKY"
   },
   "world-liberty-financial": {
@@ -252,8 +250,8 @@
   "morpho": {
    "Binance": "MORPHO",
    "OKX": "MORPHO",
-   "KuCoin": "MORPHO",
    "Gate.io": "MORPHO",
+   "KuCoin": "MORPHO",
    "MEXC": "MORPHO"
   },
   "pepe": {
@@ -276,8 +274,8 @@
    "Gate.io": "HTX"
   },
   "ethereum-classic": {
-   "Binance": "ETC",
    "OKX": "ETC",
+   "Binance": "ETC",
    "Gate.io": "ETC",
    "KuCoin": "ETC",
    "MEXC": "ETC"
@@ -314,7 +312,9 @@
   },
   "just": {
    "Binance": "JST",
-   "MEXC": "JST"
+   "MEXC": "JST",
+   "Gate.io": "JST",
+   "KuCoin": "JST"
   },
   "kaspa": {
    "Gate.io": "KAS",
@@ -359,8 +359,8 @@
   },
   "lighter": {
    "OKX": "LIT",
-   "Gate.io": "LIT",
    "MEXC": "LIT",
+   "Gate.io": "LIT",
    "KuCoin": "LIT"
   },
   "jupiter-exchange-solana": {
@@ -418,8 +418,8 @@
   },
   "injective-protocol": {
    "Binance": "INJ",
-   "Gate.io": "INJ",
    "MEXC": "INJ",
+   "Gate.io": "INJ",
    "OKX": "INJ",
    "KuCoin": "INJ"
   },
