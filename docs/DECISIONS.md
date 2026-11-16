@@ -213,3 +213,6 @@ Why the project works the way it does. Add new decisions at the end, and keep ea
 ### 52. Visual changes: options first, then a yes before code
 **Decision:** for a change to how something looks, the working pattern that emerged is: the user shows a screenshot of the live site, Claude proposes a few concrete options (with how each would read), the user picks or combines them (yes/no tiles: options 1, 3 and 5), and Claude says exactly what it will do and waits for a yes when asked to (the tab colours) before coding. Choices that change the agreed design (the open tab keeping the panel's colour, the laptop limit moving to 40% for the bigger tabs) are said up front, not discovered after the merge.
 
+### 53. Rules, lessons and ideas get their own files
+**Decision:** the README had grown into a 60 KB reference, and the reasons were spread over 50+ decisions. Data rules now live in `docs/BUSINESS-RULES.md`, look-and-behaviour rules in `docs/INTERFACE-RULES.md`, mistakes worth remembering in `docs/LESSONS.md`, unbuilt ideas in `docs/DESIGN-IDEAS.md` and the Nov 2026 session in `docs/CONVERSATION.md`. The README opens as a short, friendly tour (what each tab is, five things to try, what's new, where the docs are) and keeps the full reference below "The details". The rules files point back to the decisions by number, so a reason is written once.
+

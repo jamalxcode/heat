@@ -33,7 +33,7 @@ No lint script. `package-lock.json` is gitignored.
 - Built JSON files (`data.json`, `forex.json`, ... and generated market dirs) are gitignored and exist only in the deployed site.
 - In-browser fallback: if `data.json` is missing or older than 45 min, the page runs `scripts/build-data.mjs` itself (at most once per 10 min per browser).
 - `tests/`: unit tests (`signals`, `scoring`, per-market, `deploy.test.mjs`); `tests/e2e/` Playwright spec, fixtures and local server.
-- `docs/rebuild-prompts.md`: the prompts that built the project, in order (one per feature). `docs/DECISIONS.md`: why things work as they do (prediction-market fetching and tiles, the site-wide rules such as fallbacks, timers, the shared engine, the honest scorecard, colour and deploy safety, and how the repo is worked on). Read it before changing behaviour.
+- `docs/rebuild-prompts.md`: the prompts that built the project, in order (one per feature). `docs/DECISIONS.md`: why things work as they do (prediction-market fetching and tiles, the site-wide rules such as fallbacks, timers, the shared engine, the honest scorecard, colour and deploy safety, and how the repo is worked on). Read it before changing behaviour. `docs/BUSINESS-RULES.md` (every data rule and threshold) and `docs/INTERFACE-RULES.md` (how the site looks and behaves, and how a visual change is made): keep them in step with the code. `docs/LESSONS.md`, `docs/DESIGN-IDEAS.md` (not built yet), `docs/CONVERSATION.md` (the Nov 2026 session).
 
 ## Deployment
 
@@ -53,7 +53,7 @@ No lint script. `package-lock.json` is gitignored.
 - The live site is unreachable from cloud sessions: check UI in `npm run dev` with laptop and phone screenshots, light and dark (decision 39).
 - Browser tests must make no outside API calls (fixtures only). Phone layout (bottom sheet, sideways-scrolling tabs) and 13-inch popup fit are tested; check both when changing UI.
 - Keep FAQ JSON-LD in sync with the visible About text. Line endings are LF (`.gitattributes`).
-- Docs move with the code: a behaviour change updates `README.md`, adds a decision to `docs/DECISIONS.md` (append, numbered) when the reason is worth keeping, and adds a prompt to `docs/rebuild-prompts.md` for a new feature.
+- Docs move with the code: a behaviour change updates `README.md` (and the business or interface rules it touches), adds a decision to `docs/DECISIONS.md` (append, numbered) when the reason is worth keeping, and adds a prompt to `docs/rebuild-prompts.md` for a new feature.
 - The market switch (`#market`) is a row of folder tabs outside `.controls` (decision 50), each filled with its figure's colour by `renderXM` (decision 51); rates and predictions hide `.controls`.
 - For visual changes the user often asks for options or a yes/no confirmation before coding: give them and wait (decision 52).
 - Plain words in page text, code and docs (see decision 27 in `docs/DECISIONS.md`).

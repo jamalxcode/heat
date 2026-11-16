@@ -1,22 +1,65 @@
 # 🔥 heat.sala.company
 
-**Live: https://heat.sala.company**
+**Live: https://heat.sala.company** · free · no sign-up · updated every 10 minutes · not financial advice
 
-Market heatmaps in one place:
-
-- **[Crypto](https://heat.sala.company/)**: the top 100 coins by market cap, with stablecoins, tokenized gold and wrapped/staked copies left out
-- **[Forex](https://heat.sala.company/forex/)**: 48 currencies against the US dollar, with a US Dollar Index bar
-- **[Metals](https://heat.sala.company/metals/)**: gold, silver, platinum and palladium, with tokenized gold and Bitcoin beside them
-- **[Energy](https://heat.sala.company/energy/)**: oil, diesel, gasoline and gas futures, plus weekly pump prices
-- **[ETFs](https://heat.sala.company/etfs/)**: 112 US stock ETFs, grouped by market, sector, theme and country
-- **[Rates](https://heat.sala.company/rates/)**: official government bond yield curves for 14 markets and a monthly Europe row
-- **[Predictions](https://heat.sala.company/predictions/)**: the most traded questions on Polymarket, Kalshi, PredictIt, Manifold and Betfair
-
-On the price pages every tile combines the move with technical indicators, and a daily scorecard checks whether the 🚀 / 😢 calls actually predicted anything.
+Seven markets, one glance. Heat paints every market it can find a free, honest price for as a wall of colour, **blue when things rise and red when they fall**, and then does something most heatmaps don't: it **checks its own homework**. Every night a scorecard asks whether yesterday's 🚀 and 😢 on the crypto and forex pages were actually right, and it says so in plain words, even when the answer is "not really".
 
 > ⚠️ **Work in progress. Use at your own risk.** Data can be late, wrong or missing, and nothing here is financial advice. Prices are **not real-time**: they refresh every 10 minutes.
 
-## At a glance
+## 🗺️ The tour
+
+Pick a folder tab at the top of any page. Each tab carries its market's move of the day and is tinted to match, so the row tells you where the action is before you click.
+
+| Tab | What you get |
+|---|---|
+| 🪙 **[Crypto](https://heat.sala.company/)** | The top 100 coins, stablecoins and wrapped copies left out. RSI, moving-average trend, point & figure, momentum, relative strength, volume and suggested stop-losses, plus the nightly **Scorecard** |
+| 💱 **[Forex](https://heat.sala.company/forex/)** | 48 currencies against the US dollar from official ECB rates, with a home-made US Dollar Index computed from six of them, and its own Scorecard |
+| 🥇 **[Metals](https://heat.sala.company/metals/)** | Gold, silver, platinum and palladium, each cross-checked against a second source every day, next to tokenized gold and Bitcoin |
+| 🛢️ **[Energy](https://heat.sala.company/energy/)** | Oil, diesel, gasoline and gas futures, and weekly pump prices for the US, UK and all 27 EU countries |
+| 📊 **[ETFs](https://heat.sala.company/etfs/)** | 112 US stock ETFs, one fund per index, grouped into the market, sectors, themes and countries |
+| 📈 **[Rates](https://heat.sala.company/rates/)** | Official government bond yield curves for 14 markets: which are inverted, which pay more than inflation, which look risky against their own history |
+| 🎯 **[Predictions](https://heat.sala.company/predictions/)** | The most traded questions on Polymarket, Kalshi, PredictIt, Manifold and Betfair, with the same question matched across venues |
+
+## 👀 Five things worth trying
+
+1. **Read the headline.** Above the tiles, one line tells you how the market did (weighted by market cap on crypto, the median elsewhere), how many rose and fell, and the best and worst. Click either to open its card.
+2. **Rest your mouse on a tile.** A card opens with the story in words first ("▲ Strong uptrend · overbought (RSI 88) · near its short stop"), then the chart, the year range and the suggested stops. Tap on a phone.
+3. **Switch to Map.** On crypto and ETFs, Map sizes every tile by market cap or trading volume, so you see what moved *and* how much of the market moved with it.
+4. **Press `/` and type.** Search filters the tiles, map and table as you type. Then hit **☆ Watch** in a card to pin your favourites to the top, remembered for next time.
+5. **Ask the Scorecard.** It opens on one question, "Do the signals work?", answered honestly on fair, point-in-time data, with trading costs included.
+
+## ✨ What's new (Nov 2026)
+
+Three rounds of polish, each started from a critique of the live pages:
+
+- **Folder tabs** for the seven markets, each tinted with its move of the day; the open one joins the panel below like a real folder.
+- **A headline** above every price page, and a **week's trend line** on every heatmap tile.
+- **Map view**, **search**, a **☆ watchlist** and **instant repeat visits** (your last view is drawn at once, then refreshed).
+- **Coin cards that talk:** a first line in plain words, a year-range bar, and chart labels that no longer trip over each other.
+- **Prediction tiles that can't be misread:** "Market expects · ✗ No, it won't happen · 92% chance", with a bar naming both sides (the Yes side a touch thicker).
+- **Rates** lead with the yield, with a chart of every country's 10-year yield above the cards; **phones** put the data first, with the controls behind ⚙ View.
+- A slim warning line instead of a pop-up, a narrower grey band so calm days still show colour, and plenty of small fixes.
+
+## 📚 The docs shelf
+
+| File | Read it when you want… |
+|---|---|
+| [`docs/DECISIONS.md`](docs/DECISIONS.md) | the *why* behind everything, numbered (53 so far) |
+| [`docs/BUSINESS-RULES.md`](docs/BUSINESS-RULES.md) | every data rule and threshold: sources, timing, signals, stops, scoring, predictions |
+| [`docs/INTERFACE-RULES.md`](docs/INTERFACE-RULES.md) | how the site looks, reads and behaves, and how a visual change is made |
+| [`docs/LESSONS.md`](docs/LESSONS.md) | the mistakes that taught us something |
+| [`docs/DESIGN-IDEAS.md`](docs/DESIGN-IDEAS.md) | ideas raised but not built (yet) |
+| [`docs/CONVERSATION.md`](docs/CONVERSATION.md) | the Nov 2026 Claude Code session, step by step |
+| [`docs/rebuild-prompts.md`](docs/rebuild-prompts.md) | the prompts, in order, that rebuild the whole project with Claude |
+| [`CLAUDE.md`](CLAUDE.md) | the short guide Claude Code reads before touching anything |
+
+---
+
+# 🔍 The details
+
+Everything below is the reference: how each page works, every rule and source, and how to run it yourself.
+
+## At a glance: the details
 
 Each page is built to answer "what's happening?" in a couple of seconds (Nov 2026):
 
@@ -29,7 +72,7 @@ Each page is built to answer "what's happening?" in a couple of seconds (Nov 202
 - **Phones:** the market tabs (scrolling sideways) and a small **⚙ View** button beside the colour key (with a badge for settings that differ from the default) replace the rows of controls, the countdown and secondary buttons fold away, and the first tiles start about a third of the way down the screen (they started three quarters down).
 - **Rates** lead with the 10-year yield and its move, with a column chart of every market's yield, highest first, above the cards; **predictions** put today's news, since-your-last-visit and just-decided results in one row of small cards, so the board starts in the top half of a laptop screen. Details in their sections below.
 
-### The next click (Nov 2026, round 2)
+### The next click: the details
 
 - **The coin card opens in words:** a first line built from the readings ("▲ Strong uptrend · overbought (RSI 88) · up 50% in 30 days · near its short stop"), then the numbers, as the prediction card opens with its answer.
 - **Year range:** where the price sits between its lowest and highest close of the last year, as a bar in the card ("38% below the high · 12% above the low"), a **RNG** row on detailed tiles, a sentence in the card's first line and a **From high** column in the table. The span is named honestly: crypto's history is 260 days, so it says "9-month range" there.
@@ -305,7 +348,8 @@ GitHub Actions: daily 00:20 UTC (via cron-job.org)
 - **Keep the docs in step:** a change that alters behaviour also updates this README, adds a decision to `docs/DECISIONS.md` when the reason is worth keeping, and adds a prompt to `docs/rebuild-prompts.md` for a new feature.
 
 - **Design decisions:** [`docs/DECISIONS.md`](docs/DECISIONS.md) explains why things work as they do: prediction-market fetching and tiles, the reasons behind the rest of the site (data built in Actions, fallbacks, timers, the shared signal engine, the honest scorecard, colour, deploy safety) and how the repo is worked on.
-- **Rebuild from scratch:** [`docs/rebuild-prompts.md`](docs/rebuild-prompts.md) has the 30 prompts, in order, that built this project with Claude, up to 13 Nov 2026.
+- **Rules, lessons, ideas and the session log:** [`docs/BUSINESS-RULES.md`](docs/BUSINESS-RULES.md), [`docs/INTERFACE-RULES.md`](docs/INTERFACE-RULES.md), [`docs/LESSONS.md`](docs/LESSONS.md), [`docs/DESIGN-IDEAS.md`](docs/DESIGN-IDEAS.md), [`docs/CONVERSATION.md`](docs/CONVERSATION.md).
+- **Rebuild from scratch:** [`docs/rebuild-prompts.md`](docs/rebuild-prompts.md) has the 31 prompts, in order, that built this project with Claude, up to 16 Nov 2026.
 - **Manual runs:** go to **Actions → Update heatmap data → Run workflow**, or **Actions → Score signals → Run workflow**. Tick *"Run the tuner now"* to tune immediately.
 - **Locally:** `node scripts/build-data.mjs data.json`, then serve the folder (for example `npx serve .`). Scoring: `node scripts/score.mjs --tune` (needs the live `data.json`, via `SITE_URL`). Tests: `npm test` (unit) and `npm run test:e2e` (browser). Preview with test data: `npm run dev`.
 - **Checking a UI change from a Claude cloud session:** the live site and the deploy's files can't be reached from there, so check the change in the local preview (`npm run dev`, test data) with screenshots at laptop (1440×900) and phone (iPhone) sizes, in light and dark mode, before merging. Install the browser test runner at the version of the Playwright already on the machine (`npm install --no-save @playwright/test@<that version>`), so it finds the preinstalled browser.
