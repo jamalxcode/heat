@@ -669,6 +669,10 @@
    "Gate.io": "GNO"
   },
   "aero": {},
-  "quantixai": {}
+  "quantixai": {},
+  "ape-and-pepe": {
+   "MEXC": "APEPE",
+   "Gate.io": "APEPE"
+  }
  }
 }
