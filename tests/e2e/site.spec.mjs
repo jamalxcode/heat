@@ -1548,3 +1548,58 @@ test.describe('predictions, yes/no that can’t be misread', () => {
     await expect(page.locator('.p-today .p-news[data-id="pm:fed"] .p-news-l')).toContainText('✗ Won’t happen');   // the short form in the news strip
   });
 });
+
+// ↗ Share (app/share.mjs): every card can be sent to WhatsApp, Telegram, X, email, the phone's share sheet, the
+// clipboard, or saved as a picture. The links only open the visitor's own apps: the tests check them, never follow them.
+test.describe('share', () => {
+  const opts = async page => { await page.locator('#detail [data-share]').click(); return page.locator('#detail .share-menu'); };
+  const decoded = async (menu, k) => decodeURIComponent(await menu.locator(`.sh-${k}`).getAttribute('href'));
+
+  test('a coin card: links carry the card in words and a link that opens it; the picture downloads; the menu sits under the header', async ({ page }) => {
+    await tile(page, 'moon-coin').click();
+    const menu = await opts(page);
+    expect(await menu.evaluate(m => m.previousElementSibling.classList.contains('d-head'))).toBe(true);
+    const wa = await decoded(menu, 'whatsapp');
+    expect(wa).toMatch(/^https:\/\/wa\.me\/\?text=Moon Coin \(MOON\) · \$2,015 · /);
+    expect(wa).toContain('Strong uptrend');
+    expect(wa).toMatch(/\/\?coin=moon-coin$/);
+    expect(await decoded(menu, 'email')).toMatch(/^mailto:\?subject=Moon Coin \(MOON\)&body=/);
+    expect(await decoded(menu, 'telegram')).toMatch(/^https:\/\/t\.me\/share\/url\?url=http:\/\/localhost:4173\/\?coin=moon-coin&text=/);
+    expect(await decoded(menu, 'x')).toMatch(/^https:\/\/twitter\.com\/intent\/tweet\?text=/);
+    await expect(menu.locator('.sh-whatsapp')).toHaveAttribute('target', '_blank');
+    const [dl] = await Promise.all([page.waitForEvent('download'), menu.locator('[data-sh="image"]').click()]);
+    expect(dl.suggestedFilename()).toBe('heat-moon.png');
+    await expect(menu.locator('.sh-note')).toHaveText('✓ Saved');
+    await page.locator('#detail [data-share]').click();                     // the button closes it again
+    await expect(page.locator('#detail .share-menu')).toHaveCount(0);
+    expect(external).toEqual([]);
+  });
+
+  test('a prediction: the message says what the market expects, the chance and both sides', async ({ page }) => {
+    await page.goto('/predictions/');
+    await page.locator('.ptile[data-id="pm:fed"]').click();
+    const menu = await opts(page);
+    expect(await decoded(menu, 'whatsapp')).toContain('Fed cut in December? Market expects: ✗ No, it won’t happen (70% chance; Yes 30% · No 70%) on Polymarket');
+    expect(await decoded(menu, "whatsapp")).toMatch(/\/predictions\/\?m=pm(:|%3A)fed$/);
+  });
+
+  test('a bond market: its 10-year yield, its move and its curve', async ({ page }) => {
+    await page.goto('/rates/');
+    await page.locator('.rtile[data-id="us"]').click();
+    const menu = await opts(page);
+    expect(await decoded(menu, 'whatsapp')).toMatch(/United States 10-year government bond yield · \d\.\d\d% · \+4 bp in 1w · curve normal/);
+    expect(await decoded(menu, 'whatsapp')).toMatch(/\/rates\/\?c=us$/);
+  });
+
+  test('where the browser has a share sheet (phones), "Share…" opens it with the text, the link and the picture', async ({ page }) => {
+    await page.addInitScript(() => {
+      navigator.share = async d => { window.__shared = { title: d.title, text: d.text, url: d.url, files: (d.files || []).map(f => f.name) }; };
+      navigator.canShare = () => true;
+    });
+    await page.goto('/');
+    await tile(page, 'moon-coin').click();
+    const menu = await opts(page);
+    await menu.locator('[data-sh="native"]').click();
+    await expect.poll(() => page.evaluate(() => window.__shared)).toMatchObject({ title: 'Moon Coin (MOON)', url: 'http://localhost:4173/?coin=moon-coin', files: ['heat-moon.png'] });
+  });
+});

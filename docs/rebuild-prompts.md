@@ -1,6 +1,6 @@
 # Rebuild transcript: heat.sala.company
 
-These 31 prompts cover everything we built, up to 16 Nov 2026. Paste them in order, and wait for each step to be live and verified before sending the next. The fixes we found along the way are folded in, so a rebuild skips those detours.
+These 32 prompts cover everything we built, up to 19 Nov 2026. Paste them in order, and wait for each step to be live and verified before sending the next. The fixes we found along the way are folded in, so a rebuild skips those detours.
 
 ---
 
@@ -188,7 +188,10 @@ These 31 prompts cover everything we built, up to 16 Nov 2026. Paste them in ord
 ### 30. Write it down
 > Save to the repo the design ideas, lessons learned, the conversation, the business rules and the interface rules, each in its own file under `docs/`, pointing back to the decisions by number. Then rewrite the README's opening as a fun, short tour (the tabs, five things to try, what's new, where the docs are) and keep the full reference below it.
 
-### 31. Status checks (repeat as needed)
+### 31. Share a card
+> Add a share function to every card (coin or price, prediction, bond market): the phone's share sheet with the card as a picture where possible, links for WhatsApp, Telegram, X and email with a message and a link that opens that card, Copy text and Save image (a 1200×630 picture in the card's colour). Send nothing from the page itself. Test each, including that saving the picture doesn't close the card.
+
+### 32. Status checks (repeat as needed)
 > Status check on heat.sala.company: scheduled and manual runs over the last 24 hours, refresh gaps, data age, the latest scorecard and tuner decision, failures, and anything to sync to GitHub.
 
 ---

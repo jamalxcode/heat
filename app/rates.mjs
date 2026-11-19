@@ -6,6 +6,7 @@
 import { $, $$, esc, logo, M, S, store } from './core.mjs';
 import { renderHealth } from './render.mjs';
 import { chartUrl, pick } from '/scripts/tradingview.mjs';
+import { shareButton, toggleMenu } from './share.mjs';
 
 const DAY = 864e5, REFRESH = 10 * 60e3;
 const TFS = [['1d', 1], ['1w', 7], ['1m', 30]];
@@ -257,7 +258,7 @@ function detailHTML(c) {
     : `${curveChart(lines, `${c.name} yield curve`)}<div class="r-keys">${lines.map(l => keyOf(l.label, l.color, l.width, l.dash, l.faint)).join('')}</div>`;
   // small enough to sit beside the card: the key numbers and a chart first, the explanation and the maturities below
   return `<div class="r-card r-pop" data-country="${esc(c.id)}"><div class="r-head"><h2>${tvLink(c, `${logoOf(c)} ${esc(c.name)}`)} <span class="r-muted">yield curve</span>${tvGo(c)}</h2>
-      <span class="rt-state st-${esc(c.state || 'none')}">${st ? `<span class="st-ico" aria-hidden="true">${st.icon}</span> ${st.label}` : '—'}</span></div>
+      <span class="rt-state st-${esc(c.state || 'none')}">${st ? `<span class="st-ico" aria-hidden="true">${st.icon}</span> ${st.label}` : '—'}</span>${shareButton()}</div>
     <div class="r-mini">10y <b>${fmtY(c.y10)}</b> · ${shortLabel(c)} <b>${fmtY(c.yShort)}</b> · gap <b>${fmtPP(c.slope)}</b>${c.slope3m != null && c.short !== '3m' ? ` · 10y−3m <b>${fmtPP(c.slope3m)}</b>` : ''} · ${dayLabel(c.date)}</div>
     <div class="r-mini r-mini2">${realPill(c)}${inflTag(c)}${riskTag(c)}${rank ? `<span>${rank}</span>` : ''}</div>
     <div class="seg r-tabs" role="group" aria-label="Chart"><button data-rtab="curve" aria-pressed="${popTab === 'curve'}">Curve</button><button data-rtab="history" aria-pressed="${popTab === 'history'}">History</button></div>
@@ -268,7 +269,7 @@ function detailHTML(c) {
     <p class="r-src">${c.notRefreshed ? '⚠ The source didn’t answer in the latest check: showing its last curve. ' : ''}Source: <a href="${esc(c.srcUrl)}" target="_blank" rel="noopener">${esc(c.src)}</a>, closing yields of ${dayLabel(c.date)}.${c.note ? ' ' + esc(c.note) : ''}${c.infl ? ` Inflation: ${esc(c.infl.src)}, yearly change in consumer prices.` : ''}</p></div></div>`;
 }
 function monthHTML(m) {
-  return `<div class="r-card r-pop" data-country="${esc(m.id)}"><div class="r-head"><h2>${tvLink(m, `${logoOf(m)} ${esc(m.name)}`)} <span class="r-muted">10-year, monthly</span>${tvGo(m)}</h2><span class="r-muted">📅 monthly</span></div>
+  return `<div class="r-card r-pop" data-country="${esc(m.id)}"><div class="r-head"><h2>${tvLink(m, `${logoOf(m)} ${esc(m.name)}`)} <span class="r-muted">10-year, monthly</span>${tvGo(m)}</h2><span class="r-muted">📅 monthly</span>${shareButton()}</div>
     <div class="r-mini">${monthLabel(m.month)} <b>${fmtY(m.y10)}</b> · month <b>${fmtBp(m.chg1m)}</b> · year <b>${fmtBp(m.chg12m)}</b>${m.vsDE != null ? ` · vs Germany <b>${fmtPP(m.vsDE)}</b>` : ''}</div>
     <div class="r-mini r-mini2">${realPill(m)}${inflTag(m)}${riskTag(m)}</div>
     ${monthChart(m)}
@@ -371,6 +372,18 @@ function drawPopup(id, anchor) {
   box.style.top = Math.min(Math.max(mg, top), Math.max(mg, vh - bh - mg)) + 'px';
   return true;
 }
+// ↗ Share: the market's 10-year yield, its move and its curve, as a message, app links and a picture (app/share.mjs)
+function rateShare(id) {
+  const c = R?.countries.find(x => x.id === id), m = !c && R?.monthly?.find(x => x.id === id), x = c || m;
+  if (!x) return null;
+  const col = colourOf(x, !c), st = c && STATE[c.state];
+  const sw = document.createElement('span');
+  sw.className = col.cls; sw.hidden = true; $('#detail').append(sw);
+  return { market: 'Rates', title: `${x.name} 10-year government bond yield${m ? ` (${monthLabel(m.month, true)} average)` : ''}`, big: fmtY(x.y10),
+    sub: [col.corner && `${col.corner}${c ? (colorBy === 'change' ? ` in ${tf}` : '') : ' on the month'}`, st && `curve ${st.label.toLowerCase()}`].filter(Boolean).join(' · '),
+    words: [x.real != null && `real yield ${fmtReal(x.real)}`, x.risk?.level && `${x.risk.level === 'avg' ? 'average' : x.risk.level} risk`].filter(Boolean).join(' · '),
+    url: `${location.origin}/rates/?c=${encodeURIComponent(x.id)}`, file: `heat-rates-${x.id}.png`, tintFrom: sw };
+}
 function openPopup(id, { pin = true, anchor = null } = {}) {
   const box = $('#detail');
   const pinning = pin && previewId === id && box.classList.contains('show') && !box.classList.contains('pinned');
@@ -470,6 +483,8 @@ export function start() {
     const tab = e.target.closest('[data-rtab]');
     if (tab) switchTab(tab.dataset.rtab);
     if (!S.pinned && previewId && !e.target.closest('.x')) openPopup(previewId, { anchor: previewAnchor });
+    const sb = e.target.closest('[data-share]');
+    if (sb) { const p = rateShare(previewId); if (p) toggleMenu(sb, p); }
   });
   // closed by the shared handlers: forget the market (and take it off the address)
   new MutationObserver(() => {

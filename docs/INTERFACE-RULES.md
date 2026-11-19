@@ -43,6 +43,7 @@ How the site **looks, reads and behaves**. Data rules are in [`BUSINESS-RULES.md
 - **Links carry the view** (`?f=…&tf=…&view=…&coin=…`), but a link never overwrites the visitor's saved settings.
 - **Remembered per browser:** theme, tile style, chart type, "How to read", the watchlist (per market), the warning's dismissal (30 days).
 - **The scorecard view hides the price controls** [43].
+- **↗ Share** in every card header opens a row of options under the header (share sheet, WhatsApp, Telegram, X, email, copy, picture); the button closes it again, and nothing in it closes the card [54].
 
 ## Build and assets
 

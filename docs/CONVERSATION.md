@@ -30,6 +30,10 @@ From a live tile ("Putin out as President of Russia by June 30, 2027? · Almost 
 
 **"Save to the repo design ideas, lessons learned, the conversation, business rules and interface rules"**, and **"update the README to reflect the latest updates; make it a fun read"**: this file, [`DESIGN-IDEAS.md`](DESIGN-IDEAS.md), [`LESSONS.md`](LESSONS.md), [`BUSINESS-RULES.md`](BUSINESS-RULES.md), [`INTERFACE-RULES.md`](INTERFACE-RULES.md), and a rewritten README opening.
 
+## 7. Sharing (19 Nov)
+
+**"Add a share function to send cards to WhatsApp, email, etc., e.g. an interesting prediction market card or a price."** Every card got ↗ Share: the phone's share sheet (with the card as a picture), WhatsApp, Telegram, X, email, Copy text and Save image. The browser test caught a real bug: saving the picture closed the card. Decision 54, prompt 31.
+
 ## How the session worked
 
 - Every change went to the session's `claude/...` branch, through unit and browser tests on GitHub, then to `main` (which deploys live).

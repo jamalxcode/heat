@@ -20,13 +20,14 @@ Pick a folder tab at the top of any page. Each tab carries its market's move of 
 | 📈 **[Rates](https://heat.sala.company/rates/)** | Official government bond yield curves for 14 markets: which are inverted, which pay more than inflation, which look risky against their own history |
 | 🎯 **[Predictions](https://heat.sala.company/predictions/)** | The most traded questions on Polymarket, Kalshi, PredictIt, Manifold and Betfair, with the same question matched across venues |
 
-## 👀 Five things worth trying
+## 👀 Six things worth trying
 
 1. **Read the headline.** Above the tiles, one line tells you how the market did (weighted by market cap on crypto, the median elsewhere), how many rose and fell, and the best and worst. Click either to open its card.
 2. **Rest your mouse on a tile.** A card opens with the story in words first ("▲ Strong uptrend · overbought (RSI 88) · near its short stop"), then the chart, the year range and the suggested stops. Tap on a phone.
 3. **Switch to Map.** On crypto and ETFs, Map sizes every tile by market cap or trading volume, so you see what moved *and* how much of the market moved with it.
 4. **Press `/` and type.** Search filters the tiles, map and table as you type. Then hit **☆ Watch** in a card to pin your favourites to the top, remembered for next time.
-5. **Ask the Scorecard.** It opens on one question, "Do the signals work?", answered honestly on fair, point-in-time data, with trading costs included.
+5. **Share a card.** Spotted a wild prediction or a coin on a tear? **↗ Share** in any card sends it to WhatsApp, Telegram, X or email with a link that opens that exact card, or saves it as a picture to post anywhere. On a phone, **📲 Share…** opens your phone's own share sheet with the picture attached.
+6. **Ask the Scorecard.** It opens on one question, "Do the signals work?", answered honestly on fair, point-in-time data, with trading costs included.
 
 ## ✨ What's new (Nov 2026)
 
@@ -36,6 +37,7 @@ Three rounds of polish, each started from a critique of the live pages:
 - **A headline** above every price page, and a **week's trend line** on every heatmap tile.
 - **Map view**, **search**, a **☆ watchlist** and **instant repeat visits** (your last view is drawn at once, then refreshed).
 - **Coin cards that talk:** a first line in plain words, a year-range bar, and chart labels that no longer trip over each other.
+- **↗ Share any card** (coin, prediction or bond market) to WhatsApp, Telegram, X, email or your phone's share sheet, as a message, a link and a picture.
 - **Prediction tiles that can't be misread:** "Market expects · ✗ No, it won't happen · 92% chance", with a bar naming both sides (the Yes side a touch thicker).
 - **Rates** lead with the yield, with a chart of every country's 10-year yield above the cards; **phones** put the data first, with the controls behind ⚙ View.
 - A slim warning line instead of a pop-up, a narrower grey band so calm days still show colour, and plenty of small fixes.
@@ -44,7 +46,7 @@ Three rounds of polish, each started from a critique of the live pages:
 
 | File | Read it when you want… |
 |---|---|
-| [`docs/DECISIONS.md`](docs/DECISIONS.md) | the *why* behind everything, numbered (53 so far) |
+| [`docs/DECISIONS.md`](docs/DECISIONS.md) | the *why* behind everything, numbered (54 so far) |
 | [`docs/BUSINESS-RULES.md`](docs/BUSINESS-RULES.md) | every data rule and threshold: sources, timing, signals, stops, scoring, predictions |
 | [`docs/INTERFACE-RULES.md`](docs/INTERFACE-RULES.md) | how the site looks, reads and behaves, and how a visual change is made |
 | [`docs/LESSONS.md`](docs/LESSONS.md) | the mistakes that taught us something |
@@ -83,6 +85,16 @@ Each page is built to answer "what's happening?" in a couple of seconds (Nov 202
 - **The chart's labels don't collide:** the stop labels are pushed apart and a price-scale number next to one is left out.
 - **Table:** shorter headers (the full name on hover), a **Week** line per row, and the symbol column stays put while the table scrolls sideways.
 - **Small fixes:** a flat figure on the market tabs is outlined, so it reads in dark mode; the energy summary links to the weekly pump-price tables below the tiles.
+
+## Sharing a card
+
+Every card has **↗ Share** in its header: the coin or price card, the prediction popup and the rates popup (`app/share.mjs`). It opens a row of options under the header:
+
+- **📲 Share…** (phones and browsers that have it): the device's own share sheet, with the message, the link and the card as a picture where the browser accepts files.
+- **WhatsApp, Telegram, X, Email:** links that open the visitor's own app with a ready-written message and a link that opens that exact card (`?coin=…`, `?m=…`, `?c=…`).
+- **Copy text**, and **Save image**: a 1200×630 picture of the card drawn in the browser, in the card's own heat colour, with the site's name and "Not financial advice".
+
+The message is the card in a line, e.g. "Fed cut in December? Market expects: ✗ No, it won't happen (70% chance; Yes 30% · No 70%) on Polymarket — heat.sala.company (not financial advice)". The page itself sends nothing anywhere: the links only open the visitor's apps, and the picture never leaves their browser unless they send it.
 
 ## Prediction markets
 
@@ -349,7 +361,7 @@ GitHub Actions: daily 00:20 UTC (via cron-job.org)
 
 - **Design decisions:** [`docs/DECISIONS.md`](docs/DECISIONS.md) explains why things work as they do: prediction-market fetching and tiles, the reasons behind the rest of the site (data built in Actions, fallbacks, timers, the shared signal engine, the honest scorecard, colour, deploy safety) and how the repo is worked on.
 - **Rules, lessons, ideas and the session log:** [`docs/BUSINESS-RULES.md`](docs/BUSINESS-RULES.md), [`docs/INTERFACE-RULES.md`](docs/INTERFACE-RULES.md), [`docs/LESSONS.md`](docs/LESSONS.md), [`docs/DESIGN-IDEAS.md`](docs/DESIGN-IDEAS.md), [`docs/CONVERSATION.md`](docs/CONVERSATION.md).
-- **Rebuild from scratch:** [`docs/rebuild-prompts.md`](docs/rebuild-prompts.md) has the 31 prompts, in order, that built this project with Claude, up to 16 Nov 2026.
+- **Rebuild from scratch:** [`docs/rebuild-prompts.md`](docs/rebuild-prompts.md) has the 32 prompts, in order, that built this project with Claude, up to 19 Nov 2026.
 - **Manual runs:** go to **Actions → Update heatmap data → Run workflow**, or **Actions → Score signals → Run workflow**. Tick *"Run the tuner now"* to tune immediately.
 - **Locally:** `node scripts/build-data.mjs data.json`, then serve the folder (for example `npx serve .`). Scoring: `node scripts/score.mjs --tune` (needs the live `data.json`, via `SITE_URL`). Tests: `npm test` (unit) and `npm run test:e2e` (browser). Preview with test data: `npm run dev`.
 - **Checking a UI change from a Claude cloud session:** the live site and the deploy's files can't be reached from there, so check the change in the local preview (`npm run dev`, test data) with screenshots at laptop (1440×900) and phone (iPhone) sizes, in light and dark mode, before merging. Install the browser test runner at the version of the Playwright already on the machine (`npm install --no-save @playwright/test@<that version>`), so it finds the preinstalled browser.

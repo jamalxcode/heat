@@ -33,3 +33,4 @@ Things that went wrong, or nearly did, and what we do now because of them. Newes
 - **Don't force-push when a normal push will do.** The branch was built on the latest `main`; a fast-forward push was enough, and the force flag was refused.
 - **Retry GitHub's temporary errors, and stop the waiting loop when a step fails.** A 503 on fetch skipped the push but the CI-wait loop kept polling for runs that would never come.
 - **Pull before pushing:** the scorer commits to `main` every day.
+- **A hidden click still bubbles.** The "Save image" download was a click on a hidden link; it bubbled to the page's "click outside closes the card" handler and closed the card. Dispatch such clicks without bubbling, and test that the card stays open.

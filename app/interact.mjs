@@ -2,10 +2,11 @@
 import * as SIG from '/signals.mjs';
 import { applyHist, match, P, pickCoins } from './data.mjs';
 import { renderScorecard } from './scorecard.mjs';
-import { $, $$, chgOf, DAY, esc, fmtBig, fmtPct, fmtPrice, linkedCoin, logo, M, MARKET, prefs, S, savePrefs, store, syncURL, TF, WATCH_KEY } from './core.mjs';
+import { $, $$, chgOf, DAY, esc, fmtBig, fmtPct, fmtPrice, heatClass, linkedCoin, logo, M, MARKET, prefs, S, savePrefs, store, syncURL, TF, WATCH_KEY } from './core.mjs';
 import { done, run, show } from './main.mjs';
 import { renderAll, renderTable, rsWindow, signals } from './render.mjs';
 import { chartUrl, pick } from '/scripts/tradingview.mjs';
+import { shareButton, toggleMenu } from './share.mjs';
 
 /* ================= detail popover ================= */
 export function linePath(vals, x, y) {
@@ -128,6 +129,20 @@ export function rangeHTML(r) {
     <div class="rbar" aria-hidden="true"><i style="left:${(r.pos * 100).toFixed(1)}%"></i></div><div class="d-rv"><span>${fmtPrice(r.lo)}</span><span>${fmtPrice(r.hi)}</span></div></div>`;
 }
 
+// ↗ Share: what the card says, as a message, links for the visitor's own apps and a picture (app/share.mjs)
+const MARKET_NAME = { crypto: 'Crypto', forex: 'Forex', metals: 'Metals', energy: 'Energy', etfs: 'ETFs' };
+export function priceShare(id) {
+  const c = S.coins.find(x => x.id === id), ind = S.ind[id];
+  if (!c) return null;
+  const d1 = chgOf(c, '24h'), d7 = chgOf(c, '7d'), tmp = document.createElement('div');
+  tmp.innerHTML = sayLine(ind);
+  const sw = document.createElement('span');                    // carries the tile's heat colour for the picture
+  sw.className = heatClass(d1, '24h'); sw.hidden = true; $('#detail').append(sw);
+  return { market: MARKET_NAME[M.key], title: `${c.name} (${c.symbol.toUpperCase()})`, big: fmtPrice(c.current_price),
+    sub: `${fmtPct(d1)} ${TF('24h')} · ${fmtPct(d7)} ${TF('7d')}`, words: tmp.textContent.trim().split(' · ').slice(0, 3).join(' · '),   // the first three readings
+    url: `${location.origin}${location.pathname}?coin=${encodeURIComponent(id)}`, file: `heat-${c.symbol.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`, tintFrom: sw };
+}
+
 export function showDetail(id, anchor, keepPos) {
   S.hoverId = id;
   const c = S.coins.find(x => x.id === id);
@@ -137,7 +152,7 @@ export function showDetail(id, anchor, keepPos) {
   // the logo and name link to the TradingView chart, only when that symbol is known to exist there
   const tv = pick(c, S.raw?.hist?.[id], MARKET, S.tv, S.quote === 'usd');
   const tvA = inner => tv ? `<a class="tv" href="${chartUrl(tv)}" target="_blank" rel="noopener noreferrer" title="Open the ${esc(tv)} chart on TradingView">${inner}</a>` : inner;
-  let body = `<div class="d-head">${tvA(`${logo(c, 22)}<b>${esc(c.name)}</b>`)}<span style="color:var(--ink-2)">${esc(c.symbol.toUpperCase())}${M.ranked ? ` · #${c.market_cap_rank}` : ''}</span>${tv ? tvA('<span class="tv-go">TradingView ↗</span>') : ''}<button type="button" class="d-watch" data-watch="${esc(id)}" aria-pressed="${S.watch.has(id)}" title="${S.watch.has(id) ? 'Remove from your watchlist' : 'Pin to your watchlist at the top (saved in this browser)'}">${S.watch.has(id) ? '★ Watching' : '☆ Watch'}</button><button type="button" class="d-link" data-copy-link title="Copy a link to this ${M.one}" aria-label="Copy a link to this ${M.one}">🔗</button></div>
+  let body = `<div class="d-head">${tvA(`${logo(c, 22)}<b>${esc(c.name)}</b>`)}<span style="color:var(--ink-2)">${esc(c.symbol.toUpperCase())}${M.ranked ? ` · #${c.market_cap_rank}` : ''}</span>${tv ? tvA('<span class="tv-go">TradingView ↗</span>') : ''}<button type="button" class="d-watch" data-watch="${esc(id)}" aria-pressed="${S.watch.has(id)}" title="${S.watch.has(id) ? 'Remove from your watchlist' : 'Pin to your watchlist at the top (saved in this browser)'}">${S.watch.has(id) ? '★ Watching' : '☆ Watch'}</button>${shareButton()}<button type="button" class="d-link" data-copy-link title="Copy a link to this ${M.one}" aria-label="Copy a link to this ${M.one}">🔗</button></div>
     <div class="d-price">${fmtPrice(c.current_price)}</div>
     ${sayLine(ind)}
     <div class="d-chg"><span>${TF('24h')} ${fmtPct(chgOf(c, '24h'))}</span><span>${TF('7d')} ${fmtPct(chgOf(c, '7d'))}</span><span>${TF('30d')} ${fmtPct(chgOf(c, '30d'))}</span>${M.ranked ? `<span>Cap ${fmtBig(c.market_cap)}</span>` : ''}</div>
@@ -283,6 +298,8 @@ $('#detail').addEventListener('mouseenter', () => { overDetail = true; cancelHid
 $('#detail').addEventListener('mouseleave', () => { overDetail = false; hideSoon(HOVER_HIDE_MS); });
 // clicking the hover popup pins it open, like clicking the tile
 $('#detail').addEventListener('click', e => {
+  const sh = e.target.closest('[data-share]');
+  if (sh && !M.custom) { const p = priceShare(S.pinned || S.hoverId); if (p) toggleMenu(sh, p); }   // (then pinned below, so it stays open)
   const wb = e.target.closest('[data-watch]');
   if (wb && !M.custom) {                      // ☆ Watch: pin it to the watchlist at the top of the grid (saved per market)
     const id = wb.dataset.watch;

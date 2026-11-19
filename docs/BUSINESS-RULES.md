@@ -13,6 +13,7 @@ Every rule the site follows about **data and numbers**: where they come from, ho
 | A whole builder fails or times out | The last published file is republished [7, 13] |
 | Freshness alarm | Hourly `check-fresh.mjs`: fails (GitHub emails) when a file stops updating, a prediction venue is stale for a day or has an empty tab, or a rates source keeps failing for a day [8] |
 | Repeat visit | The browser draws its last copy (under a day old, under 3 MB) at once, marked "last visit's prices", then swaps in the fresh file [44] |
+| Sharing a card | The page sends nothing: WhatsApp, Telegram, X and email links open the visitor's own app; the picture is drawn in the browser. Every message ends with the site and "not financial advice" [54] |
 | `pulse.json` | `items`: BTC, ETH, gold, Brent for go.sala.company (unchanged); `xm`: each market's headline figure for the market tabs (BTC, DXY, gold, Brent, SPY, US 10-year in bp). A missing figure is left out, never guessed [26, 31] |
 
 ## 2. Which assets are listed

@@ -21,5 +21,5 @@ Ideas raised but **not built** (or built differently), so they aren't lost. Noth
 - **Compare with the benchmark** in the coin card (the coin's line over Bitcoin's / SPY's). M
 - **Keyboard moves between tiles** (arrow keys), for people who browse without a mouse. S
 - **A skeleton** (grey tiles) on a first visit while `data.json` loads; repeat visits already draw at once. S
-- **Share images per question page** (an Open Graph image with the answer), so links preview with the market's answer. M
+- **Link previews with the card's answer.** ↗ Share already makes a picture of the card in the browser (decision 54), but a shared link still previews with the page's general image; building an Open Graph image per question page at deploy would make the preview show the answer too. M
 - **Time zones:** show times in the visitor's zone everywhere (some lines still use UTC dates). S

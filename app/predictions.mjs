@@ -14,6 +14,7 @@ import { $, $$, esc, M, S, store } from './core.mjs';
 import { renderHealth } from './render.mjs';
 import { bestMatch } from './names.mjs';
 import { squarify } from './treemap.mjs';
+import { shareButton, toggleMenu } from './share.mjs';
 
 const DAY = 864e5, REFRESH = 10 * 60e3, ALL_MAX = 200;
 const DECIDED = 0.97;                  // a question whose likeliest outcome is at least this sure counts as decided
@@ -768,7 +769,7 @@ function detailHTML(m) {
   return `<div class="r-card r-pop p-pop">
     <div class="p-pophead"><span class="p-popven">${membersOf(m).filter(x => merged() || x === m).map(x => `<span class="pv pv-${x.venue}" title="${VNAME[x.venue]}">${VTAG[x.venue]}</span>`).join('')}</span>
       <button class="btn p-watchbtn" data-watch="${esc(m.id)}" aria-pressed="${watch.has(m.id)}">${watch.has(m.id) ? '★ Watching' : '☆ Watch'}</button>
-      <button class="btn p-linkbtn" title="Copy a link that opens this question">🔗 Copy link</button>
+      ${shareButton()}<button class="btn p-linkbtn" title="Copy a link that opens this question">🔗 Copy link</button>
       <button class="btn p-fullbtn" aria-pressed="${full}" title="${full ? 'Back to the small view' : 'Full screen'}">${full ? '⤡ Smaller' : '⤢ Full view'}</button></div>
     <h2 class="p-q">${icon(m)}${esc(titleParts(m)[0])}</h2>${titleParts(m)[1] ? `<p class="p-qfull">${esc(titleParts(m)[1])}</p>` : ''}
     <p class="p-say${likeFont(h)}"><span class="p-say-v">${kicker(m, h)}:</span> <b class="p-say-a">${esc(answerFull(m, h))}</b> <b class="p-say-p">${pct(h.p)}</b>${isYN(h) ? ' <span class="p-say-w">chance</span>' : ''}</p>${ynBar(h)}
@@ -819,6 +820,19 @@ function openPopup(id) {
 }
 let pageTitle = '';
 const linkTo = id => `${location.origin}${location.pathname}?m=${encodeURIComponent(id)}`;
+// ↗ Share: the question, what the market expects and its chance, as a message, app links and a picture (app/share.mjs)
+function predShare(m) {
+  const h = shownOutcome(m), yn = isYN(h), yes = yn && h.p != null ? (h.no ? 1 - h.p : h.p) : null;
+  const venues = membersOf(m).filter(x => merged() || x === m).map(x => VNAME[x.venue]).join(', '), t$ = mToday(m);
+  const sw = document.createElement('span');
+  sw.className = sureClass(h); sw.hidden = true; $('#detail').append(sw);
+  const ans = answerFull(m, h), title = fullTitle(m, h);
+  return { market: 'Predictions', title, kicker: kicker(m, h), big: pct(h.p), bigNote: yn ? 'chance' : '',
+    sub: ans + (yes != null ? ` · Yes ${pct(yes)} · No ${pct(1 - yes)}` : ''),
+    words: `${venues}${t$ != null ? ` · ${money(t$, 'USD')} bet today` : ''}`,
+    text: `${title} ${kicker(m, h)}: ${ans} (${pct(h.p)}${yn ? ' chance' : ''}${yes != null ? `; Yes ${pct(yes)} · No ${pct(1 - yes)}` : ''}) on ${venues} — heat.sala.company (not financial advice)`,
+    url: linkTo(m.id), file: `heat-prediction-${String(m.id).replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.png`, tintFrom: sw };
+}
 
 /* ---------- fresh line and loading ---------- */
 function renderFresh() {
@@ -912,6 +926,8 @@ export function start() {
   on('#grid', 'keydown', e => { if (e.key === 'Enter' && e.target.closest('.r-row')) openPopup(e.target.closest('.r-row').dataset.id); });
   // inside the popup: watch, full view, a related question
   on('#detail', 'click', e => {
+    const sb = e.target.closest('[data-share]');
+    if (sb) { const m = P?.markets.find(x => x.id === sel); if (m) toggleMenu(sb, predShare(m)); return; }
     const w = e.target.closest('[data-watch]');
     if (w) { const id = w.dataset.watch; if (watch.has(id)) watch.delete(id); else watch.add(id); store.set('hm.predWatch', [...watch]); openPopup(id); return; }
     if (e.target.closest('.p-fullbtn')) { full = !full; openPopup(sel); return; }
