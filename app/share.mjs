@@ -7,19 +7,25 @@ const escH = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<':
 
 export const shareButton = () => '<button type="button" class="d-share" data-share aria-expanded="false" title="Share this card: WhatsApp, Telegram, X, email, your phone’s share sheet, or as a picture">↗ Share</button>';
 
-// the message: the card in one or two lines, then the link (apps that take the link separately get it separately)
+// The message reads like one a person would send: the question (or the coin) on the first line, what the card says on
+// the second, then what the link opens and the link ("👉 Live odds from every venue, updated every 10 min: https://…"),
+// then "Not financial advice". Apps that take the link on its own (Telegram, X) get the text and the link separately.
+const oneLine = s => String(s || '').replace(/\s+/g, ' ').trim();
 export function shareText(p) {
-  if (p.text) return p.text;
-  return [p.title, [p.kicker, p.big].filter(Boolean).join(' '), p.sub, p.words].filter(Boolean).join(' · ').replace(/\s+/g, ' ').trim()
-    + ' — heat.sala.company (not financial advice)';
+  return [oneLine(p.title), oneLine(p.line || [[p.kicker, p.big].filter(Boolean).join(' '), p.sub, p.words].filter(Boolean).join(' · '))].filter(Boolean).join('\n');
 }
+export const FOOT = 'Not financial advice.';
+export const linkLine = p => `👉 ${p.linkNote || 'See it live on heat.sala.company'}: ${p.url}`;
+export const shareMessage = p => `${shareText(p)}\n${linkLine(p)}\n${FOOT}`;
+// for 🔗 Copy link: what it's about, then what the link opens and the link
+export const copyMessage = (title, url, linkNote) => `${oneLine(title)}\n${linkLine({ url, linkNote })}`;
 export function shareLinks(p) {
-  const text = shareText(p);
+  const text = `${shareText(p)}\n👉 ${p.linkNote || 'See it live on heat.sala.company'}:`;
   return {
-    whatsapp: `https://wa.me/?text=${enc(`${text}\n${p.url}`)}`,
+    whatsapp: `https://wa.me/?text=${enc(shareMessage(p))}`,
     telegram: `https://t.me/share/url?url=${enc(p.url)}&text=${enc(text)}`,
     x: `https://twitter.com/intent/tweet?text=${enc(text)}&url=${enc(p.url)}`,
-    email: `mailto:?subject=${enc(p.title)}&body=${enc(`${text}\n\n${p.url}`)}`,
+    email: `mailto:?subject=${enc(oneLine(p.title))}&body=${enc(shareMessage(p).replace(/\n/g, '\n\n'))}`,
   };
 }
 
@@ -47,7 +53,7 @@ export function toggleMenu(btn, p) {
     e.preventDefault();
     const say = t => { note.textContent = t; setTimeout(() => { if (note.textContent === t) note.textContent = ''; }, 2500); };
     if (b.dataset.sh === 'copy') {
-      try { await navigator.clipboard.writeText(`${shareText(p)}\n${p.url}`); say('✓ Copied'); } catch { prompt('Copy this:', `${shareText(p)}\n${p.url}`); }
+      try { await navigator.clipboard.writeText(shareMessage(p)); say('✓ Copied'); } catch { prompt('Copy this:', shareMessage(p)); }
     } else if (b.dataset.sh === 'image') {
       const blob = await cardImage(p);
       const url = URL.createObjectURL(blob), dl = document.createElement('a');
@@ -57,12 +63,9 @@ export function toggleMenu(btn, p) {
       setTimeout(() => URL.revokeObjectURL(url), 4000);
       say('✓ Saved');
     } else if (b.dataset.sh === 'native') {
-      const data = { title: p.title, text: shareText(p), url: p.url };
-      try {
-        const file = new File([await cardImage(p)], p.file || 'heat-card.png', { type: 'image/png' });
-        if (navigator.canShare?.({ files: [file] })) data.files = [file];   // the picture too, where the phone takes files
-      } catch { /* no picture: text and link only */ }
-      try { await navigator.share(data); } catch { /* cancelled */ }
+      // the whole message (question, answer, link) as the text, and no separate url or picture: given a url or a file,
+      // apps such as WhatsApp keep only that and drop the question. "Save image" is there for the picture.
+      try { await navigator.share({ title: oneLine(p.title), text: shareMessage(p) }); } catch { /* cancelled */ }
     }
   });
 }

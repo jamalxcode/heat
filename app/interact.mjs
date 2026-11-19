@@ -6,7 +6,8 @@ import { $, $$, chgOf, DAY, esc, fmtBig, fmtPct, fmtPrice, heatClass, linkedCoin
 import { done, run, show } from './main.mjs';
 import { renderAll, renderTable, rsWindow, signals } from './render.mjs';
 import { chartUrl, pick } from '/scripts/tradingview.mjs';
-import { shareButton, toggleMenu } from './share.mjs';
+import { copyMessage, shareButton, toggleMenu } from './share.mjs';
+const LINK_NOTE = 'Live price, chart, signals and suggested stops';   // what a shared link opens
 
 /* ================= detail popover ================= */
 export function linePath(vals, x, y) {
@@ -140,7 +141,7 @@ export function priceShare(id) {
   sw.className = heatClass(d1, '24h'); sw.hidden = true; $('#detail').append(sw);
   return { market: MARKET_NAME[M.key], title: `${c.name} (${c.symbol.toUpperCase()})`, big: fmtPrice(c.current_price),
     sub: `${fmtPct(d1)} ${TF('24h')} · ${fmtPct(d7)} ${TF('7d')}`, words: tmp.textContent.trim().split(' · ').slice(0, 3).join(' · '),   // the first three readings
-    url: `${location.origin}${location.pathname}?coin=${encodeURIComponent(id)}`, file: `heat-${c.symbol.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`, tintFrom: sw };
+    url: `${location.origin}${location.pathname}?coin=${encodeURIComponent(id)}`, linkNote: LINK_NOTE, file: `heat-${c.symbol.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.png`, tintFrom: sw };
 }
 
 export function showDetail(id, anchor, keepPos) {
@@ -474,8 +475,11 @@ markFilter();
 // 🔗 copies a link to what's on screen; the popup's 🔗 copies a link to that coin (its chart card opens on arrival)
 async function copyLink(btn) {
   syncURL();
-  const url = location.href, label = btn.textContent;
-  try { await navigator.clipboard.writeText(url); } catch { prompt('Copy this link:', url); return; }
+  // a card's 🔗 copies its name on the first line and the link under it, so a pasted link says what it's about;
+  // the header's 🔗 Link copies the address of the whole view
+  const c = btn.dataset.copyLink !== undefined && S.pinned ? S.coins.find(x => x.id === S.pinned) : null;
+  const url = location.href, text = c ? copyMessage(`${c.name} (${c.symbol.toUpperCase()}) ${fmtPrice(c.current_price)}`, url, LINK_NOTE) : url, label = btn.textContent;
+  try { await navigator.clipboard.writeText(text); } catch { prompt('Copy this link:', text); return; }
   btn.textContent = btn.id === 'share' ? '✓ Copied' : '✓';
   setTimeout(() => { btn.textContent = label; }, 1500);
 }

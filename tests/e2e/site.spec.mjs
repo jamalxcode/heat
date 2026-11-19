@@ -500,7 +500,8 @@ test.describe('shareable links', () => {
     await page.locator('#share').dispatchEvent('click');                                 // on this screen size the open card covers the header
     await expect(page.locator('#share')).toHaveText('✓ Copied');
     await expect(page.locator('#detail')).toHaveClass(/pinned/);                          // the header button keeps the popup open
-    expect(await page.evaluate(() => window.copied)).toEqual(Array(2).fill(page.url()));
+    // the card's 🔗 copies what it's about, what the link opens and the link; the header's 🔗 Link copies the bare address
+    expect(await page.evaluate(() => window.copied)).toEqual([`Moon Coin (MOON) $2,015\n👉 Live price, chart, signals and suggested stops: ${page.url()}`, page.url()]);
     await page.locator('#detail .x').click();
     await expect(page).toHaveURL(/\?tf=30d$/);
     await page.locator('#colorBy [data-v="24h"]').click();
@@ -1231,7 +1232,7 @@ test.describe('predictions', () => {
     await expect(page).toHaveTitle(/^NYC mayor winner\?: Alice 71% · Predictions/);
     await expect(page.locator('#detail .p-linkbtn')).toHaveText('🔗 Copy link');
     await page.locator('#detail .p-linkbtn').click();
-    await expect(page.locator('#detail .p-linkbtn')).toHaveText(/✓ Copied|\/predictions\/\?m=pm%3Amayor/);
+    await expect(page.locator('#detail .p-linkbtn')).toHaveText(/✓ Copied|\/predictions\/\?m=pm:mayor/);
     await page.keyboard.press('Escape');
     await expect(page).toHaveTitle(/Prediction Market Heatmap/);
     // the track record: 20 answers at 80% a week before, 15 happened
@@ -1560,9 +1561,10 @@ test.describe('share', () => {
     const menu = await opts(page);
     expect(await menu.evaluate(m => m.previousElementSibling.classList.contains('d-head'))).toBe(true);
     const wa = await decoded(menu, 'whatsapp');
-    expect(wa).toMatch(/^https:\/\/wa\.me\/\?text=Moon Coin \(MOON\) · \$2,015 · /);
+    // the coin on the first line, what the card says on the second, then the link, then "Not financial advice"
+    expect(wa).toMatch(/^https:\/\/wa\.me\/\?text=Moon Coin \(MOON\)\n\$2,015 · /);
     expect(wa).toContain('Strong uptrend');
-    expect(wa).toMatch(/\/\?coin=moon-coin$/);
+    expect(wa).toMatch(/\n👉 Live price, chart, signals and suggested stops: http:\/\/localhost:4173\/\?coin=moon-coin\nNot financial advice\.$/);
     expect(await decoded(menu, 'email')).toMatch(/^mailto:\?subject=Moon Coin \(MOON\)&body=/);
     expect(await decoded(menu, 'telegram')).toMatch(/^https:\/\/t\.me\/share\/url\?url=http:\/\/localhost:4173\/\?coin=moon-coin&text=/);
     expect(await decoded(menu, 'x')).toMatch(/^https:\/\/twitter\.com\/intent\/tweet\?text=/);
@@ -1579,19 +1581,18 @@ test.describe('share', () => {
     await page.goto('/predictions/');
     await page.locator('.ptile[data-id="pm:fed"]').click();
     const menu = await opts(page);
-    expect(await decoded(menu, 'whatsapp')).toContain('Fed cut in December? Market expects: ✗ No, it won’t happen (70% chance; Yes 30% · No 70%) on Polymarket');
-    expect(await decoded(menu, "whatsapp")).toMatch(/\/predictions\/\?m=pm(:|%3A)fed$/);
+    // the question first, then the answer, then a readable link (pm:fed, not pm%3Afed)
+    expect(await decoded(menu, 'whatsapp')).toContain('text=Fed cut in December?\nMarket expects: ✗ No, it won’t happen · 70% chance (Yes 30% · No 70%) on Polymarket\n👉 Live odds from every venue, updated every 10 min: http://localhost:4173/predictions/?m=pm:fed\nNot financial advice.');
   });
 
   test('a bond market: its 10-year yield, its move and its curve', async ({ page }) => {
     await page.goto('/rates/');
     await page.locator('.rtile[data-id="us"]').click();
     const menu = await opts(page);
-    expect(await decoded(menu, 'whatsapp')).toMatch(/United States 10-year government bond yield · \d\.\d\d% · \+4 bp in 1w · curve normal/);
-    expect(await decoded(menu, 'whatsapp')).toMatch(/\/rates\/\?c=us$/);
+    expect(await decoded(menu, 'whatsapp')).toMatch(/United States 10-year government bond yield\n\d\.\d\d% · \+4 bp in 1w · curve normal.*\n👉 Live yield curve and its history: http:\/\/localhost:4173\/rates\/\?c=us\n/);
   });
 
-  test('where the browser has a share sheet (phones), "Share…" opens it with the text, the link and the picture', async ({ page }) => {
+  test('where the browser has a share sheet (phones), "Share…" sends the whole message, question first and the link under it, as one text', async ({ page }) => {
     await page.addInitScript(() => {
       navigator.share = async d => { window.__shared = { title: d.title, text: d.text, url: d.url, files: (d.files || []).map(f => f.name) }; };
       navigator.canShare = () => true;
@@ -1600,6 +1601,22 @@ test.describe('share', () => {
     await tile(page, 'moon-coin').click();
     const menu = await opts(page);
     await menu.locator('[data-sh="native"]').click();
-    await expect.poll(() => page.evaluate(() => window.__shared)).toMatchObject({ title: 'Moon Coin (MOON)', url: 'http://localhost:4173/?coin=moon-coin', files: ['heat-moon.png'] });
+    await expect.poll(() => page.evaluate(() => window.__shared)).toMatchObject({ title: 'Moon Coin (MOON)', files: [] });
+    const sent = await page.evaluate(() => window.__shared);
+    expect(sent.url).toBeUndefined();                                         // given a separate url, WhatsApp keeps only the link
+    expect(sent.text).toMatch(/^Moon Coin \(MOON\)\n\$2,015 · .*\n👉 Live price, chart, signals and suggested stops: http:\/\/localhost:4173\/\?coin=moon-coin\nNot financial advice/s);
   });
+});
+
+test('🔗 Copy link in a card copies what it is about on the first line and the link under it', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('/predictions/');
+  await page.locator('.ptile[data-id="pm:fed"]').click();
+  await page.locator('#detail .p-linkbtn').click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('Fed cut in December?\n👉 Live odds from every venue, updated every 10 min: http://localhost:4173/predictions/?m=pm:fed');
+  await page.keyboard.press('Escape');
+  await page.goto('/');
+  await tile(page, 'moon-coin').click();
+  await page.locator('#detail [data-copy-link]').click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/^Moon Coin \(MOON\) \$2,015\n👉 Live price, chart, signals and suggested stops: http:\/\/localhost:4173\/\?(.*&)?coin=moon-coin$/);
 });

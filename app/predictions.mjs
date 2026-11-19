@@ -14,7 +14,8 @@ import { $, $$, esc, M, S, store } from './core.mjs';
 import { renderHealth } from './render.mjs';
 import { bestMatch } from './names.mjs';
 import { squarify } from './treemap.mjs';
-import { shareButton, toggleMenu } from './share.mjs';
+import { copyMessage, shareButton, toggleMenu } from './share.mjs';
+const LINK_NOTE = 'Live odds from every venue, updated every 10 min';   // what a shared link opens
 
 const DAY = 864e5, REFRESH = 10 * 60e3, ALL_MAX = 200;
 const DECIDED = 0.97;                  // a question whose likeliest outcome is at least this sure counts as decided
@@ -819,7 +820,8 @@ function openPopup(id) {
   render();
 }
 let pageTitle = '';
-const linkTo = id => `${location.origin}${location.pathname}?m=${encodeURIComponent(id)}`;
+// the ":" in an id like "pm:fed" stays readable in the link (it's valid in a query string)
+const linkTo = id => `${location.origin}${location.pathname}?m=${encodeURIComponent(id).replace(/%3A/gi, ':')}`;
 // ↗ Share: the question, what the market expects and its chance, as a message, app links and a picture (app/share.mjs)
 function predShare(m) {
   const h = shownOutcome(m), yn = isYN(h), yes = yn && h.p != null ? (h.no ? 1 - h.p : h.p) : null;
@@ -830,8 +832,8 @@ function predShare(m) {
   return { market: 'Predictions', title, kicker: kicker(m, h), big: pct(h.p), bigNote: yn ? 'chance' : '',
     sub: ans + (yes != null ? ` · Yes ${pct(yes)} · No ${pct(1 - yes)}` : ''),
     words: `${venues}${t$ != null ? ` · ${money(t$, 'USD')} bet today` : ''}`,
-    text: `${title} ${kicker(m, h)}: ${ans} (${pct(h.p)}${yn ? ' chance' : ''}${yes != null ? `; Yes ${pct(yes)} · No ${pct(1 - yes)}` : ''}) on ${venues} — heat.sala.company (not financial advice)`,
-    url: linkTo(m.id), file: `heat-prediction-${String(m.id).replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.png`, tintFrom: sw };
+    line: `${kicker(m, h)}: ${ans} · ${pct(h.p)}${yn ? ' chance' : ''}${yes != null ? ` (Yes ${pct(yes)} · No ${pct(1 - yes)})` : ''} on ${venues}`,
+    url: linkTo(m.id), linkNote: LINK_NOTE, file: `heat-prediction-${String(m.id).replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.png`, tintFrom: sw };
 }
 
 /* ---------- fresh line and loading ---------- */
@@ -933,8 +935,10 @@ export function start() {
     if (e.target.closest('.p-fullbtn')) { full = !full; openPopup(sel); return; }
     const lb = e.target.closest('.p-linkbtn');
     if (lb) {
-      const url = linkTo(sel), done = ok => { lb.textContent = ok ? '✓ Copied' : url; setTimeout(() => { lb.textContent = '🔗 Copy link'; }, 2500); };
-      (navigator.clipboard?.writeText(url) ?? Promise.reject()).then(() => done(true), () => done(false));
+      // the question on the first line and the link under it, so a pasted link says what it's about
+      const m = P?.markets.find(x => x.id === sel), url = linkTo(sel), msg = m ? copyMessage(fullTitle(m), url, LINK_NOTE) : url;
+      const done = ok => { lb.textContent = ok ? '✓ Copied' : url; setTimeout(() => { lb.textContent = '🔗 Copy link'; }, 2500); };
+      (navigator.clipboard?.writeText(msg) ?? Promise.reject()).then(() => done(true), () => done(false));
       return;
     }
     const r = e.target.closest('[data-rel]');

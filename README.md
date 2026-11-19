@@ -26,7 +26,7 @@ Pick a folder tab at the top of any page. Each tab carries its market's move of 
 2. **Rest your mouse on a tile.** A card opens with the story in words first ("▲ Strong uptrend · overbought (RSI 88) · near its short stop"), then the chart, the year range and the suggested stops. Tap on a phone.
 3. **Switch to Map.** On crypto and ETFs, Map sizes every tile by market cap or trading volume, so you see what moved *and* how much of the market moved with it.
 4. **Press `/` and type.** Search filters the tiles, map and table as you type. Then hit **☆ Watch** in a card to pin your favourites to the top, remembered for next time.
-5. **Share a card.** Spotted a wild prediction or a coin on a tear? **↗ Share** in any card sends it to WhatsApp, Telegram, X or email with a link that opens that exact card, or saves it as a picture to post anywhere. On a phone, **📲 Share…** opens your phone's own share sheet with the picture attached.
+5. **Share a card.** Spotted a wild prediction or a coin on a tear? **↗ Share** in any card sends it to WhatsApp, Telegram, X or email with a link that opens that exact card, or saves it as a picture to post anywhere. On a phone, **📲 Share…** opens your phone's own share sheet. Every message leads with the question, then a line saying what the link opens.
 6. **Ask the Scorecard.** It opens on one question, "Do the signals work?", answered honestly on fair, point-in-time data, with trading costs included.
 
 ## ✨ What's new (Nov 2026)
@@ -46,7 +46,7 @@ Three rounds of polish, each started from a critique of the live pages:
 
 | File | Read it when you want… |
 |---|---|
-| [`docs/DECISIONS.md`](docs/DECISIONS.md) | the *why* behind everything, numbered (54 so far) |
+| [`docs/DECISIONS.md`](docs/DECISIONS.md) | the *why* behind everything, numbered (55 so far) |
 | [`docs/BUSINESS-RULES.md`](docs/BUSINESS-RULES.md) | every data rule and threshold: sources, timing, signals, stops, scoring, predictions |
 | [`docs/INTERFACE-RULES.md`](docs/INTERFACE-RULES.md) | how the site looks, reads and behaves, and how a visual change is made |
 | [`docs/LESSONS.md`](docs/LESSONS.md) | the mistakes that taught us something |
@@ -90,11 +90,20 @@ Each page is built to answer "what's happening?" in a couple of seconds (Nov 202
 
 Every card has **↗ Share** in its header: the coin or price card, the prediction popup and the rates popup (`app/share.mjs`). It opens a row of options under the header:
 
-- **📲 Share…** (phones and browsers that have it): the device's own share sheet, with the message, the link and the card as a picture where the browser accepts files.
-- **WhatsApp, Telegram, X, Email:** links that open the visitor's own app with a ready-written message and a link that opens that exact card (`?coin=…`, `?m=…`, `?c=…`).
+- **📲 Share…** (phones and browsers that have it): the device's own share sheet, with the whole message as one text (no separate link or picture, since WhatsApp and others would then drop the question).
+- **WhatsApp, Telegram, X, Email:** links that open the visitor's own app with a ready-written message and a link that opens that exact card (`?coin=…`, `?m=pm:fed`, `?c=us`).
 - **Copy text**, and **Save image**: a 1200×630 picture of the card drawn in the browser, in the card's own heat colour, with the site's name and "Not financial advice".
 
-The message is the card in a line, e.g. "Fed cut in December? Market expects: ✗ No, it won't happen (70% chance; Yes 30% · No 70%) on Polymarket — heat.sala.company (not financial advice)". The page itself sends nothing anywhere: the links only open the visitor's apps, and the picture never leaves their browser unless they send it.
+The message reads like one a person would send: the question (or the coin, or the bond market) first, what the card says next, then what the link opens and the link:
+
+```
+Fed cut in December?
+Market expects: ✗ No, it won't happen · 70% chance (Yes 30% · No 70%) on Polymarket
+👉 Live odds from every venue, updated every 10 min: https://heat.sala.company/predictions/?m=pm:fed
+Not financial advice.
+```
+
+Coins say "👉 Live price, chart, signals and suggested stops:", bond markets "👉 Live yield curve and its history:". A card's **🔗 Copy link** copies the first line and the link line the same way; the header's 🔗 Link still copies the bare address of the whole view. The page itself sends nothing anywhere: the links only open the visitor's apps, and the picture never leaves their browser unless they send it.
 
 ## Prediction markets
 

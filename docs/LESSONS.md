@@ -34,3 +34,4 @@ Things that went wrong, or nearly did, and what we do now because of them. Newes
 - **Retry GitHub's temporary errors, and stop the waiting loop when a step fails.** A 503 on fetch skipped the push but the CI-wait loop kept polling for runs that would never come.
 - **Pull before pushing:** the scorer commits to `main` every day.
 - **A hidden click still bubbles.** The "Save image" download was a click on a hidden link; it bubbled to the page's "click outside closes the card" handler and closed the card. Dispatch such clicks without bubbling, and test that the card stays open.
+- **Share sheets keep what they like best.** Given a `url` or a file along with the text, WhatsApp (and others) sent only the link or the picture, without the question. Put the whole message in `text`, the link included, and give nothing else.

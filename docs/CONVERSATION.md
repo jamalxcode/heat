@@ -34,6 +34,8 @@ From a live tile ("Putin out as President of Russia by June 30, 2027? · Almost 
 
 **"Add a share function to send cards to WhatsApp, email, etc., e.g. an interesting prediction market card or a price."** Every card got ↗ Share: the phone's share sheet (with the card as a picture), WhatsApp, Telegram, X, email, Copy text and Save image. The browser test caught a real bug: saving the picture closed the card. Decision 54, prompt 31.
 
+Then **"show the question asked followed by the link, not just a url, so it's cleaner in WhatsApp; the same for crypto, bonds; and explain what the link is about"**: every message and each card's 🔗 Copy link now lead with the question or name, then the answer, then "👉 Live odds from every venue, updated every 10 min: link" (or the coin's / bond market's version), and the share sheet gets it all as one text so WhatsApp keeps the question. Decision 55.
+
 ## How the session worked
 
 - Every change went to the session's `claude/...` branch, through unit and browser tests on GitHub, then to `main` (which deploys live).

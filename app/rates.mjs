@@ -382,7 +382,7 @@ function rateShare(id) {
   return { market: 'Rates', title: `${x.name} 10-year government bond yield${m ? ` (${monthLabel(m.month, true)} average)` : ''}`, big: fmtY(x.y10),
     sub: [col.corner && `${col.corner}${c ? (colorBy === 'change' ? ` in ${tf}` : '') : ' on the month'}`, st && `curve ${st.label.toLowerCase()}`].filter(Boolean).join(' · '),
     words: [x.real != null && `real yield ${fmtReal(x.real)}`, x.risk?.level && `${x.risk.level === 'avg' ? 'average' : x.risk.level} risk`].filter(Boolean).join(' · '),
-    url: `${location.origin}/rates/?c=${encodeURIComponent(x.id)}`, file: `heat-rates-${x.id}.png`, tintFrom: sw };
+    url: `${location.origin}/rates/?c=${encodeURIComponent(x.id)}`, linkNote: 'Live yield curve and its history', file: `heat-rates-${x.id}.png`, tintFrom: sw };
 }
 function openPopup(id, { pin = true, anchor = null } = {}) {
   const box = $('#detail');
