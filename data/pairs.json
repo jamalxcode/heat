@@ -673,6 +673,12 @@
   "ape-and-pepe": {
    "MEXC": "APEPE",
    "Gate.io": "APEPE"
+  },
+  "terra-luna": {
+   "Binance": "LUNC",
+   "KuCoin": "LUNC",
+   "Gate.io": "LUNC",
+   "MEXC": "LUNC"
   }
  }
 }
