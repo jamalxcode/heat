@@ -36,6 +36,10 @@ From a live tile ("Putin out as President of Russia by June 30, 2027? · Almost 
 
 Then **"show the question asked followed by the link, not just a url, so it's cleaner in WhatsApp; the same for crypto, bonds; and explain what the link is about"**: every message and each card's 🔗 Copy link now lead with the question or name, then the answer, then "👉 Live odds from every venue, updated every 10 min: link" (or the coin's / bond market's version), and the share sheet gets it all as one text so WhatsApp keeps the question. Decision 55.
 
+## 8. Bigger prices (21 Nov)
+
+**"On a tile the percentage change is bigger than the price; show the price 2 points bigger, keep the change large."** On detailed tiles the price is now 18px bold against the change's 16px (16.5 and 14.5px on phones); heatmap tiles keep theirs. Decision 56.
+
 ## How the session worked
 
 - Every change went to the session's `claude/...` branch, through unit and browser tests on GitHub, then to `main` (which deploys live).

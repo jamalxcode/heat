@@ -757,7 +757,7 @@ body.proven-pnfUp [data-k="pnfUp"], body.proven-pnfDown [data-k="pnfDown"] { fon
 .controls .reset { flex: none; }
 .leg-item.edge.weak { color: var(--ink-2); }
 .leg-item.edge a { color: inherit; }
-.tile .px { font-size: 12px; opacity: .85; text-align: right; white-space: nowrap; }
+.tile .px { font-size: 18px; font-weight: 700; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }   /* detailed tiles: the price 2px bigger than the change (16px); heatmap tiles keep theirs */
 .tile .ind { padding: 8px 12px 10px; display: grid; gap: 5px; font-size: 11.5px; border-top: 1px solid var(--border); min-height: 74px; }
 .row { display: flex; align-items: center; gap: 6px; min-width: 0; white-space: nowrap; }
 .row .k { color: var(--muted); width: 26px; flex: none; font-size: 10.5px; letter-spacing: .02em; }
@@ -782,7 +782,7 @@ body.proven-pnfUp [data-k="pnfUp"], body.proven-pnfDown [data-k="pnfDown"] { fon
 .grid.heatmap .tile .sym { font-size: 15px; gap: 5px; letter-spacing: .01em; }
 .grid.heatmap .tile .sym img { width: 16px; height: 16px; }
 .grid.heatmap .tile .chg { font-size: 21px; font-weight: 700; text-align: center; letter-spacing: -.01em; }
-.grid.heatmap .tile .px { font-size: 12px; text-align: center; opacity: .8; }
+.grid.heatmap .tile .px { font-size: 12px; font-weight: 400; text-align: center; opacity: .8; }
 .grid.heatmap .tile.stop-closed, .grid.heatmap .tile.stop-intraday { box-shadow: none; }
 .grid.heatmap .tile.stop-closed::after { content: '🛑'; position: absolute; top: 5px; right: 6px; font-size: 13px; line-height: 1; }
 .grid.heatmap .tile.stop-intraday::after { content: '⚠'; position: absolute; top: 5px; right: 6px; font-size: 13px; line-height: 1; }
@@ -887,6 +887,7 @@ td .cell-heat { display: inline-block; padding: 1px 6px; border-radius: 4px; bac
   .tile .top { padding: 8px 9px 7px; }
   .tile .ind { padding: 7px 9px 9px; }
   .tile .sym, .tile .chg { font-size: 14.5px; }
+  .tile .px { font-size: 16.5px; }
   .row .k { width: 22px; }
   .row .pp, .row .tw { display: none; }
   #detail.pinned { left: 0 !important; right: 0; bottom: 0; top: auto !important; width: 100%; max-width: none; border-radius: 16px 16px 0 0; max-height: 85vh; overflow-y: auto; }

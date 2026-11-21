@@ -46,7 +46,7 @@ Three rounds of polish, each started from a critique of the live pages:
 
 | File | Read it when you want… |
 |---|---|
-| [`docs/DECISIONS.md`](docs/DECISIONS.md) | the *why* behind everything, numbered (55 so far) |
+| [`docs/DECISIONS.md`](docs/DECISIONS.md) | the *why* behind everything, numbered (56 so far) |
 | [`docs/BUSINESS-RULES.md`](docs/BUSINESS-RULES.md) | every data rule and threshold: sources, timing, signals, stops, scoring, predictions |
 | [`docs/INTERFACE-RULES.md`](docs/INTERFACE-RULES.md) | how the site looks, reads and behaves, and how a visual change is made |
 | [`docs/LESSONS.md`](docs/LESSONS.md) | the mistakes that taught us something |
@@ -199,7 +199,7 @@ Click the popup (or the tile) to pin it open, and click outside it to close it. 
 
 **Sources health.** A line at the foot of every page shows which data sources are working: CoinGecko (crypto prices and rankings), the exchanges (daily candles and volume), the ECB, exchange-api, Swissquote (with the metals cross-check), Yahoo Finance (energy futures, and ETF prices as a separate entry), the official bond yield sources and TradingView (chart links). ✓ working, ⚠ working on a backup, partly or a bit late, ✕ not working; hover for details. It is built at the end of every deploy from the files just made (`scripts/health.mjs` → `health.json`), so it costs no extra requests.
 
-**Heatmap | Detailed.** In grid view, the default **Heatmap** tiles are filled with their heat colour and show just the symbol, the change and the price, like a classic market heatmap (3 per row on a phone, about 8 on a laptop); the ⚠ caution and a 🛑 for a close past a stop stay, and hover or tap opens the chart card with every reading. **Detailed** shows the full tiles (RSI, trend, relative strength, volume, stops). The choice is remembered, and links carry `d=detailed` / `d=heatmap`. Heat colours: blue up, red down, a soft grey for flat, stronger shades for bigger moves (in dark mode, deep for small moves and bright for big ones). The page uses the Inter typeface, hosted on the site itself (no calls to Google), and a tile blinks once when its price changes.
+**Heatmap | Detailed.** In grid view, the default **Heatmap** tiles are filled with their heat colour and show just the symbol, the change and the price, like a classic market heatmap (3 per row on a phone, about 8 on a laptop); the ⚠ caution and a 🛑 for a close past a stop stay, and hover or tap opens the chart card with every reading. **Detailed** shows the full tiles (RSI, trend, relative strength, volume, stops), with the price in bold, a little bigger than the change. The choice is remembered, and links carry `d=detailed` / `d=heatmap`. Heat colours: blue up, red down, a soft grey for flat, stronger shades for bigger moves (in dark mode, deep for small moves and bright for big ones). The page uses the Inter typeface, hosted on the site itself (no calls to Google), and a tile blinks once when its price changes.
 
 **↺ Reset**, at the start of the controls row, puts everything back to the default view in one click: all coins, no colour range, 24h, grid, heatmap tiles, USD/… on forex, pegged coins hidden, chart cards closed (the theme stays).
 

@@ -29,7 +29,7 @@ How the site **looks, reads and behaves**. Data rules are in [`BUSINESS-RULES.md
 
 ## Tiles, cards and charts
 
-- **Heatmap tiles** (default): colour, symbol, change, price and a week's line; ⚠ caution and 🛑 stop stay visible [34]. **Detailed tiles:** every reading as a row, including the year range.
+- **Heatmap tiles** (default): colour, symbol, change, price and a week's line; ⚠ caution and 🛑 stop stay visible [34]. **Detailed tiles:** every reading as a row, including the year range; the price is 2px bigger than the change and bold (18px vs 16px; 16.5px vs 14.5px on phones) [56].
 - **Map view** (crypto, ETFs): area by the square root of the size, a note under the map says so [32].
 - **The coin card:** words first, then the numbers; two columns that fit a **13-inch** screen (720px); a bottom sheet on phones; ☆ Watch in its header [24, 42].
 - **Chart labels never overprint:** stop labels 11px apart; a price-scale number near one is dropped [45].
