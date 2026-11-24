@@ -674,6 +674,9 @@
    "KuCoin": "LUNC",
    "Gate.io": "LUNC",
    "MEXC": "LUNC"
+  },
+  "nvidia-bstocks": {
+   "Binance": "NVDAB"
   }
  }
 }
